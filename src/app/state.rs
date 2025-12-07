@@ -12,4 +12,8 @@ pub enum ScreenType {
     #[default]
     Home,
     CurrentSprint,
+    MyIssues,
+    SearchIssues,
+    NewIssue,
+    Profiles,
 }

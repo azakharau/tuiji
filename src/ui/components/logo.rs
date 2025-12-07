@@ -5,6 +5,8 @@ use ratatui::{
     widgets::Widget,
 };
 
+use crate::ui::utils::text_params;
+
 const LOGO: &str = r"
 ░██████████░██     ░██ ░██████    ░█████ ░██████
     ░██    ░██     ░██   ░██        ░██    ░██
@@ -15,7 +17,7 @@ const LOGO: &str = r"
     ░██      ░██████   ░██████ ░██████   ░██████
 ";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct AsciiLogoComponent(&'static str);
 
 impl Default for AsciiLogoComponent {
@@ -29,19 +31,13 @@ impl Widget for AsciiLogoComponent {
     where
         Self: Sized,
     {
-        let lines: Vec<&str> = self.0.lines().collect();
-        let logo_height = lines.len() as u16;
-        let logo_width = lines
-            .into_iter()
-            .map(|l| l.chars().count())
-            .max()
-            .unwrap_or(0) as u16;
+        let (logo_width, logo_height) = text_params(self.0);
         let vertical = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min((area.height.saturating_sub(logo_height)) / 2),
-                Constraint::Length(logo_height),
-                Constraint::Length(1),
+                Constraint::Min((area.height.saturating_sub(logo_height.get())) / 2),
+                Constraint::Length(logo_height.get()),
+                Constraint::Length(2),
                 Constraint::Length(1),
                 Constraint::Min(0),
             ])
@@ -50,8 +46,8 @@ impl Widget for AsciiLogoComponent {
         let horizontal = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Min((area.width.saturating_sub(logo_width)) / 2),
-                Constraint::Length(logo_width),
+                Constraint::Min((area.width.saturating_sub(logo_width.get())) / 2),
+                Constraint::Length(logo_width.get()),
                 Constraint::Min(0),
             ])
             .split(vertical[1]);

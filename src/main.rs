@@ -1,7 +1,6 @@
 use color_eyre::eyre::Result;
-use crossterm::event::{self, Event};
-use ratatui::{DefaultTerminal, TerminalOptions, Viewport};
-use tuiji::app::AppState;
+use ratatui::{TerminalOptions, Viewport};
+use tuiji::app::{App, AppState};
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -9,25 +8,11 @@ fn main() -> Result<()> {
         viewport: Viewport::Fullscreen,
     });
 
-    let app = AppState::default();
+    let state = AppState::default();
+    let mut app = App::new(terminal, state);
 
-    let result = run(terminal, app);
+    let result = app.run();
     ratatui::restore();
     println!();
     result
-}
-
-fn run(mut terminal: DefaultTerminal, _app: AppState) -> Result<()> {
-    terminal.clear()?;
-
-    loop {
-        let home_screen = tuiji::ui::screens::home::HomeScreen::default();
-        terminal.draw(|frame| {
-            home_screen.draw(frame);
-        })?;
-        if matches!(event::read()?, Event::Key(_)) {
-            terminal.clear()?;
-            break Ok(());
-        }
-    }
 }
