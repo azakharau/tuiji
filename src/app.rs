@@ -1,12 +1,15 @@
 use color_eyre::eyre::Result;
-use crossterm::event::{self, Event};
+use crossterm::event::{self as term_event, Event};
 use ratatui::DefaultTerminal;
 
 use crate::{
     app::state::ScreenType,
-    ui::screens::{Screen, ScreenAction, home::HomeScreen},
+    ui::screens::{Screen, ScreenState, current_sprint::CurrentSprintScreen, home::HomeScreen},
 };
 
+pub mod datasets;
+pub mod event;
+pub mod key_handlers;
 pub mod state;
 
 #[derive(Debug, Default, Clone)]
@@ -15,11 +18,12 @@ pub struct AppState {
     pub current_screen: state::ScreenType,
 }
 
-struct CachedScreens {
+struct CachedScreens<'a> {
     home_screen: Option<HomeScreen>,
+    current_sprint_screen: Option<CurrentSprintScreen<'a>>,
 }
 
-impl CachedScreens {
+impl<'a> CachedScreens<'a> {
     pub fn active_mut(&mut self, which: &state::ScreenType) -> &mut dyn Screen {
         match which {
             ScreenType::Home => {
@@ -30,21 +34,28 @@ impl CachedScreens {
                 self.home_screen.as_mut().unwrap()
             }
             _ => {
-                unreachable!("Screen not implemented");
+                if self.current_sprint_screen.is_none() {
+                    self.current_sprint_screen = Some(CurrentSprintScreen::default());
+                }
+                // SAFE: We just ensured it's Some above
+                self.current_sprint_screen.as_mut().unwrap()
             }
         }
     }
 }
 
-pub struct App {
+pub struct App<'a> {
     pub terminal: DefaultTerminal,
     pub state: AppState,
-    screen: CachedScreens,
+    screen: CachedScreens<'a>,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new(terminal: DefaultTerminal, state: AppState) -> Self {
-        let screen = CachedScreens { home_screen: None };
+        let screen = CachedScreens {
+            home_screen: None,
+            current_sprint_screen: None,
+        };
         Self {
             terminal,
             state,
@@ -60,20 +71,23 @@ impl App {
             self.terminal.draw(|frame| {
                 screen.draw(frame);
             })?;
-            if let Event::Key(key) = event::read()? {
+            if let Event::Key(key) = term_event::read()? {
                 match screen.handle_key_event(key) {
-                    ScreenAction::Quit => {
+                    ScreenState::Quit => {
                         self.terminal.clear()?;
                         break Ok(());
                     }
-                    ScreenAction::SwitchTo(new_screen) => {
+                    ScreenState::SwitchTo(new_screen) => {
                         self.state.current_screen = new_screen;
                     }
-                    ScreenAction::Refresh => {
+                    ScreenState::Refresh => {
                         // No-op, just redraw
                     }
-                    ScreenAction::Stay => {
+                    ScreenState::Stay => {
                         // No-op, just redraw
+                    }
+                    _ => {
+                        // TODO: Handle other actions
                     }
                 }
             }

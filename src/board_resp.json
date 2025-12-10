@@ -1,0 +1,1933 @@
+{
+  "id": 175,
+  "type": "SCRUM",
+  "name": "LABS Scrum",
+  "rankable": true,
+  "rankingCustomField": "10011",
+  "etag": ":-1726806914",
+  "columns": [
+    {
+      "id": 1283,
+      "name": "To Do",
+      "statusIds": [
+        "10000",
+        "10333"
+      ],
+      "statuses": [
+        {
+          "id": "10000",
+          "name": "To Do",
+          "statusCategory": {
+            "id": 2,
+            "key": "new",
+            "colorName": "blue-gray"
+          }
+        },
+        {
+          "id": "10333",
+          "name": "Backlog",
+          "description": "This status is managed internally by Jira Software",
+          "statusCategory": {
+            "id": 2,
+            "key": "new",
+            "colorName": "blue-gray"
+          }
+        }
+      ],
+      "issues": [
+        {
+          "id": 70508,
+          "key": "LABS-262",
+          "summary": "[FE] Searching for vendor across all tenant vendors",
+          "issueTypeId": "10002",
+          "projectId": "10196",
+          "statusId": "10333",
+          "priorityId": "4",
+          "subTaskParentId": 69796,
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1762947176724,
+          "fixVersions": [],
+          "isResolved": false,
+          "flagged": false,
+          "cardColor": "#707070"
+        },
+        {
+          "id": 70511,
+          "key": "LABS-263",
+          "summary": "[BE] Parse new X-Mapping property for the selected vendor",
+          "issueTypeId": "10002",
+          "projectId": "10196",
+          "statusId": "10333",
+          "priorityId": "4",
+          "subTaskParentId": 69796,
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1762947176991,
+          "fixVersions": [],
+          "isResolved": false,
+          "flagged": false,
+          "cardColor": "#707070"
+        },
+        {
+          "id": 69799,
+          "key": "LABS-230",
+          "summary": "Suppliers in Intake - E2E Flow",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "10000",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764235574118,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Supplier Recommendation in Intake",
+            "key": "LABS-98"
+          },
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 69520,
+          "key": "LABS-211",
+          "summary": "Migrate Customers off old SOW",
+          "issueTypeId": "10008",
+          "assigneeKey": "tristan",
+          "assigneeAccountId": "5d826fa436a52a0da790e3de",
+          "projectId": "10196",
+          "statusId": "10000",
+          "priorityId": "3",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764234423735,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 3.0,
+          "estimation": "3",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#f79232"
+        },
+        {
+          "id": 71640,
+          "key": "LABS-307",
+          "summary": "Budget customer migration strategy",
+          "issueTypeId": "10008",
+          "assigneeKey": "tristan",
+          "assigneeAccountId": "5d826fa436a52a0da790e3de",
+          "projectId": "10196",
+          "statusId": "10000",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764234421047,
+          "fixVersions": [],
+          "isResolved": false,
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Budget Rework",
+            "key": "LABS-245"
+          },
+          "cardColor": "#f15c75"
+        }
+      ],
+      "createIssueMode": "NOT_ALLOWED"
+    },
+    {
+      "id": 1288,
+      "name": "Blocked",
+      "statusIds": [
+        "10111"
+      ],
+      "statuses": [
+        {
+          "id": "10111",
+          "name": "Blocked",
+          "statusCategory": {
+            "id": 2,
+            "key": "new",
+            "colorName": "blue-gray"
+          }
+        }
+      ],
+      "issues": [],
+      "createIssueMode": "NOT_ALLOWED"
+    },
+    {
+      "id": 1284,
+      "name": "In Progress",
+      "statusIds": [
+        "3"
+      ],
+      "statuses": [
+        {
+          "id": "3",
+          "name": "In progress",
+          "statusCategory": {
+            "id": 4,
+            "key": "indeterminate",
+            "colorName": "yellow"
+          }
+        }
+      ],
+      "issues": [
+        {
+          "id": 72745,
+          "key": "LABS-336",
+          "summary": "[FE] New Routing and Assignment Tables (for new Budget Rules) Pt.2",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "3",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765374433717,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 1.0,
+          "estimation": "1",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Budget Rework",
+            "key": "LABS-245"
+          },
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 72505,
+          "key": "LABS-327",
+          "summary": "\t  [BE] New Routing and Assignment",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:0aec6a20-658b-4db8-b7ef-0293b05a6df9",
+          "assigneeAccountId": "60f1f5eda0de58006ad9b099",
+          "projectId": "10196",
+          "statusId": "3",
+          "priorityId": "1",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765210297287,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 7.0,
+          "estimation": "7",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Budget Rework",
+            "key": "LABS-245"
+          },
+          "cardColor": "#d04437"
+        },
+        {
+          "id": 71746,
+          "key": "LABS-335",
+          "summary": "User Profile API: 500 error ",
+          "issueTypeId": "10009",
+          "assigneeKey": "e41f67bf-7aef-432e-8127-ceea8798d552",
+          "assigneeAccountId": "712020:c57b15f0-1104-460c-b3ea-2f40e5f0a274",
+          "projectId": "10196",
+          "statusId": "3",
+          "priorityId": "3",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764234202915,
+          "fixVersions": [],
+          "isResolved": false,
+          "dueDate": "2025-11-20",
+          "flagged": false,
+          "cardColor": "#f79232"
+        },
+        {
+          "id": 71399,
+          "key": "LABS-291",
+          "summary": "PO Service Pt.2",
+          "issueTypeId": "10008",
+          "assigneeKey": "e41f67bf-7aef-432e-8127-ceea8798d552",
+          "assigneeAccountId": "712020:c57b15f0-1104-460c-b3ea-2f40e5f0a274",
+          "projectId": "10196",
+          "statusId": "3",
+          "priorityId": "1",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764234442764,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 8.0,
+          "estimation": "8",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Azure migration",
+            "key": "LABS-208"
+          },
+          "cardColor": "#d04437"
+        },
+        {
+          "id": 69798,
+          "key": "LABS-229",
+          "summary": "Suppliers in Intake - Use Case 4 (New Supplier)",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "3",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764839065129,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 2.0,
+          "estimation": "2",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Supplier Recommendation in Intake",
+            "key": "LABS-98"
+          },
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 73127,
+          "key": "LABS-350",
+          "summary": "Add ability for all users (requestors, buyers, admins, etc.) to edit the request title on the request page",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "3",
+          "priorityId": "3",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765357057525,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 1.0,
+          "estimation": "1",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#f79232"
+        }
+      ],
+      "createIssueMode": "NOT_ALLOWED"
+    },
+    {
+      "id": 1508,
+      "name": "CODE REVIEW",
+      "statusIds": [
+        "10114"
+      ],
+      "statuses": [
+        {
+          "id": "10114",
+          "name": "Code Review",
+          "description": "This status is managed internally by Jira Software",
+          "statusCategory": {
+            "id": 4,
+            "key": "indeterminate",
+            "colorName": "yellow"
+          }
+        }
+      ],
+      "issues": [
+        {
+          "id": 69797,
+          "key": "LABS-228",
+          "summary": "Suppliers in Intake - Use Case 3 (Select Multiple Suppliers)",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "10114",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765202275213,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 2.0,
+          "estimation": "2",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Supplier Recommendation in Intake",
+            "key": "LABS-98"
+          },
+          "cardColor": "#f15c75"
+        }
+      ],
+      "createIssueMode": "NOT_ALLOWED"
+    },
+    {
+      "id": 1287,
+      "name": "UAT",
+      "statusIds": [
+        "11135"
+      ],
+      "statuses": [
+        {
+          "id": "11135",
+          "name": "UAT",
+          "description": "This status is managed internally by Jira",
+          "statusCategory": {
+            "id": 4,
+            "key": "indeterminate",
+            "colorName": "yellow"
+          }
+        }
+      ],
+      "issues": [
+        {
+          "id": 69795,
+          "key": "LABS-226",
+          "summary": "[FE] Suppliers in Intake - Map selected supplier to items on Request",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764662270056,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 1.0,
+          "estimation": "1",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Supplier Recommendation in Intake",
+            "key": "LABS-98"
+          },
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 71137,
+          "key": "LABS-288",
+          "summary": "[FE] Diageo: Withdraw an request option for is absent on requester’s end ",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "3",
+          "labels": [
+            "jira_escalated"
+          ],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764951467446,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Request withdraw in \"In review\" status",
+            "key": "LABS-353"
+          },
+          "cardColor": "#f79232"
+        },
+        {
+          "id": 72078,
+          "key": "LABS-318",
+          "summary": "BASF: Amazon Punchout not working as expected",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "2",
+          "labels": [
+            "customer_basf"
+          ],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765195782823,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 1.0,
+          "estimation": "1",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 73109,
+          "key": "LABS-347",
+          "summary": "Fix PunchOut item creation",
+          "issueTypeId": "10009",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "4",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764770474597,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#707070"
+        },
+        {
+          "id": 72418,
+          "key": "LABS-325",
+          "summary": "BTI: Add warning type banner on the Intake Initial screen",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "2",
+          "labels": [
+            "cuatomer_bti"
+          ],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764859236425,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 73224,
+          "key": "LABS-359",
+          "summary": "[FE] [Nestle] Every intake request should go into draft, even if no approval rules active",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "4",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765287776261,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#707070"
+        },
+        {
+          "id": 73539,
+          "key": "LABS-365",
+          "summary": "[BE] [Nestle] Every intake request should go into draft, even if no approval rules active",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:0aec6a20-658b-4db8-b7ef-0293b05a6df9",
+          "assigneeAccountId": "60f1f5eda0de58006ad9b099",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "4",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765282735945,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#707070"
+        },
+        {
+          "id": 73557,
+          "key": "LABS-371",
+          "summary": "Redirect to intake",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "1",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765311998227,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#d04437"
+        },
+        {
+          "id": 73160,
+          "key": "LABS-358",
+          "summary": "BASF: Update Warning message on the first screen",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "3",
+          "labels": [
+            "customer_basf"
+          ],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765291038954,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.2,
+          "estimation": "0.2",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#f79232"
+        },
+        {
+          "id": 73469,
+          "key": "LABS-364",
+          "summary": "[BOE] Update Intake Warning Message BOE1 Staging and BOE Production ",
+          "issueTypeId": "10008",
+          "assigneeKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+          "assigneeAccountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+          "projectId": "10196",
+          "statusId": "11135",
+          "priorityId": "3",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765311999018,
+          "fixVersions": [],
+          "isResolved": false,
+          "storyPoints": 0.2,
+          "estimation": "0.2",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "cardColor": "#f79232"
+        }
+      ],
+      "createIssueMode": "NOT_ALLOWED"
+    },
+    {
+      "id": 1285,
+      "name": "Done",
+      "statusIds": [
+        "10001",
+        "10113"
+      ],
+      "statuses": [
+        {
+          "id": "10001",
+          "name": "Done",
+          "statusCategory": {
+            "id": 3,
+            "key": "done",
+            "colorName": "green"
+          }
+        },
+        {
+          "id": "10113",
+          "name": "Won't Do",
+          "description": "won't be implemented (either because not needed or ticket is a duplicate)",
+          "statusCategory": {
+            "id": 3,
+            "key": "done",
+            "colorName": "green"
+          }
+        }
+      ],
+      "issues": [
+        {
+          "id": 73122,
+          "key": "LABS-349",
+          "summary": "Provide overview for Analytics Team on Intake Sessions",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "10001",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765374469906,
+          "fixVersions": [],
+          "isResolved": true,
+          "flagged": false,
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 71385,
+          "key": "LABS-289",
+          "summary": "[BE] Update Pricebook Filtering Logic",
+          "issueTypeId": "10008",
+          "assigneeKey": "e41f67bf-7aef-432e-8127-ceea8798d552",
+          "assigneeAccountId": "712020:c57b15f0-1104-460c-b3ea-2f40e5f0a274",
+          "projectId": "10196",
+          "statusId": "10001",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764234190103,
+          "fixVersions": [],
+          "isResolved": true,
+          "storyPoints": 0.5,
+          "estimation": "0.5",
+          "estimationFieldId": "customfield_10028",
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Pricebooks 2.0",
+            "key": "LABS-44"
+          },
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 69796,
+          "key": "LABS-227",
+          "summary": "Suppliers in Intake - Use Case 2 (Select 1 Supplier)",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "10113",
+          "priorityId": "3",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1763664207343,
+          "fixVersions": [],
+          "isResolved": true,
+          "flagged": false,
+          "epic": {
+            "color": "purple",
+            "text": "Supplier Recommendation in Intake",
+            "key": "LABS-98"
+          },
+          "cardColor": "#f79232"
+        },
+        {
+          "id": 72795,
+          "key": "LABS-337",
+          "summary": "Fix save for vendors groups UI",
+          "issueTypeId": "10009",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "10001",
+          "priorityId": "2",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1764578017186,
+          "fixVersions": [],
+          "isResolved": true,
+          "flagged": false,
+          "cardColor": "#f15c75"
+        },
+        {
+          "id": 73355,
+          "key": "LABS-362",
+          "summary": "Inception Account Banner",
+          "issueTypeId": "10008",
+          "assigneeKey": "atyasov",
+          "assigneeAccountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+          "projectId": "10196",
+          "statusId": "10001",
+          "priorityId": "1",
+          "labels": [],
+          "cardExtraFields": [],
+          "isVisible": true,
+          "sprintIds": [
+            6304
+          ],
+          "updatedAt": 1765186166876,
+          "fixVersions": [],
+          "isResolved": true,
+          "flagged": false,
+          "cardColor": "#d04437"
+        }
+      ],
+      "createIssueMode": "NOT_ALLOWED"
+    }
+  ],
+  "people": {
+    "tristan": {
+      "userKey": "tristan",
+      "accountId": "5d826fa436a52a0da790e3de",
+      "displayName": "Tristan Deschler",
+      "emailAddress": "tristan@fairmarkit.com",
+      "avatarUrl": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/5d826fa436a52a0da790e3de/d69fcafa-0d61-41d2-bec4-fdfd6459ebe9/48",
+      "active": true
+    },
+    "ug:09d77576-364a-4165-bafb-9c064cea30b8": {
+      "userKey": "ug:09d77576-364a-4165-bafb-9c064cea30b8",
+      "accountId": "712020:02782383-eefa-44cc-9b59-6350abd5bf45",
+      "displayName": "Stepan Pershko",
+      "emailAddress": "stepan.pershko@fairmarkit.com",
+      "avatarUrl": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:02782383-eefa-44cc-9b59-6350abd5bf45/f17927bf-3dc1-43e6-a48d-4777ab62bb40/48",
+      "active": true
+    },
+    "atyasov": {
+      "userKey": "atyasov",
+      "accountId": "557058:2502c87d-ba4e-4441-976c-54c954101b39",
+      "displayName": "Denis Atyasov",
+      "emailAddress": "denis@fairmarkit.com",
+      "avatarUrl": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/557058:2502c87d-ba4e-4441-976c-54c954101b39/5fd66f1b-37a8-49a5-9ac2-f0abd0c65da1/48",
+      "active": true
+    },
+    "e41f67bf-7aef-432e-8127-ceea8798d552": {
+      "userKey": "e41f67bf-7aef-432e-8127-ceea8798d552",
+      "accountId": "712020:c57b15f0-1104-460c-b3ea-2f40e5f0a274",
+      "displayName": "Alexey Zakharov",
+      "emailAddress": "alexey.zakharov@fairmarkit.com",
+      "avatarUrl": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:c57b15f0-1104-460c-b3ea-2f40e5f0a274/5a7b7d42-affa-4f7d-94b9-c2ed161e122f/48",
+      "active": true
+    },
+    "ug:0aec6a20-658b-4db8-b7ef-0293b05a6df9": {
+      "userKey": "ug:0aec6a20-658b-4db8-b7ef-0293b05a6df9",
+      "accountId": "60f1f5eda0de58006ad9b099",
+      "displayName": "Alexander Teliuk",
+      "emailAddress": "alex.teliuk@fairmarkit.com",
+      "avatarUrl": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/60f1f5eda0de58006ad9b099/e87f4458-39ee-44d3-a907-b9252be2ae00/48",
+      "active": true
+    }
+  },
+  "issueTypes": {
+    "10008": {
+      "id": 10008,
+      "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+      "subtask": false,
+      "name": "Story",
+      "hierarchyLevel": 0,
+      "default": true
+    },
+    "10000": {
+      "id": 10000,
+      "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+      "subtask": false,
+      "name": "Epic",
+      "hierarchyLevel": 1,
+      "default": false
+    },
+    "10002": {
+      "id": 10002,
+      "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10316?size=medium",
+      "subtask": true,
+      "name": "Sub-task",
+      "hierarchyLevel": -1,
+      "default": false
+    },
+    "10009": {
+      "id": 10009,
+      "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+      "subtask": false,
+      "name": "Bug",
+      "hierarchyLevel": 0,
+      "default": false
+    },
+    "10001": {
+      "id": 10001,
+      "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+      "subtask": false,
+      "name": "Task",
+      "hierarchyLevel": 0,
+      "default": false
+    }
+  },
+  "priorities": {
+    "10000": {
+      "id": "10000",
+      "name": "No Clear Business Value ",
+      "iconUrl": "/images/icons/priorities/blocker_new.svg"
+    },
+    "1": {
+      "id": "1",
+      "name": "Critical",
+      "iconUrl": "/images/icons/priorities/critical_new.svg"
+    },
+    "2": {
+      "id": "2",
+      "name": "High",
+      "iconUrl": "/images/icons/priorities/high_new.svg"
+    },
+    "3": {
+      "id": "3",
+      "name": "Medium",
+      "iconUrl": "/images/icons/priorities/medium_new.svg"
+    },
+    "4": {
+      "id": "4",
+      "name": "Low",
+      "iconUrl": "/images/icons/priorities/low_new.svg"
+    },
+    "5": {
+      "id": "5",
+      "name": "Lowest",
+      "iconUrl": "/images/icons/priorities/lowest_new.svg"
+    }
+  },
+  "projects": {
+    "10196": {
+      "id": 10196,
+      "projectTypeKey": "software",
+      "issueTypes": [
+        {
+          "id": 10001,
+          "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10318?size=medium",
+          "subtask": false,
+          "name": "Task",
+          "hierarchyLevel": 0,
+          "default": false
+        },
+        {
+          "id": 10002,
+          "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10316?size=medium",
+          "subtask": true,
+          "name": "Sub-task",
+          "hierarchyLevel": -1,
+          "default": false
+        },
+        {
+          "id": 10008,
+          "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+          "subtask": false,
+          "name": "Story",
+          "hierarchyLevel": 0,
+          "default": true
+        },
+        {
+          "id": 10009,
+          "iconUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium",
+          "subtask": false,
+          "name": "Bug",
+          "hierarchyLevel": 0,
+          "default": false
+        },
+        {
+          "id": 10000,
+          "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+          "subtask": false,
+          "name": "Epic",
+          "hierarchyLevel": 1,
+          "default": false
+        }
+      ],
+      "name": "Labs",
+      "avatar": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/project/avatar/10420?size=xxxlarge",
+      "key": "LABS",
+      "permissions": {
+        "DELETE_ISSUES": true,
+        "ARCHIVE_ISSUES": true,
+        "CREATE_ISSUES": true,
+        "SCHEDULE_ISSUES": true,
+        "ASSIGN_ISSUES": true
+      },
+      "canRank": true,
+      "transitionsPerIssueType": {
+        "10008": [
+          {
+            "transitionId": 1,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Create",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": true,
+            "global": false,
+            "initial": true
+          },
+          {
+            "transitionId": 11,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Backlog",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 31,
+            "fromStatusId": null,
+            "toStatusId": "3",
+            "name": "In Progress",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 41,
+            "fromStatusId": null,
+            "toStatusId": "10001",
+            "name": "Done",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 61,
+            "fromStatusId": null,
+            "toStatusId": "10111",
+            "name": "Blocked",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 71,
+            "fromStatusId": null,
+            "toStatusId": "10113",
+            "name": "Won't Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 91,
+            "fromStatusId": null,
+            "toStatusId": "10114",
+            "name": "Code Review",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 101,
+            "fromStatusId": null,
+            "toStatusId": "11135",
+            "name": "UAT",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 111,
+            "fromStatusId": null,
+            "toStatusId": "10000",
+            "name": "To Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          }
+        ],
+        "10009": [
+          {
+            "transitionId": 1,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Create",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": true,
+            "global": false,
+            "initial": true
+          },
+          {
+            "transitionId": 11,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Backlog",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 31,
+            "fromStatusId": null,
+            "toStatusId": "3",
+            "name": "In Progress",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 41,
+            "fromStatusId": null,
+            "toStatusId": "10001",
+            "name": "Done",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 61,
+            "fromStatusId": null,
+            "toStatusId": "10111",
+            "name": "Blocked",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 71,
+            "fromStatusId": null,
+            "toStatusId": "10113",
+            "name": "Won't Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 91,
+            "fromStatusId": null,
+            "toStatusId": "10114",
+            "name": "Code Review",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 101,
+            "fromStatusId": null,
+            "toStatusId": "11135",
+            "name": "UAT",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 111,
+            "fromStatusId": null,
+            "toStatusId": "10000",
+            "name": "To Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          }
+        ],
+        "10000": [
+          {
+            "transitionId": 1,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Create",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": true,
+            "global": false,
+            "initial": true
+          },
+          {
+            "transitionId": 11,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Backlog",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 31,
+            "fromStatusId": null,
+            "toStatusId": "3",
+            "name": "In Progress",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 41,
+            "fromStatusId": null,
+            "toStatusId": "10001",
+            "name": "Done",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 61,
+            "fromStatusId": null,
+            "toStatusId": "10111",
+            "name": "Blocked",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 71,
+            "fromStatusId": null,
+            "toStatusId": "10113",
+            "name": "Won't Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 91,
+            "fromStatusId": null,
+            "toStatusId": "10114",
+            "name": "Code Review",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 101,
+            "fromStatusId": null,
+            "toStatusId": "11135",
+            "name": "UAT",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 111,
+            "fromStatusId": null,
+            "toStatusId": "10000",
+            "name": "To Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          }
+        ],
+        "10002": [
+          {
+            "transitionId": 1,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Create",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": true,
+            "global": false,
+            "initial": true
+          },
+          {
+            "transitionId": 11,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Backlog",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 31,
+            "fromStatusId": null,
+            "toStatusId": "3",
+            "name": "In Progress",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 41,
+            "fromStatusId": null,
+            "toStatusId": "10001",
+            "name": "Done",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 61,
+            "fromStatusId": null,
+            "toStatusId": "10111",
+            "name": "Blocked",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 71,
+            "fromStatusId": null,
+            "toStatusId": "10113",
+            "name": "Won't Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 91,
+            "fromStatusId": null,
+            "toStatusId": "10114",
+            "name": "Code Review",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 101,
+            "fromStatusId": null,
+            "toStatusId": "11135",
+            "name": "UAT",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 111,
+            "fromStatusId": null,
+            "toStatusId": "10000",
+            "name": "To Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          }
+        ],
+        "10001": [
+          {
+            "transitionId": 1,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Create",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": true,
+            "global": false,
+            "initial": true
+          },
+          {
+            "transitionId": 11,
+            "fromStatusId": null,
+            "toStatusId": "10333",
+            "name": "Backlog",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 31,
+            "fromStatusId": null,
+            "toStatusId": "3",
+            "name": "In Progress",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 41,
+            "fromStatusId": null,
+            "toStatusId": "10001",
+            "name": "Done",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 61,
+            "fromStatusId": null,
+            "toStatusId": "10111",
+            "name": "Blocked",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 71,
+            "fromStatusId": null,
+            "toStatusId": "10113",
+            "name": "Won't Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 91,
+            "fromStatusId": null,
+            "toStatusId": "10114",
+            "name": "Code Review",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 101,
+            "fromStatusId": null,
+            "toStatusId": "11135",
+            "name": "UAT",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          },
+          {
+            "transitionId": 111,
+            "fromStatusId": null,
+            "toStatusId": "10000",
+            "name": "To Do",
+            "transitionAgents": [],
+            "hasScreen": false,
+            "hasConditions": false,
+            "hasValidators": false,
+            "global": true,
+            "initial": false
+          }
+        ]
+      }
+    }
+  },
+  "boardLocation": {
+    "type": "PROJECT",
+    "id": 10196,
+    "name": "Labs",
+    "avatarUrl": "https://fairmarkit.atlassian.net/rest/api/2/universal_avatar/view/type/project/avatar/10420?size=medium",
+    "key": "LABS",
+    "contextualKey": "LABS"
+  },
+  "capabilities": {
+    "BOARD": {
+      "name": "BOARD",
+      "enabled": true,
+      "toggleable": false
+    },
+    "BACKLOG": {
+      "name": "BACKLOG",
+      "enabled": true,
+      "toggleable": false
+    },
+    "RELEASES": {
+      "name": "RELEASES",
+      "enabled": true,
+      "toggleable": false
+    },
+    "STANDUP": {
+      "name": "STANDUP",
+      "enabled": true,
+      "toggleable": false
+    },
+    "PARALLEL_SPRINTS": {
+      "name": "PARALLEL_SPRINTS",
+      "enabled": true,
+      "toggleable": false
+    },
+    "REPORTS": {
+      "name": "REPORTS",
+      "enabled": true,
+      "toggleable": false
+    },
+    "SPRINTS": {
+      "name": "SPRINTS",
+      "enabled": true,
+      "toggleable": false
+    },
+    "ROADMAP": {
+      "name": "ROADMAP",
+      "enabled": true,
+      "toggleable": false
+    },
+    "ESTIMATION": {
+      "name": "ESTIMATION",
+      "enabled": false,
+      "toggleable": false
+    },
+    "REOPEN_SPRINTS": {
+      "name": "REOPEN_SPRINTS",
+      "enabled": true,
+      "toggleable": false
+    }
+  },
+  "missingParents": [],
+  "swimlaneInfo": {
+    "swimlaneStrategy": "assignee",
+    "validStrategies": [
+      {
+        "id": "custom",
+        "name": "Queries",
+        "description": "Group issues by custom queries. Queries are based on JQL that is additional to the saved filter of this board."
+      },
+      {
+        "id": "parentChild",
+        "name": "Stories",
+        "description": "Group sub-tasks under their parent issue. Issues without sub-tasks will be shown in their own group at the bottom."
+      },
+      {
+        "id": "assignee",
+        "name": "Assignees",
+        "description": "Group issues by their assignee"
+      },
+      {
+        "id": "assigneeUnassignedFirst",
+        "name": "Assignees - unassigned first",
+        "description": "Group issues by their assignee"
+      },
+      {
+        "id": "epic",
+        "name": "Epics",
+        "description": "Group issues under their epic. Issues not assigned to an epic will be shown in their own group at the bottom. Epics with no issues on the board will not be shown."
+      },
+      {
+        "id": "project",
+        "name": "Projects",
+        "description": "Group issues by their projects."
+      },
+      {
+        "id": "none",
+        "name": "None",
+        "description": "No swimlanes will be displayed."
+      }
+    ],
+    "canEdit": true
+  },
+  "statisticsConfig": {
+    "fieldConfigured": true,
+    "typeId": "issueCountExclSubs",
+    "id": ""
+  },
+  "epicIssues": [
+    {
+      "id": 65955,
+      "key": "LABS-44",
+      "summary": "Pricebooks 2.0",
+      "issueType": {
+        "id": 10000,
+        "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+        "subtask": false,
+        "name": "Epic",
+        "hierarchyLevel": 1,
+        "default": false
+      },
+      "color": "purple",
+      "status": {
+        "id": "10333",
+        "name": "Backlog",
+        "description": "This status is managed internally by Jira Software",
+        "iconUrl": "https://fairmarkit.atlassian.net/",
+        "statusCategory": {
+          "id": "2",
+          "key": "new",
+          "colorName": "blue-gray"
+        }
+      },
+      "flagged": false
+    },
+    {
+      "id": 66150,
+      "key": "LABS-98",
+      "summary": "Supplier Recommendation in Intake",
+      "issueType": {
+        "id": 10000,
+        "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+        "subtask": false,
+        "name": "Epic",
+        "hierarchyLevel": 1,
+        "default": false
+      },
+      "color": "purple",
+      "epicName": "Supplier Recommendation in Intake",
+      "status": {
+        "id": "10333",
+        "name": "Backlog",
+        "description": "This status is managed internally by Jira Software",
+        "iconUrl": "https://fairmarkit.atlassian.net/",
+        "statusCategory": {
+          "id": "2",
+          "key": "new",
+          "colorName": "blue-gray"
+        }
+      },
+      "flagged": false
+    },
+    {
+      "id": 69412,
+      "key": "LABS-208",
+      "summary": "Azure migration",
+      "issueType": {
+        "id": 10000,
+        "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+        "subtask": false,
+        "name": "Epic",
+        "hierarchyLevel": 1,
+        "default": false
+      },
+      "color": "purple",
+      "epicName": "Azure migration",
+      "status": {
+        "id": "10333",
+        "name": "Backlog",
+        "description": "This status is managed internally by Jira Software",
+        "iconUrl": "https://fairmarkit.atlassian.net/",
+        "statusCategory": {
+          "id": "2",
+          "key": "new",
+          "colorName": "blue-gray"
+        }
+      },
+      "flagged": false
+    },
+    {
+      "id": 69908,
+      "key": "LABS-245",
+      "summary": "Budget Rework",
+      "issueType": {
+        "id": 10000,
+        "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+        "subtask": false,
+        "name": "Epic",
+        "hierarchyLevel": 1,
+        "default": false
+      },
+      "color": "purple",
+      "epicName": "Budget Rework",
+      "status": {
+        "id": "10333",
+        "name": "Backlog",
+        "description": "This status is managed internally by Jira Software",
+        "iconUrl": "https://fairmarkit.atlassian.net/",
+        "statusCategory": {
+          "id": "2",
+          "key": "new",
+          "colorName": "blue-gray"
+        }
+      },
+      "flagged": false
+    },
+    {
+      "id": 73137,
+      "key": "LABS-353",
+      "summary": "Request withdraw in \"In review\" status",
+      "issueType": {
+        "id": 10000,
+        "iconUrl": "https://fairmarkit.atlassian.net/images/icons/issuetypes/epic.svg",
+        "subtask": false,
+        "name": "Epic",
+        "hierarchyLevel": 1,
+        "default": false
+      },
+      "color": "purple",
+      "status": {
+        "id": "10333",
+        "name": "Backlog",
+        "description": "This status is managed internally by Jira Software",
+        "iconUrl": "https://fairmarkit.atlassian.net/",
+        "statusCategory": {
+          "id": "2",
+          "key": "new",
+          "colorName": "blue-gray"
+        }
+      },
+      "flagged": false
+    }
+  ],
+  "orderedIssueIds": [
+    73122,
+    72745,
+    72505,
+    71385,
+    71746,
+    71399,
+    69795,
+    71137,
+    72078,
+    69796,
+    70508,
+    70511,
+    69797,
+    69798,
+    69799,
+    69520,
+    71640,
+    72795,
+    73109,
+    72418,
+    73224,
+    73539,
+    73355,
+    73557,
+    73160,
+    73469,
+    73127
+  ],
+  "issueLimitExceeded": false,
+  "requestTypes": {},
+  "statuses": {},
+  "flexibleNomenclatureData": {
+    "levelOneName": "Epic"
+  },
+  "savedFilterId": 11635,
+  "media": {
+    "clientId": "cc04c9e6-4ec6-44e5-b7eb-acb8ba8fb524",
+    "endpointUrl": "https://api.media.atlassian.com"
+  },
+  "self": "https://fairmarkit.atlassian.net/rest/boards/1.0/board/175?moduleKey=agile-web-board-service",
+  "moduleKey": "agile-web-board-service",
+  "estimation": {
+    "type": "field",
+    "field": {
+      "fieldId": "customfield_10028",
+      "displayName": "Story Points"
+    }
+  },
+  "subscribed": false,
+  "localDeviceCacheEnabled": false,
+  "isUsingSimplifiedWorkflow": true,
+  "inlineCardCreate": {
+    "mode": "FULL",
+    "requireJqlContext": false
+  },
+  "canEdit": true,
+  "canRelease": false,
+  "sprints": [
+    {
+      "id": 6304,
+      "sequence": 6342,
+      "name": "LABS Sprint 9",
+      "state": "ACTIVE",
+      "linkedPagesCount": 0,
+      "goal": "1. Complete Supplier (go live)\n2. Budgets rework is live",
+      "sprintVersion": 7,
+      "startDate": "27/Nov/25 10:28 AM",
+      "endDate": "10/Dec/25 7:00 PM",
+      "isoStartDate": "2025-11-27T10:28:29+0100",
+      "isoEndDate": "2025-12-10T19:00:00+0100",
+      "completeDate": "None",
+      "isoCompleteDate": "None",
+      "canUpdateSprint": true,
+      "remoteLinks": [],
+      "daysRemaining": 0
+    }
+  ],
+  "filters": [
+    {
+      "id": 153,
+      "name": "Recently Updated",
+      "description": "Displays work items which have been updated in the last day",
+      "canEdit": true
+    },
+    {
+      "id": 154,
+      "name": "Assigned to me",
+      "description": "Displays work items which are currently assigned to the current user",
+      "canEdit": true
+    }
+  ]
+}
