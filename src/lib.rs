@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 pub mod app;
+pub mod client;
 pub mod config;
 pub mod ui;
 

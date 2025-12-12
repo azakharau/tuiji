@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use ratatui::{
     buffer::Buffer,
@@ -10,36 +7,33 @@ use ratatui::{
     widgets::{Paragraph, Widget},
 };
 
-use crate::ui::components::issue_card::IssueCardComponent;
+use crate::{client::jira::BoardConfig, ui::components::issue_card::IssueCardComponent};
 
 pub struct KanbanBoard<'a> {
     pub id: u32,
     pub title: String,
-    pub statuses: Vec<&'a str>,
-    pub issues: Vec<&'a IssueCardComponent<'a>>,
+    pub issues: Rc<Vec<IssueCardComponent>>,
+    pub board_cfg: &'a BoardConfig,
 }
 
 impl<'a> KanbanBoard<'a> {
-    pub fn new(id: u32, title: String, issues: Vec<&'a IssueCardComponent>) -> Self {
-        let statuses: Vec<&'a str> = issues
-            .iter()
-            .map(|issue| issue.status)
-            .collect::<Vec<&'a str>>()
-            .into_iter()
-            .collect::<HashSet<&'a str>>()
-            .into_iter()
-            .collect();
+    pub fn new(
+        id: u32,
+        title: String,
+        issues: Rc<Vec<IssueCardComponent>>,
+        cfg: &'a BoardConfig,
+    ) -> Self {
         KanbanBoard {
             id,
             title,
-            statuses,
             issues,
+            board_cfg: cfg,
         }
     }
 
     fn cols_layout(&self) -> Layout {
-        let constraints: Vec<Constraint> = (0..self.statuses.len())
-            .map(|_| Constraint::Ratio(1, self.statuses.len() as u32))
+        let constraints: Vec<Constraint> = (0..self.board_cfg.columns.len())
+            .map(|_| Constraint::Ratio(1, self.board_cfg.columns.len() as u32))
             .collect();
         Layout::horizontal(constraints)
     }
@@ -47,17 +41,20 @@ impl<'a> KanbanBoard<'a> {
     fn rows_layout(&self) -> Layout {
         let mut constraints: Vec<Constraint> = Vec::new();
         let rows_count = self.max_issues_in_status();
-        let sample = self.issues.first().unwrap_or(&&IssueCardComponent {
-            key: "",
-            summary: "",
-            epic: "",
-            status: "",
-            issue_type: crate::ui::components::issue_card::IssueType::Task,
-            priority: crate::ui::components::issue_card::Priority::Low,
-            assignee: "",
-            story_points: None,
-        });
-        // Header row
+        let sample = if let Some(issue) = self.issues.first() {
+            issue.to_owned()
+        } else {
+            IssueCardComponent::new(
+                "".to_string(),
+                "No Issues".to_string(),
+                None,
+                "".to_string(),
+                crate::ui::components::issue_card::IssueType::Task,
+                "".to_string(),
+                crate::ui::components::issue_card::Priority::Medium,
+                None,
+            )
+        };
         constraints.push(Constraint::Length(1));
 
         (0..rows_count).for_each(|_| {
@@ -79,11 +76,14 @@ impl<'a> KanbanBoard<'a> {
         layout
     }
 
-    fn group_issues_by_status(&self) -> HashMap<&'a str, Vec<&'a IssueCardComponent<'a>>> {
-        let mut grouped_issues: HashMap<&'a str, Vec<&'a IssueCardComponent>> = HashMap::new();
+    fn group_issues_by_status(&self) -> HashMap<String, Vec<IssueCardComponent>> {
+        let mut grouped_issues: HashMap<String, Vec<IssueCardComponent>> = HashMap::new();
 
-        for issue in &self.issues {
-            grouped_issues.entry(issue.status).or_default().push(*issue);
+        for issue in self.issues.clone().iter() {
+            grouped_issues
+                .entry(issue.status.clone())
+                .or_default()
+                .push(issue.clone());
         }
 
         grouped_issues
@@ -105,15 +105,14 @@ impl Widget for KanbanBoard<'_> {
         let header_index = 0;
         let _footer_index = table.len() - 1;
         let grouped_issues = self.group_issues_by_status();
-
-        for (i, status) in self.statuses.into_iter().enumerate() {
-            Paragraph::new(Text::from(status.to_uppercase()))
+        for (i, col) in self.board_cfg.columns.iter().enumerate() {
+            Paragraph::new(Text::from(col.name.to_uppercase()))
                 .alignment(Alignment::Center)
                 .render(table[i][header_index], buf);
-            let body_len = grouped_issues.get(status).unwrap_or(&Vec::new()).len();
+            let body_len = grouped_issues.get(&col.name).unwrap_or(&Vec::new()).len();
             let body_indexes = 0..body_len;
             for body_index in body_indexes {
-                grouped_issues.get(status).unwrap_or(&Vec::new())[body_index]
+                grouped_issues.get(&col.name).unwrap_or(&Vec::new())[body_index]
                     .to_owned()
                     .render(table[i][body_index + 1], buf);
             }

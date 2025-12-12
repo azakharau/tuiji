@@ -37,11 +37,12 @@ impl From<Status> for &str {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Priority {
     NoBusinessValue,
     Low,
     Lowest,
+    #[default]
     Medium,
     High,
     Critical,
@@ -76,11 +77,25 @@ impl Priority {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum IssueType {
     Bug,
+    #[default]
     Task,
     Story,
+    Subtask,
+}
+
+impl From<&str> for IssueType {
+    fn from(s: &str) -> Self {
+        match s {
+            "Bug" => IssueType::Bug,
+            "Task" => IssueType::Task,
+            "Story" => IssueType::Story,
+            "Subtask" => IssueType::Subtask,
+            _ => IssueType::Task,
+        }
+    }
 }
 
 impl IssueType {
@@ -89,33 +104,34 @@ impl IssueType {
             IssueType::Bug => Span::styled("B", Style::default().fg(Color::Red)),
             IssueType::Task => Span::styled("T", Style::default().fg(Color::Blue)),
             IssueType::Story => Span::styled("S", Style::default().fg(Color::Green)),
+            IssueType::Subtask => Span::styled("ST", Style::default().fg(Color::Cyan)),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct IssueCardComponent<'a> {
-    pub key: &'a str,
-    pub summary: &'a str,
-    pub epic: &'a str,
-    pub status: &'a str,
+pub struct IssueCardComponent {
+    pub key: String,
+    pub summary: String,
+    pub epic: Option<String>,
+    pub status: String,
     pub issue_type: IssueType,
-    pub assignee: &'a str,
+    pub assignee: String,
     pub priority: Priority,
-    pub story_points: Option<u8>,
+    pub story_points: Option<f64>,
 }
 
-impl<'a> IssueCardComponent<'a> {
+impl IssueCardComponent {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        key: &'a str,
-        summary: &'a str,
-        epic: &'a str,
-        status: &'a str,
+        key: String,
+        summary: String,
+        epic: Option<String>,
+        status: String,
         issue_type: IssueType,
-        assignee: &'a str,
+        assignee: String,
         priority: Priority,
-        story_points: Option<u8>,
+        story_points: Option<f64>,
     ) -> Self {
         Self {
             key,
@@ -134,7 +150,7 @@ impl<'a> IssueCardComponent<'a> {
     }
 }
 
-impl<'a> Widget for IssueCardComponent<'a> {
+impl Widget for IssueCardComponent {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
@@ -152,8 +168,8 @@ impl<'a> Widget for IssueCardComponent<'a> {
         Paragraph::new(Text::from(self.summary))
             .wrap(Wrap { trim: false })
             .render(chunks[0], buf);
-        if !self.epic.is_empty() {
-            Paragraph::new(Text::from(self.epic)).render(chunks[1], buf);
+        if self.epic.is_some() {
+            Paragraph::new(Text::from(self.epic.unwrap())).render(chunks[1], buf);
         }
         let sp_prio_layout = Layout::horizontal([
             Constraint::Length(4),
