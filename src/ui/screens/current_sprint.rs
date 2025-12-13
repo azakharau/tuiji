@@ -31,6 +31,10 @@ pub struct CurrentSprintScreen {
     board_cfg: BoardConfig,
     actions: Arc<Vec<ActionHint>>,
     mode: Mode,
+    selected_col: usize,
+    selected_row: usize,
+    scroll_offset: usize,
+    rows_visible: usize,
 }
 
 impl CurrentSprintScreen {
@@ -41,13 +45,9 @@ impl CurrentSprintScreen {
             cfg.jira.username.as_str(),
             cfg.jira.api_token.as_str(),
         )?;
-        let board_cfg = jira
-            .get_board_config(BOARD_ID)
-            .await?;
+        let board_cfg = jira.get_board_config(BOARD_ID).await?;
 
-        let jira_issues = jira
-            .get_current_sprint_issues(BOARD_ID)
-            .await?;
+        let jira_issues = jira.get_current_sprint_issues(BOARD_ID).await?;
 
         jira_issues.into_iter().for_each(|issue| {
             let key = issue.key.to_string();
@@ -89,17 +89,16 @@ impl CurrentSprintScreen {
             board_cfg,
             actions: Arc::new(vec![]),
             mode,
+            selected_col: 0,
+            selected_row: 0,
+            scroll_offset: 0,
+            rows_visible: 1,
         })
     }
 }
 impl Screen for CurrentSprintScreen {
     fn draw(&mut self, frame: &mut Frame) {
-        let kanban_board = KanbanBoard::new(
-            1,
-            "Current Sprint".to_string(),
-            self.issues.clone(),
-            &self.board_cfg,
-        );
+        let issue_height = self.issues.first().map(|i| i.height()).unwrap_or(8);
         let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone());
         let layout = Layout::vertical([
             Constraint::Length(2),
@@ -107,6 +106,19 @@ impl Screen for CurrentSprintScreen {
             Constraint::Length(1),
         ])
         .split(frame.area());
+        self.rows_visible = ((layout[1].height.saturating_sub(1)) / issue_height.max(1)).max(1) as usize;
+        self.clamp_selection();
+        self.ensure_selection_visible();
+        let kanban_board = KanbanBoard::new(
+            1,
+            "Current Sprint".to_string(),
+            self.issues.clone(),
+            &self.board_cfg,
+            self.selected_col,
+            self.selected_row,
+            self.scroll_offset,
+            self.rows_visible,
+        );
         frame.render_widget(kanban_board, layout[1]);
         frame.render_widget(bottom_bar, layout[2]);
     }
@@ -130,139 +142,162 @@ impl KeyHandler for CurrentSprintScreen {
         if binding_matches(&key_event, &bindings.refresh) {
             return ScreenState::Refresh;
         }
+        match key_event.code {
+            crossterm::event::KeyCode::Char('j') | crossterm::event::KeyCode::Down => {
+                self.move_down();
+                return ScreenState::Refresh;
+            }
+            crossterm::event::KeyCode::Char('k') | crossterm::event::KeyCode::Up => {
+                self.move_up();
+                return ScreenState::Refresh;
+            }
+            crossterm::event::KeyCode::Char('h') | crossterm::event::KeyCode::Left => {
+                self.move_left();
+                return ScreenState::Refresh;
+            }
+            crossterm::event::KeyCode::Char('l') | crossterm::event::KeyCode::Right => {
+                self.move_right();
+                return ScreenState::Refresh;
+            }
+            _ => {}
+        }
         ScreenState::Stay
     }
 }
 
-// impl Default for CurrentSprintScreen {
-//     fn default() -> Self {
-//         let issues = vec![
-//             IssueCardComponent {
-//
-//                 key: "SPRINT-123".to_string(),
-//                 summary: "Implement current sprint screen".to_string(),
-//                 epic: None,
-//                 status: "In Progress".to_string(),
-//                 issue_type: IssueType::Story,
-//                 priority: Priority::High,
-//                 assignee: "Alice".to_string(),
-//                 story_points: Some(5.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-124".to_string(),
-//                 summary: "Fix bug in sprint view".to_string(),
-//                 epic: None,
-//                 status: "To Do".to_string(),
-//                 issue_type: IssueType::Bug,
-//                 priority: Priority::Medium,
-//                 assignee: "Bob".to_string(),
-//                 story_points: Some(3.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-125".to_string(),
-//                 summary: "Write tests for sprint functionality".to_string(),
-//                 epic: None,
-//                 status: "Done".to_string(),
-//                 issue_type: IssueType::Task,
-//                 priority: Priority::Low,
-//                 assignee: "Charlie".to_string(),
-//                 story_points: Some(2.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-126".to_string(),
-//                 summary: "Update documentation for sprint features".to_string(),
-//                 epic: None,
-//                 status: "In Review".to_string(),
-//                 issue_type: IssueType::Task,
-//                 priority: Priority::Low,
-//                 assignee: "Dana".to_string(),
-//                 story_points: Some(1.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-127".to_string(),
-//                 summary: "Refactor sprint management code".to_string(),
-//                 epic: None,
-//                 status: "To Do".to_string(),
-//                 issue_type: IssueType::Story,
-//                 priority: Priority::High,
-//                 assignee: "Eve".to_string(),
-//                 story_points: Some(8.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-128".to_string(),
-//                 summary: "Design new sprint board UI".to_string(),
-//                 epic: None,
-//                 status: "In Progress".to_string(),
-//                 issue_type: IssueType::Story,
-//                 priority: Priority::Critical,
-//                 assignee: "Frank".to_string(),
-//                 story_points: Some(13.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-129".to_string(),
-//                 summary: "Optimize sprint data loading".to_string(),
-//                 epic: None,
-//                 status: "To Do".to_string(),
-//                 issue_type: IssueType::Task,
-//                 priority: Priority::Medium,
-//                 assignee: "Grace".to_string(),
-//                 story_points: Some(5.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-130".to_string(),
-//                 summary: "Conduct sprint retrospective meeting".to_string(),
-//                 epic: None,
-//                 status: "Done".to_string(),
-//                 issue_type: IssueType::Task,
-//                 priority: Priority::Low,
-//                 assignee: "Heidi".to_string(),
-//                 story_points: Some(2.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-131".to_string(),
-//                 summary: "Implement sprint burndown chart".to_string(),
-//                 epic: None,
-//                 status: "In Review".to_string(),
-//                 issue_type: IssueType::Story,
-//                 priority: Priority::High,
-//                 assignee: "Ivan".to_string(),
-//                 story_points: Some(8.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-132".to_string(),
-//                 summary: "Set up sprint notifications".to_string(),
-//                 epic: None,
-//                 status: "To Do".to_string(),
-//                 issue_type: IssueType::Task,
-//                 priority: Priority::Medium,
-//                 assignee: "Judy".to_string(),
-//                 story_points: Some(3.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-133".to_string(),
-//                 summary: "Analyze sprint performance metrics".to_string(),
-//                 epic: None,
-//                 status: "Code Review".to_string(),
-//                 issue_type: IssueType::Story,
-//                 priority: Priority::High,
-//                 assignee: "Kevin".to_string(),
-//                 story_points: Some(5.0),
-//             },
-//             IssueCardComponent {
-//                 key: "SPRINT-134".to_string(),
-//                 summary: "Integrate sprint tools with CI/CD pipeline".to_string(),
-//                 epic: None,
-//                 status: "Code Review".to_string(),
-//                 issue_type: IssueType::Story,
-//                 priority: Priority::Critical,
-//                 assignee: "Laura".to_string(),
-//                 story_points: Some(13.0),
-//             },
-//         ];
-//
-//         Self {
-//             issues: Rc::new(issues),
-//             board_cfg: BoardConfig::default(),
-//         }
-//     }
-// }
+impl CurrentSprintScreen {
+    pub fn action_hints(bindings: &crate::config::KeyBindings) -> Arc<Vec<ActionHint>> {
+        Arc::new(vec![
+            ActionHint {
+                binding: format!("{}/↑", bindings.previous),
+                description: "Up".to_string(),
+            },
+            ActionHint {
+                binding: format!("{}/↓", bindings.next),
+                description: "Down".to_string(),
+            },
+            ActionHint {
+                binding: "h/←".to_string(),
+                description: "Prev column".to_string(),
+            },
+            ActionHint {
+                binding: "l/→".to_string(),
+                description: "Next column".to_string(),
+            },
+            ActionHint {
+                binding: bindings.refresh.clone(),
+                description: "Refresh".to_string(),
+            },
+            ActionHint {
+                binding: bindings.quit.clone(),
+                description: "Quit".to_string(),
+            },
+        ])
+    }
+
+    fn column_counts(&self) -> Vec<usize> {
+        let mut counts = vec![0; self.board_cfg.columns.len()];
+        for issue in self.issues.iter() {
+            if let Some(idx) = self
+                .board_cfg
+                .columns
+                .iter()
+                .position(|c| c.name.eq_ignore_ascii_case(&issue.status))
+            {
+                counts[idx] += 1;
+            }
+        }
+        counts
+    }
+
+    fn clamp_selection(&mut self) {
+        let counts = self.column_counts();
+        let col_count = counts.get(self.selected_col).copied().unwrap_or(0);
+        if col_count == 0 {
+            self.selected_row = 0;
+        } else if self.selected_row >= col_count {
+            self.selected_row = col_count - 1;
+        }
+    }
+
+    fn ensure_selection_visible(&mut self) {
+        let counts = self.column_counts();
+        let col_count = counts.get(self.selected_col).copied().unwrap_or(0);
+        let rows_visible = self.rows_visible.max(1);
+        // Keep a single scroll_offset applied to all columns; clamp to available rows in current column.
+        if col_count <= rows_visible {
+            self.scroll_offset = 0;
+            return;
+        }
+        if self.selected_row < self.scroll_offset {
+            self.scroll_offset = self.selected_row;
+        } else if self.selected_row >= self.scroll_offset + rows_visible {
+            self.scroll_offset = self.selected_row + 1 - rows_visible;
+        }
+        let max_offset = counts
+            .iter()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .saturating_sub(rows_visible);
+        if self.scroll_offset > max_offset {
+            self.scroll_offset = max_offset;
+        }
+    }
+
+    fn move_down(&mut self) {
+        let counts = self.column_counts();
+        let count = counts.get(self.selected_col).copied().unwrap_or(0);
+        if self.selected_row + 1 < count {
+            self.selected_row += 1;
+        }
+        self.ensure_selection_visible();
+    }
+
+    fn move_up(&mut self) {
+        if self.selected_row > 0 {
+            self.selected_row -= 1;
+        }
+        self.ensure_selection_visible();
+    }
+
+    fn move_left(&mut self) {
+        if self.board_cfg.columns.is_empty() {
+            return;
+        }
+        let target = if self.selected_col == 0 {
+            self.board_cfg.columns.len() - 1
+        } else {
+            self.selected_col - 1
+        };
+        self.selected_col = self.find_non_empty_from(target, -1);
+        self.clamp_selection();
+        self.ensure_selection_visible();
+    }
+
+    fn move_right(&mut self) {
+        if self.board_cfg.columns.is_empty() {
+            return;
+        }
+        let target = (self.selected_col + 1) % self.board_cfg.columns.len();
+        self.selected_col = self.find_non_empty_from(target, 1);
+        self.clamp_selection();
+        self.ensure_selection_visible();
+    }
+
+    fn find_non_empty_from(&self, start: usize, dir: i32) -> usize {
+        let counts = self.column_counts();
+        if counts.iter().all(|&c| c == 0) {
+            return 0;
+        }
+        let len = counts.len();
+        let mut idx = start % len;
+        for _ in 0..len {
+            if counts[idx] > 0 {
+                return idx;
+            }
+            idx = (((idx as i32 + dir).rem_euclid(len as i32)) as usize) % len;
+        }
+        start
+    }
+}

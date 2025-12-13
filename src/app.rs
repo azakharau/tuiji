@@ -1,10 +1,8 @@
-use std::time::Duration;
-
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, EventStream, KeyEvent};
 use futures::StreamExt;
 use ratatui::DefaultTerminal;
-use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle, time};
+use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 
 use crate::{
     app::{
@@ -13,14 +11,12 @@ use crate::{
         state::ScreenType,
     },
     config::AppConfig,
-    ui::screens::{Screen, ScreenState, current_sprint::CurrentSprintScreen, home::HomeScreen},
+    ui::screens::{Screen, ScreenState, current_sprint, current_sprint::CurrentSprintScreen, home::HomeScreen},
 };
 
 pub mod event;
 pub mod key_handlers;
 pub mod state;
-
-const NOTIFY_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Default, Clone)]
 pub struct AppState {
@@ -43,11 +39,10 @@ impl CachedScreens {
                 // SAFE: We just ensured it's Some above
                 self.home_screen.as_mut().unwrap()
             }
-            ScreenType::CurrentSprint => {
-                self.current_sprint_screen
-                    .as_mut()
-                    .expect("Current sprint screen not loaded")
-            }
+            ScreenType::CurrentSprint => self
+                .current_sprint_screen
+                .as_mut()
+                .expect("Current sprint screen not loaded"),
             _ => {
                 panic!("Screen {:?} not implemented yet", state.current_screen);
             }
@@ -87,9 +82,9 @@ impl App {
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let _input = spawn_input_listener(tx.clone());
-        let _tick = spawn_tick(tx.clone(), Duration::from_millis(250));
-        let _cache_worker = spawn_worker(tx.clone());
-        let _notification_worker = spawn_notifications(tx.clone());
+        // let _tick = spawn_tick(tx.clone(), Duration::from_millis(250));
+        // let _cache_worker = spawn_worker(tx.clone());
+        // let _notification_worker = spawn_notifications(tx.clone());
 
         // Initial paint.
         self.render().await?;
@@ -157,8 +152,14 @@ impl App {
 
     async fn render(&mut self) -> Result<()> {
         self.ensure_screen_ready().await?;
-        let hints = global_action_hints(&self.cfg.key_bindings);
+        let screen_type = self.state.current_screen.clone();
         let screen = self.screens.active_mut(&self.cfg, &self.state);
+        let hints = match screen_type {
+            ScreenType::CurrentSprint => {
+                current_sprint::CurrentSprintScreen::action_hints(&self.cfg.key_bindings)
+            }
+            _ => global_action_hints(&self.cfg.key_bindings),
+        };
         screen.set_action_hints(hints);
         self.terminal.draw(|frame| {
             screen.draw(frame);
@@ -197,39 +198,39 @@ fn spawn_input_listener(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
     })
 }
 
-fn spawn_tick(tx: UnboundedSender<AppEvent>, period: Duration) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        let mut ticker = time::interval(period);
-        loop {
-            ticker.tick().await;
-            if tx.send(AppEvent::Tick).is_err() {
-                break;
-            }
-        }
-    })
-}
-
-fn spawn_worker(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        // Placeholder for cache/notification workers; send messages when ready.
-        // let _ = tx.send(AppEvent::Worker(WorkerMessage::JiraUpdated));
-        let _ = tx;
-    })
-}
-
-fn spawn_notifications(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        let mut ticker = time::interval(NOTIFY_POLL_INTERVAL);
-        loop {
-            ticker.tick().await;
-            // placeholder: poll notification source, then:
-            // if tx.send(AppEvent::Worker(WorkerMessage::Notification(payload))).is_err() { break; }
-            if tx.is_closed() {
-                break;
-            }
-        }
-    })
-}
+// fn spawn_tick(tx: UnboundedSender<AppEvent>, period: Duration) -> JoinHandle<()> {
+//     tokio::spawn(async move {
+//         let mut ticker = time::interval(period);
+//         loop {
+//             ticker.tick().await;
+//             if tx.send(AppEvent::Tick).is_err() {
+//                 break;
+//             }
+//         }
+//     })
+// }
+//
+// fn spawn_worker(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
+//     tokio::spawn(async move {
+//         // Placeholder for cache/notification workers; send messages when ready.
+//         // let _ = tx.send(AppEvent::Worker(WorkerMessage::JiraUpdated));
+//         let _ = tx;
+//     })
+// }
+//
+// fn spawn_notifications(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
+//     tokio::spawn(async move {
+//         let mut ticker = time::interval(NOTIFY_POLL_INTERVAL);
+//         loop {
+//             ticker.tick().await;
+//             // placeholder: poll notification source, then:
+//             // if tx.send(AppEvent::Worker(WorkerMessage::Notification(payload))).is_err() { break; }
+//             if tx.is_closed() {
+//                 break;
+//             }
+//         }
+//     })
+// }
 
 fn map_global(key: &KeyEvent, bindings: &crate::config::KeyBindings) -> Option<ScreenState> {
     if binding_matches(key, &bindings.quit) {

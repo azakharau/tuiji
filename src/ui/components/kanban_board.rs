@@ -14,6 +14,10 @@ pub struct KanbanBoard<'a> {
     pub title: String,
     pub issues: Arc<Vec<IssueCardComponent>>,
     pub board_cfg: &'a BoardConfig,
+    pub selected_col: usize,
+    pub selected_row: usize,
+    pub scroll_offset: usize,
+    pub rows_visible: usize,
 }
 
 impl<'a> KanbanBoard<'a> {
@@ -22,12 +26,20 @@ impl<'a> KanbanBoard<'a> {
         title: String,
         issues: Arc<Vec<IssueCardComponent>>,
         cfg: &'a BoardConfig,
+        selected_col: usize,
+        selected_row: usize,
+        scroll_offset: usize,
+        rows_visible: usize,
     ) -> Self {
         KanbanBoard {
             id,
             title,
             issues,
             board_cfg: cfg,
+            selected_col,
+            selected_row,
+            scroll_offset,
+            rows_visible,
         }
     }
 
@@ -40,27 +52,15 @@ impl<'a> KanbanBoard<'a> {
 
     fn rows_layout(&self) -> Layout {
         let mut constraints: Vec<Constraint> = Vec::new();
-        let rows_count = self.max_issues_in_status();
-        let sample = if let Some(issue) = self.issues.first() {
-            issue.to_owned()
-        } else {
-            IssueCardComponent::new(
-                "".to_string(),
-                "No Issues".to_string(),
-                None,
-                "".to_string(),
-                crate::ui::components::issue_card::IssueType::Task,
-                "".to_string(),
-                crate::ui::components::issue_card::Priority::Medium,
-                None,
-            )
-        };
-        constraints.push(Constraint::Length(1));
-
-        (0..rows_count).for_each(|_| {
-            constraints.push(Constraint::Length(sample.height()));
+        constraints.push(Constraint::Length(1)); // header
+        let issue_height = self
+            .issues
+            .first()
+            .map(|i| i.height())
+            .unwrap_or(8);
+        (0..self.rows_visible).for_each(|_| {
+            constraints.push(Constraint::Length(issue_height));
         });
-
         Layout::vertical(constraints)
     }
 
@@ -89,14 +89,6 @@ impl<'a> KanbanBoard<'a> {
         grouped_issues
     }
 
-    fn max_issues_in_status(&self) -> usize {
-        let grouped_issues = self.group_issues_by_status();
-        grouped_issues
-            .values()
-            .map(|issues| issues.len())
-            .max()
-            .unwrap_or(0)
-    }
 }
 
 impl Widget for KanbanBoard<'_> {
@@ -105,16 +97,25 @@ impl Widget for KanbanBoard<'_> {
         let header_index = 0;
         let _footer_index = table.len() - 1;
         let grouped_issues = self.group_issues_by_status();
+        let empty: &[IssueCardComponent] = &[];
         for (i, col) in self.board_cfg.columns.iter().enumerate() {
             Paragraph::new(Text::from(col.name.to_uppercase()))
                 .alignment(Alignment::Center)
                 .render(table[i][header_index], buf);
-            let body_len = grouped_issues.get(&col.name).unwrap_or(&Vec::new()).len();
-            let body_indexes = 0..body_len;
-            for body_index in body_indexes {
-                grouped_issues.get(&col.name).unwrap_or(&Vec::new())[body_index]
-                    .to_owned()
-                    .render(table[i][body_index + 1], buf);
+            let column_issues = grouped_issues
+                .get(&col.name)
+                .map(|v| v.as_slice())
+                .unwrap_or(empty);
+            let offset = self.scroll_offset;
+            for row_idx in 0..self.rows_visible {
+                let area = table[i][row_idx + 1];
+                if let Some(issue) = column_issues.get(offset + row_idx) {
+                    let selected = self.selected_col == i && (offset + row_idx) == self.selected_row;
+                    issue.render_with_selection(area, buf, selected);
+                } else {
+                    // Clear the area for empty rows to avoid ghost content.
+                    Paragraph::new(Text::raw("")).render(area, buf);
+                }
             }
         }
     }

@@ -18,7 +18,7 @@ pub struct ActionHint {
 
 impl ActionHint {
     pub fn render(&self) -> String {
-        format!("[{}]  {}", self.binding, self.description)
+        format!("[{}]{}", self.binding, self.description)
     }
 }
 
@@ -53,7 +53,7 @@ pub fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
         return false;
     }
     match key.code {
-        KeyCode::Char(c) => binding.len() == 1 && binding.chars().next() == Some(c),
+        KeyCode::Char(c) => binding.len() == 1 && binding.starts_with(c),
         KeyCode::Enter => binding.eq_ignore_ascii_case("enter") || binding == "<enter>",
         KeyCode::Esc => binding.eq_ignore_ascii_case("esc") || binding == "<esc>",
         KeyCode::Up => binding.eq_ignore_ascii_case("up") || binding == "<up>",

@@ -7,7 +7,7 @@ use serde_json::Value;
 
 pub type Issues = Vec<Issue>;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct BoardConfig {
     #[serde(rename = "columnConfig")]
     pub columns: Vec<BoardColumn>,
@@ -23,7 +23,7 @@ impl Default for BoardConfig {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub enum Estimation {
     StoryPoints(String),
     DateBased(String),
@@ -133,7 +133,8 @@ impl JiraClient {
     pub async fn get_current_sprint_issues(&self, board_id: u64) -> gouqi::Result<Issues> {
         let sprint = self.get_current_sprint(board_id).await?;
         let jql = format!("sprint = {}", sprint.id);
-        let opts = SearchOptions::builder().jql(&jql).all_fields().build();
+        // Pass JQL directly to search; keep options free of JQL to avoid double injection (caused 400 with stray comma).
+        let opts = SearchOptions::builder().all_fields().build();
         let res = self.client.search().list(&jql, &opts).await?;
         Ok(res.issues)
     }

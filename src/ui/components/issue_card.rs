@@ -148,13 +148,18 @@ impl IssueCardComponent {
     pub fn height(&self) -> u16 {
         8
     }
-}
 
-impl Widget for IssueCardComponent {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    pub fn render_with_selection(&self, area: Rect, buf: &mut Buffer, selected: bool) {
+        let border_style = if selected {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        };
+
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
-            .borders(Borders::ALL);
+            .borders(Borders::ALL)
+            .style(border_style);
         let inner_area = block.inner(area);
         block.render(area, buf);
         let chunks = Layout::vertical([
@@ -165,11 +170,11 @@ impl Widget for IssueCardComponent {
             Constraint::Length(1),
         ])
         .split(inner_area);
-        Paragraph::new(Text::from(self.summary))
+        Paragraph::new(Text::from(self.summary.clone()))
             .wrap(Wrap { trim: false })
             .render(chunks[0], buf);
-        if self.epic.is_some() {
-            Paragraph::new(Text::from(self.epic.unwrap())).render(chunks[1], buf);
+        if let Some(epic) = &self.epic {
+            Paragraph::new(Text::from(epic.clone())).render(chunks[1], buf);
         }
         let sp_prio_layout = Layout::horizontal([
             Constraint::Length(4),
@@ -177,9 +182,7 @@ impl Widget for IssueCardComponent {
             Constraint::Fill(1),
         ])
         .split(chunks[2]);
-        if self.story_points.is_some() {
-            // SAFETY: unwrap checked above
-            let sp = self.story_points.unwrap();
+        if let Some(sp) = self.story_points {
             let sp_span = Span::styled(format!("{} SP", sp), Style::default().fg(Color::Yellow));
             Paragraph::new(Text::from(sp_span)).render(sp_prio_layout[0], buf);
         }
@@ -191,7 +194,13 @@ impl Widget for IssueCardComponent {
         ])
         .split(chunks[3]);
         Paragraph::new(Text::from(self.issue_type.as_span())).render(type_key_layout[0], buf);
-        Paragraph::new(Text::from(self.key)).render(type_key_layout[2], buf);
-        Paragraph::new(Text::from(self.assignee)).render(chunks[4], buf);
+        Paragraph::new(Text::from(self.key.clone())).render(type_key_layout[2], buf);
+        Paragraph::new(Text::from(self.assignee.clone())).render(chunks[4], buf);
+    }
+}
+
+impl Widget for IssueCardComponent {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        self.render_with_selection(area, buf, false);
     }
 }
