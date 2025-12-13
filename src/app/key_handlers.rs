@@ -1,13 +1,32 @@
-use crossterm::event::KeyEvent;
-
 use std::sync::Arc;
 
 use crate::{config::KeyBindings, ui::screens::ScreenState};
+use crossterm::event::KeyEvent;
 
 pub mod navigation_hanler;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Motion {
+    Up(usize),
+    Down(usize),
+    Left(usize),
+    Right(usize),
+    Top,
+    Bottom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    Motion(Motion),
+    Refresh,
+    Quit,
+    SwitchTo(crate::app::state::ScreenType),
+    Unhandled(KeyEvent),
+    Noop,
+}
+
 pub trait KeyHandler {
-    fn handle_key_event(&mut self, key_event: KeyEvent, bindings: &KeyBindings) -> ScreenState;
+    fn handle_command(&mut self, command: Command) -> ScreenState;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -62,4 +81,95 @@ pub fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
         KeyCode::Right => binding.eq_ignore_ascii_case("right") || binding == "<right>",
         _ => false,
     }
+}
+
+#[derive(Default)]
+pub struct InputState {
+    pending_count: Option<usize>,
+    pending_g: bool,
+}
+
+pub fn parse_command(
+    key_event: KeyEvent,
+    mode: crate::app::state::Mode,
+    bindings: &KeyBindings,
+    state: &mut InputState,
+) -> Command {
+    use crossterm::event::KeyCode;
+
+    // Refresh
+    if binding_matches(&key_event, &bindings.refresh) {
+        state.pending_count = None;
+        state.pending_g = false;
+        return Command::Refresh;
+    }
+
+    // Quit (only in Normal)
+    if (key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Char('Q'))
+        && matches!(mode, crate::app::state::Mode::Normal)
+    {
+        state.pending_count = None;
+        state.pending_g = false;
+        return Command::Quit;
+    }
+
+    // Esc -> Home
+    if key_event.code == KeyCode::Esc {
+        state.pending_count = None;
+        state.pending_g = false;
+        return Command::SwitchTo(crate::app::state::ScreenType::Home);
+    }
+
+    // Counts
+    if let KeyCode::Char(d @ '0'..='9') = key_event.code {
+        let digit = d.to_digit(10).unwrap() as usize;
+        let new_count = state
+            .pending_count
+            .unwrap_or(0)
+            .saturating_mul(10)
+            .saturating_add(digit);
+        state.pending_count = Some(new_count);
+        return Command::Noop;
+    }
+
+    // gg / g
+    if key_event.code == KeyCode::Char('g') {
+        if state.pending_g {
+            state.pending_g = false;
+            let _ = take_count(state);
+            return Command::Motion(Motion::Top);
+        } else {
+            state.pending_g = true;
+            return Command::Noop;
+        }
+    }
+    state.pending_g = false;
+
+    // Motions
+    let motion = match key_event.code {
+        KeyCode::Char('j') | KeyCode::Down => Some(Motion::Down(take_count_or(state, 1))),
+        KeyCode::Char('k') | KeyCode::Up => Some(Motion::Up(take_count_or(state, 1))),
+        KeyCode::Char('h') | KeyCode::Left => Some(Motion::Left(take_count_or(state, 1))),
+        KeyCode::Char('l') | KeyCode::Right => Some(Motion::Right(take_count_or(state, 1))),
+        KeyCode::Char('G') => Some(Motion::Bottom),
+        _ => None,
+    };
+
+    if let Some(m) = motion {
+        return Command::Motion(m);
+    }
+
+    // Default: pass raw key to screen-level handler
+    state.pending_count = None;
+    Command::Unhandled(key_event)
+}
+
+fn take_count(state: &mut InputState) -> usize {
+    let n = state.pending_count.take().unwrap_or(1);
+    if n == 0 { 1 } else { n }
+}
+
+fn take_count_or(state: &mut InputState, default: usize) -> usize {
+    let n = state.pending_count.take().unwrap_or(default);
+    if n == 0 { default } else { n }
 }

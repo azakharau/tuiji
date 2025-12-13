@@ -7,7 +7,7 @@ use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 use crate::{
     app::{
         event::{AppEvent, WorkerMessage},
-        key_handlers::{binding_matches, global_action_hints},
+        key_handlers::{global_action_hints, parse_command, Command, InputState},
         state::ScreenType,
     },
     config::AppConfig,
@@ -60,6 +60,7 @@ pub struct App {
     pub state: AppState,
     screens: CachedScreens,
     cfg: AppConfig,
+    input_state: InputState,
 }
 
 impl App {
@@ -74,6 +75,7 @@ impl App {
             state,
             screens: screen,
             cfg: config,
+            input_state: InputState::default(),
         }
     }
 
@@ -121,11 +123,16 @@ impl App {
     }
 
     fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
-        if let Some(global) = map_global(&key, &self.cfg.key_bindings) {
-            return Ok(global);
+        let cmd = parse_command(key, self.state.mode.clone(), &self.cfg.key_bindings, &mut self.input_state);
+        match cmd {
+            Command::Quit => Ok(ScreenState::Quit),
+            Command::Refresh => Ok(ScreenState::Refresh),
+            Command::SwitchTo(screen) => Ok(ScreenState::SwitchTo(screen)),
+            Command::Motion(_) | Command::Noop | Command::Unhandled(_) => {
+                let screen = self.screens.active_mut(&self.cfg, &self.state);
+                Ok(screen.handle_command(cmd))
+            }
         }
-        let screen = self.screens.active_mut(&self.cfg, &self.state);
-        Ok(screen.handle_key_event(key, &self.cfg.key_bindings))
     }
 
     fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
@@ -141,7 +148,6 @@ impl App {
             }
             ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
             ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
-            _ => Ok(ActionOutcome::Continue { render: false }),
         }
     }
 
@@ -232,12 +238,8 @@ fn spawn_input_listener(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
 //     })
 // }
 
-fn map_global(key: &KeyEvent, bindings: &crate::config::KeyBindings) -> Option<ScreenState> {
-    if binding_matches(key, &bindings.quit) {
-        return Some(ScreenState::Quit);
-    }
-    if binding_matches(key, &bindings.refresh) {
-        return Some(ScreenState::Refresh);
-    }
+// Legacy stub retained to avoid unused warnings when adding more global mappings later.
+#[allow(dead_code)]
+fn map_global(_key: &KeyEvent, _bindings: &crate::config::KeyBindings) -> Option<ScreenState> {
     None
 }

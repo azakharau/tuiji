@@ -46,36 +46,32 @@ impl Screen for HomeScreen {
 }
 
 impl KeyHandler for HomeScreen {
-    fn handle_key_event(
-        &mut self,
-        key_code: crossterm::event::KeyEvent,
-        bindings: &crate::config::KeyBindings,
-    ) -> ScreenState {
-        use crate::app::key_handlers::binding_matches;
-        if binding_matches(&key_code, &bindings.quit) {
-            return ScreenState::Quit;
-        }
-        if binding_matches(&key_code, &bindings.refresh) {
-            return ScreenState::Refresh;
-        }
-        match key_code.code {
-            crossterm::event::KeyCode::Char('c') => {
-                ScreenState::SwitchTo(crate::app::state::ScreenType::CurrentSprint)
-            }
-            crossterm::event::KeyCode::Char('i') => {
-                ScreenState::SwitchTo(crate::app::state::ScreenType::MyIssues)
-            }
-            crossterm::event::KeyCode::Char('s') => {
-                ScreenState::SwitchTo(crate::app::state::ScreenType::SearchIssues)
-            }
-            crossterm::event::KeyCode::Char('n') => {
-                ScreenState::SwitchTo(crate::app::state::ScreenType::NewIssue)
-            }
-            crossterm::event::KeyCode::Char('r') => ScreenState::Refresh,
-            crossterm::event::KeyCode::Char('p') => {
-                ScreenState::SwitchTo(crate::app::state::ScreenType::Profiles)
-            }
-            crossterm::event::KeyCode::Char('q') => ScreenState::Quit,
+    fn handle_command(&mut self, command: crate::app::key_handlers::Command) -> ScreenState {
+        use crate::app::key_handlers::Command;
+        match command {
+            Command::Refresh => ScreenState::Refresh,
+            Command::SwitchTo(screen) => ScreenState::SwitchTo(screen),
+            Command::Unhandled(key) => match key.code {
+                crossterm::event::KeyCode::Char('c') => {
+                    ScreenState::SwitchTo(crate::app::state::ScreenType::CurrentSprint)
+                }
+                crossterm::event::KeyCode::Char('i') => {
+                    ScreenState::SwitchTo(crate::app::state::ScreenType::MyIssues)
+                }
+                crossterm::event::KeyCode::Char('s') => {
+                    ScreenState::SwitchTo(crate::app::state::ScreenType::SearchIssues)
+                }
+                crossterm::event::KeyCode::Char('n') => {
+                    ScreenState::SwitchTo(crate::app::state::ScreenType::NewIssue)
+                }
+                crossterm::event::KeyCode::Char('p') => {
+                    ScreenState::SwitchTo(crate::app::state::ScreenType::Profiles)
+                }
+                crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Char('Q') => {
+                    ScreenState::Quit
+                }
+                _ => ScreenState::Stay,
+            },
             _ => ScreenState::Stay,
         }
     }

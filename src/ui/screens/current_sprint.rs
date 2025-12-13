@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 
-use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
@@ -98,6 +97,7 @@ impl CurrentSprintScreen {
 }
 impl Screen for CurrentSprintScreen {
     fn draw(&mut self, frame: &mut Frame) {
+        self.ensure_valid_column();
         let issue_height = self.issues.first().map(|i| i.height()).unwrap_or(8);
         let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone());
         let layout = Layout::vertical([
@@ -133,35 +133,26 @@ impl Screen for CurrentSprintScreen {
 }
 
 impl KeyHandler for CurrentSprintScreen {
-    fn handle_key_event(
-        &mut self,
-        key_event: KeyEvent,
-        bindings: &crate::config::KeyBindings,
-    ) -> ScreenState {
-        use crate::app::key_handlers::binding_matches;
-        if binding_matches(&key_event, &bindings.refresh) {
-            return ScreenState::Refresh;
+    fn handle_command(&mut self, command: crate::app::key_handlers::Command) -> ScreenState {
+        use crate::app::key_handlers::{Command, Motion};
+        match command {
+            Command::Refresh => ScreenState::Refresh,
+            Command::Quit if matches!(self.mode, Mode::Normal) => ScreenState::Quit,
+            Command::SwitchTo(screen) => ScreenState::SwitchTo(screen),
+            Command::Motion(m) => {
+                match m {
+                    Motion::Down(n) => self.move_down(n),
+                    Motion::Up(n) => self.move_up(n),
+                    Motion::Left(n) => self.move_left(n),
+                    Motion::Right(n) => self.move_right(n),
+                    Motion::Top => self.go_top(),
+                    Motion::Bottom => self.go_bottom(),
+                }
+                ScreenState::Refresh
+            }
+            Command::Unhandled(_) => ScreenState::Stay,
+            _ => ScreenState::Stay,
         }
-        match key_event.code {
-            crossterm::event::KeyCode::Char('j') | crossterm::event::KeyCode::Down => {
-                self.move_down();
-                return ScreenState::Refresh;
-            }
-            crossterm::event::KeyCode::Char('k') | crossterm::event::KeyCode::Up => {
-                self.move_up();
-                return ScreenState::Refresh;
-            }
-            crossterm::event::KeyCode::Char('h') | crossterm::event::KeyCode::Left => {
-                self.move_left();
-                return ScreenState::Refresh;
-            }
-            crossterm::event::KeyCode::Char('l') | crossterm::event::KeyCode::Right => {
-                self.move_right();
-                return ScreenState::Refresh;
-            }
-            _ => {}
-        }
-        ScreenState::Stay
     }
 }
 
@@ -210,6 +201,34 @@ impl CurrentSprintScreen {
         counts
     }
 
+    fn ensure_valid_column(&mut self) {
+        let len = self.board_cfg.columns.len();
+        if len == 0 {
+            self.selected_col = 0;
+            self.selected_row = 0;
+            self.scroll_offset = 0;
+            return;
+        }
+        if self.selected_col >= len {
+            self.selected_col = len - 1;
+        }
+        let counts = self.column_counts();
+        if counts.get(self.selected_col).copied().unwrap_or(0) > 0 {
+            return;
+        }
+        // prefer nearest non-empty to the left, then right
+        if let Some(left) = (0..=self.selected_col).rev().find(|&i| counts.get(i).copied().unwrap_or(0) > 0) {
+            self.selected_col = left;
+        } else if let Some(right) = (self.selected_col + 1..len).find(|&i| counts.get(i).copied().unwrap_or(0) > 0) {
+            self.selected_col = right;
+        } else {
+            // all empty
+            self.selected_col = 0;
+            self.selected_row = 0;
+            self.scroll_offset = 0;
+        }
+    }
+
     fn clamp_selection(&mut self) {
         let counts = self.column_counts();
         let col_count = counts.get(self.selected_col).copied().unwrap_or(0);
@@ -245,59 +264,85 @@ impl CurrentSprintScreen {
         }
     }
 
-    fn move_down(&mut self) {
+    fn move_down(&mut self, n: usize) {
         let counts = self.column_counts();
         let count = counts.get(self.selected_col).copied().unwrap_or(0);
-        if self.selected_row + 1 < count {
-            self.selected_row += 1;
+        if count == 0 {
+            return;
         }
+        let max_row = count - 1;
+        self.selected_row = (self.selected_row + n).min(max_row);
         self.ensure_selection_visible();
     }
 
-    fn move_up(&mut self) {
+    fn move_up(&mut self, n: usize) {
         if self.selected_row > 0 {
-            self.selected_row -= 1;
+            self.selected_row = self.selected_row.saturating_sub(n);
         }
         self.ensure_selection_visible();
     }
 
-    fn move_left(&mut self) {
+    fn move_left(&mut self, steps: usize) {
         if self.board_cfg.columns.is_empty() {
             return;
         }
-        let target = if self.selected_col == 0 {
-            self.board_cfg.columns.len() - 1
-        } else {
-            self.selected_col - 1
-        };
-        self.selected_col = self.find_non_empty_from(target, -1);
-        self.clamp_selection();
-        self.ensure_selection_visible();
-    }
-
-    fn move_right(&mut self) {
-        if self.board_cfg.columns.is_empty() {
-            return;
-        }
-        let target = (self.selected_col + 1) % self.board_cfg.columns.len();
-        self.selected_col = self.find_non_empty_from(target, 1);
-        self.clamp_selection();
-        self.ensure_selection_visible();
-    }
-
-    fn find_non_empty_from(&self, start: usize, dir: i32) -> usize {
         let counts = self.column_counts();
-        if counts.iter().all(|&c| c == 0) {
-            return 0;
+        let target = self.selected_col.saturating_sub(steps);
+        let mut idx = self.find_left_from(target, &counts);
+        if counts.get(idx).copied().unwrap_or(0) == 0 {
+            idx = self.find_right_from(target, &counts);
         }
-        let len = counts.len();
-        let mut idx = start % len;
-        for _ in 0..len {
-            if counts[idx] > 0 {
-                return idx;
+        self.selected_col = idx;
+        self.clamp_selection();
+        self.ensure_selection_visible();
+    }
+
+    fn move_right(&mut self, steps: usize) {
+        if self.board_cfg.columns.is_empty() {
+            return;
+        }
+        let counts = self.column_counts();
+        let len = self.board_cfg.columns.len();
+        let target = (self.selected_col + steps).min(len.saturating_sub(1));
+        let mut idx = self.find_right_from(target, &counts);
+        if counts.get(idx).copied().unwrap_or(0) == 0 {
+            idx = self.find_left_from(target, &counts);
+        }
+        self.selected_col = idx;
+        self.clamp_selection();
+        self.ensure_selection_visible();
+    }
+
+    fn find_left_from(&self, start: usize, counts: &[usize]) -> usize {
+        for i in (0..=start).rev() {
+            if counts.get(i).copied().unwrap_or(0) > 0 {
+                return i;
             }
-            idx = (((idx as i32 + dir).rem_euclid(len as i32)) as usize) % len;
         }
         start
+    }
+
+    fn find_right_from(&self, start: usize, counts: &[usize]) -> usize {
+        for i in start..counts.len() {
+            if counts.get(i).copied().unwrap_or(0) > 0 {
+                return i;
+            }
+        }
+        start
+    }
+
+    fn go_top(&mut self) {
+        self.selected_row = 0;
+        self.scroll_offset = 0;
+    }
+
+    fn go_bottom(&mut self) {
+        let counts = self.column_counts();
+        if let Some(max_rows) = counts.get(self.selected_col) {
+            if *max_rows > 0 {
+                self.selected_row = *max_rows - 1;
+                self.ensure_selection_visible();
+            }
+        }
     }
 }

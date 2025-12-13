@@ -22,16 +22,7 @@ pub trait Screen: KeyHandler {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScreenState {
     Stay,
+    Refresh,
     SwitchTo(ScreenType),
     Quit,
-    Refresh,
-    OneRowUp,
-    OneRowDown,
-    OneColumnLeft,
-    OneColumnRight,
-    HalfPageUp,
-    HalfPageDown,
-    GoToTop,
-    GoToBottom,
-    GoToLine(usize),
 }
