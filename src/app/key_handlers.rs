@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use crate::{config::KeyBindings, ui::screens::ScreenState};
+use crate::{
+    app::state::{Mode, ScreenType},
+    config::KeyBindings,
+    ui::screens::ScreenState,
+};
 use crossterm::event::KeyEvent;
 
 pub mod navigation_hanler;
@@ -20,7 +24,7 @@ pub enum Command {
     Motion(Motion),
     Refresh,
     Quit,
-    SwitchTo(crate::app::state::ScreenType),
+    SwitchTo(ScreenType),
     Unhandled(KeyEvent),
     Noop,
 }
@@ -106,7 +110,7 @@ pub fn parse_command(
 
     // Quit (only in Normal)
     if (key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Char('Q'))
-        && matches!(mode, crate::app::state::Mode::Normal)
+        && matches!(mode, Mode::Normal)
     {
         state.pending_count = None;
         state.pending_g = false;
@@ -117,7 +121,14 @@ pub fn parse_command(
     if key_event.code == KeyCode::Esc {
         state.pending_count = None;
         state.pending_g = false;
-        return Command::SwitchTo(crate::app::state::ScreenType::Home);
+        return Command::SwitchTo(ScreenType::Home);
+    }
+
+    // In Insert/Command modes we don't interpret motions or counts — pass raw input through.
+    if matches!(mode, Mode::Insert | Mode::Command) {
+        state.pending_count = None;
+        state.pending_g = false;
+        return Command::Unhandled(key_event);
     }
 
     // Counts

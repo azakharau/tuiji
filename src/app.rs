@@ -7,11 +7,13 @@ use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 use crate::{
     app::{
         event::{AppEvent, WorkerMessage},
-        key_handlers::{global_action_hints, parse_command, Command, InputState},
+        key_handlers::{Command, InputState, global_action_hints, parse_command},
         state::ScreenType,
     },
     config::AppConfig,
-    ui::screens::{Screen, ScreenState, current_sprint, current_sprint::CurrentSprintScreen, home::HomeScreen},
+    ui::screens::{
+        Screen, ScreenState, current_sprint, current_sprint::CurrentSprintScreen, home::HomeScreen,
+    },
 };
 
 pub mod event;
@@ -123,7 +125,12 @@ impl App {
     }
 
     fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
-        let cmd = parse_command(key, self.state.mode.clone(), &self.cfg.key_bindings, &mut self.input_state);
+        let cmd = parse_command(
+            key,
+            self.state.mode.clone(),
+            &self.cfg.key_bindings,
+            &mut self.input_state,
+        );
         match cmd {
             Command::Quit => Ok(ScreenState::Quit),
             Command::Refresh => Ok(ScreenState::Refresh),
