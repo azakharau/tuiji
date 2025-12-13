@@ -5,41 +5,41 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::{app::key_handlers::ActionItem, ui::utils::text_params};
+use crate::{app::key_handlers::ActionHint, ui::utils::text_params};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct HomeMenuActions(Vec<ActionItem>);
+pub struct HomeMenuActions(Vec<ActionHint>);
 
 impl Default for HomeMenuActions {
     fn default() -> Self {
         HomeMenuActions(vec![
-            ActionItem {
-                binding: "c",
-                description: "Current Sprint",
+            ActionHint {
+                binding: "c".to_string(),
+                description: "Current Sprint".to_string(),
             },
-            ActionItem {
-                binding: "i",
-                description: "My issues",
+            ActionHint {
+                binding: "i".to_string(),
+                description: "My issues".to_string(),
             },
-            ActionItem {
-                binding: "s",
-                description: "Search Issues",
+            ActionHint {
+                binding: "s".to_string(),
+                description: "Search Issues".to_string(),
             },
-            ActionItem {
-                binding: "n",
-                description: "New Issue",
+            ActionHint {
+                binding: "n".to_string(),
+                description: "New Issue".to_string(),
             },
-            ActionItem {
-                binding: "r",
-                description: "Refresh",
+            ActionHint {
+                binding: "r".to_string(),
+                description: "Refresh".to_string(),
             },
-            ActionItem {
-                binding: "p",
-                description: "Profiles",
+            ActionHint {
+                binding: "p".to_string(),
+                description: "Profiles".to_string(),
             },
-            ActionItem {
-                binding: "q",
-                description: "Quit",
+            ActionHint {
+                binding: "q".to_string(),
+                description: "Quit".to_string(),
             },
         ])
     }

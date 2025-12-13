@@ -1,4 +1,7 @@
-use gouqi::{Board, Credentials, Issue, Jira, JiraBuilder, Project, SearchOptions, Sprint};
+use gouqi::{
+    r#async::Jira,
+    Board, Credentials, Issue, Project, SearchOptions, Sprint,
+};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -87,62 +90,59 @@ pub struct JiraClient {
 }
 
 impl JiraClient {
-    pub fn new(base_url: &str, username: &str, api_token: &str) -> Self {
-        let credentals = Credentials::Basic(username.to_string(), api_token.to_string());
-        let client = JiraBuilder::new()
-            .host(base_url)
-            .credentials(credentals)
-            .build_with_validation()
-            .expect("Failed to create Jira client");
-        JiraClient { client }
+    pub fn new(base_url: &str, username: &str, api_token: &str) -> gouqi::Result<Self> {
+        let credentials = Credentials::Basic(username.to_string(), api_token.to_string());
+        let client = Jira::new(base_url, credentials)?;
+        Ok(JiraClient { client })
     }
 
-    pub fn get_projects(&self) -> gouqi::Result<Vec<Project>> {
-        self.client.projects().list()
+    pub async fn get_projects(&self) -> gouqi::Result<Vec<Project>> {
+        self.client.projects().list().await
     }
 
-    pub fn get_project_boards(&self, project_key: &str) -> gouqi::Result<Vec<Board>> {
-        let res = self.client.boards().list(
-            &SearchOptions::builder()
-                .project_key_or_id(project_key)
-                .build(),
-        )?;
-        let boards = res.values;
-        gouqi::Result::Ok(boards)
+    pub async fn get_project_boards(&self, project_key: &str) -> gouqi::Result<Vec<Board>> {
+        let res = self
+            .client
+            .boards()
+            .list(
+                &SearchOptions::builder()
+                    .project_key_or_id(project_key)
+                    .build(),
+            )
+            .await?;
+        Ok(res.values)
     }
 
-    pub fn get_board_sprints(&self, board_id: u64) -> gouqi::Result<Vec<gouqi::Sprint>> {
-        let board = self.client.boards().get(board_id)?;
+    pub async fn get_board_sprints(&self, board_id: u64) -> gouqi::Result<Vec<Sprint>> {
+        let board = self.client.boards().get(board_id).await?;
         let res = self
             .client
             .sprints()
-            .list(&board, &SearchOptions::builder().build())?;
-        let sprints = res.values;
-        gouqi::Result::Ok(sprints)
+            .list(&board, &SearchOptions::builder().build())
+            .await?;
+        Ok(res.values)
     }
 
-    pub fn get_current_sprint(&self, board_id: u64) -> gouqi::Result<Sprint> {
+    pub async fn get_current_sprint(&self, board_id: u64) -> gouqi::Result<Sprint> {
         let opts = SearchOptions::builder().state("active").build();
-        let board = self.client.boards().get(board_id)?;
-        let mut page = self.client.sprints().list(&board, &opts)?;
+        let board = self.client.boards().get(board_id).await?;
+        let mut page = self.client.sprints().list(&board, &opts).await?;
         page.values.pop().ok_or(gouqi::Error::NotFound)
     }
 
-    pub fn get_current_sprint_issues(&self, board_id: u64) -> gouqi::Result<Issues> {
-        let board = self.client.boards().get(175_u64)?;
-        let mut issues: Vec<Issue> = Vec::new();
-        let sprint = self.get_current_sprint(board_id)?;
+    pub async fn get_current_sprint_issues(&self, board_id: u64) -> gouqi::Result<Issues> {
+        let sprint = self.get_current_sprint(board_id).await?;
         let jql = format!("sprint = {}", sprint.id);
         let opts = SearchOptions::builder().jql(&jql).all_fields().build();
-        let issue_page = self.client.issues().iter(&board, &opts)?;
-        issue_page.for_each(|issue| issues.push(issue));
-        gouqi::Result::Ok(issues)
+        let res = self.client.search().list(&jql, &opts).await?;
+        Ok(res.issues)
     }
 
-    pub fn get_board_config(&self, board_id: u64) -> gouqi::Result<BoardConfig> {
+    pub async fn get_board_config(&self, board_id: u64) -> gouqi::Result<BoardConfig> {
         let resp: Value = self
             .client
-            .get("agile", &format!("/board/{}/configuration", board_id))?;
+            .get("agile", &format!("/board/{}/configuration", board_id))
+            .await?;
         let columns_cfg = resp.get("columnConfig");
         if columns_cfg.is_none() {
             return gouqi::Result::Err(gouqi::Error::ConfigError {
@@ -216,7 +216,7 @@ impl JiraClient {
                 }
             }
         };
-        gouqi::Result::Ok(BoardConfig {
+        Ok(BoardConfig {
             columns: columns_cfg
                 .into_iter()
                 .map(|mut col| {
@@ -226,11 +226,5 @@ impl JiraClient {
                 .collect(),
             estimation: estim,
         })
-    }
-    pub fn get_board_config_test(&self, board_id: u64) -> gouqi::Result<Value> {
-        let resp: Value = self
-            .client
-            .get("agile", &format!("/board/{}/configuration", board_id))?;
-        gouqi::Result::Ok(resp.clone())
     }
 }

@@ -1,11 +1,13 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{KeyHandler, ScreenState};
+use crate::{config::KeyBindings, ui::screens::ScreenState};
+
+use super::KeyHandler;
 
 pub struct VimRowNavigationHandler;
 
 impl KeyHandler for VimRowNavigationHandler {
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> ScreenState {
+    fn handle_key_event(&mut self, key_event: KeyEvent, _bindings: &KeyBindings) -> ScreenState {
         match key_event.code {
             KeyCode::Char('j') => {
                 // Handle down movement

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use color_eyre::Result;
+
 use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
@@ -8,7 +10,7 @@ use ratatui::{
 
 use crate::{
     app::{
-        key_handlers::{ActionItem, KeyHandler},
+        key_handlers::{ActionHint, KeyHandler},
         state::Mode,
     },
     client::jira::{BoardConfig, JiraClient},
@@ -27,25 +29,25 @@ const BOARD_ID: u64 = 175;
 pub struct CurrentSprintScreen {
     issues: Arc<Vec<IssueCardComponent>>,
     board_cfg: BoardConfig,
-    actions: Arc<Vec<ActionItem>>,
+    actions: Arc<Vec<ActionHint>>,
     mode: Mode,
 }
 
 impl CurrentSprintScreen {
-    pub fn new(cfg: &AppConfig, mode: Mode) -> Self {
+    pub async fn new(cfg: &AppConfig, mode: Mode) -> Result<Self> {
         let mut isuses = Vec::new();
         let jira = JiraClient::new(
             cfg.jira.base_url.as_str(),
             cfg.jira.username.as_str(),
             cfg.jira.api_token.as_str(),
-        );
+        )?;
         let board_cfg = jira
             .get_board_config(BOARD_ID)
-            .expect("Failed to fetch board config");
+            .await?;
 
         let jira_issues = jira
             .get_current_sprint_issues(BOARD_ID)
-            .expect("Failed to fetch current sprint issues");
+            .await?;
 
         jira_issues.into_iter().for_each(|issue| {
             let key = issue.key.to_string();
@@ -82,12 +84,12 @@ impl CurrentSprintScreen {
 
             isuses.push(issue_card);
         });
-        Self {
+        Ok(Self {
             issues: Arc::new(isuses),
             board_cfg,
             actions: Arc::new(vec![]),
             mode,
-        }
+        })
     }
 }
 impl Screen for CurrentSprintScreen {
@@ -112,14 +114,23 @@ impl Screen for CurrentSprintScreen {
     fn name(&self) -> &'static str {
         "Current Sprint"
     }
+
+    fn set_action_hints(&mut self, actions: Arc<Vec<ActionHint>>) {
+        self.actions = actions;
+    }
 }
 
 impl KeyHandler for CurrentSprintScreen {
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> ScreenState {
-        match key_event.code {
-            crossterm::event::KeyCode::Char('q') => ScreenState::Quit,
-            _ => ScreenState::Stay,
+    fn handle_key_event(
+        &mut self,
+        key_event: KeyEvent,
+        bindings: &crate::config::KeyBindings,
+    ) -> ScreenState {
+        use crate::app::key_handlers::binding_matches;
+        if binding_matches(&key_event, &bindings.refresh) {
+            return ScreenState::Refresh;
         }
+        ScreenState::Stay
     }
 }
 

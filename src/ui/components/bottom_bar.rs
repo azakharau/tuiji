@@ -7,15 +7,15 @@ use ratatui::{
     widgets::{Paragraph, Widget},
 };
 
-use crate::app::{key_handlers::ActionItem, state::Mode};
+use crate::app::{key_handlers::ActionHint, state::Mode};
 
 pub struct BottomBar {
     pub mode: Mode,
-    pub actions: Arc<Vec<ActionItem>>, 
+    pub actions: Arc<Vec<ActionHint>>,
 }
 
 impl BottomBar {
-    pub fn new(mode: Mode, actions: Arc<Vec<ActionItem>>) -> Self {
+    pub fn new(mode: Mode, actions: Arc<Vec<ActionHint>>) -> Self {
         BottomBar { mode, actions }
     }
 }
@@ -30,7 +30,7 @@ impl Widget for BottomBar {
             .join(" ");
         let actions_paragraph = Paragraph::new(actions_str)
             .style(Style::default().fg(Color::White))
-            .alignment(Alignment::Right);
+            .alignment(Alignment::Left);
 
         let chunks = Layout::horizontal([Constraint::Length(10), Constraint::Min(0)]).split(area);
 

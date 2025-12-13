@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use color_eyre::eyre::{Result, eyre};
+use color_eyre::eyre::Result;
 use crossterm::event::{Event, EventStream, KeyEvent};
 use futures::StreamExt;
 use ratatui::DefaultTerminal;
@@ -9,6 +9,7 @@ use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle, time};
 use crate::{
     app::{
         event::{AppEvent, WorkerMessage},
+        key_handlers::{binding_matches, global_action_hints},
         state::ScreenType,
     },
     config::AppConfig,
@@ -33,7 +34,7 @@ struct CachedScreens {
 }
 
 impl CachedScreens {
-    pub fn active_mut(&mut self, cfg: &AppConfig, state: &AppState) -> &mut dyn Screen {
+    pub fn active_mut(&mut self, _cfg: &AppConfig, state: &AppState) -> &mut dyn Screen {
         match state.current_screen {
             ScreenType::Home => {
                 if self.home_screen.is_none() {
@@ -43,12 +44,9 @@ impl CachedScreens {
                 self.home_screen.as_mut().unwrap()
             }
             ScreenType::CurrentSprint => {
-                if self.current_sprint_screen.is_none() {
-                    self.current_sprint_screen =
-                        Some(CurrentSprintScreen::new(cfg, state.mode.clone()));
-                }
-                // SAFE: We just ensured it's Some above
-                self.current_sprint_screen.as_mut().unwrap()
+                self.current_sprint_screen
+                    .as_mut()
+                    .expect("Current sprint screen not loaded")
             }
             _ => {
                 panic!("Screen {:?} not implemented yet", state.current_screen);
@@ -128,8 +126,11 @@ impl App {
     }
 
     fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
+        if let Some(global) = map_global(&key, &self.cfg.key_bindings) {
+            return Ok(global);
+        }
         let screen = self.screens.active_mut(&self.cfg, &self.state);
-        Ok(screen.handle_key_event(key))
+        Ok(screen.handle_key_event(key, &self.cfg.key_bindings))
     }
 
     fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
@@ -156,7 +157,9 @@ impl App {
 
     async fn render(&mut self) -> Result<()> {
         self.ensure_screen_ready().await?;
+        let hints = global_action_hints(&self.cfg.key_bindings);
         let screen = self.screens.active_mut(&self.cfg, &self.state);
+        screen.set_action_hints(hints);
         self.terminal.draw(|frame| {
             screen.draw(frame);
         })?;
@@ -169,11 +172,7 @@ impl App {
         {
             let cfg = self.cfg.clone();
             let mode = self.state.mode.clone();
-            let handle =
-                tokio::task::spawn_blocking(move || CurrentSprintScreen::new(&cfg, mode));
-            let screen = handle
-                .await
-                .map_err(|e| eyre!("failed to join sprint loader: {e}"))?;
+            let screen = CurrentSprintScreen::new(&cfg, mode).await?;
             self.screens.current_sprint_screen = Some(screen);
         }
         Ok(())
@@ -230,4 +229,14 @@ fn spawn_notifications(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
             }
         }
     })
+}
+
+fn map_global(key: &KeyEvent, bindings: &crate::config::KeyBindings) -> Option<ScreenState> {
+    if binding_matches(key, &bindings.quit) {
+        return Some(ScreenState::Quit);
+    }
+    if binding_matches(key, &bindings.refresh) {
+        return Some(ScreenState::Refresh);
+    }
+    None
 }

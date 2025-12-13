@@ -46,7 +46,18 @@ impl Screen for HomeScreen {
 }
 
 impl KeyHandler for HomeScreen {
-    fn handle_key_event(&mut self, key_code: crossterm::event::KeyEvent) -> ScreenState {
+    fn handle_key_event(
+        &mut self,
+        key_code: crossterm::event::KeyEvent,
+        bindings: &crate::config::KeyBindings,
+    ) -> ScreenState {
+        use crate::app::key_handlers::binding_matches;
+        if binding_matches(&key_code, &bindings.quit) {
+            return ScreenState::Quit;
+        }
+        if binding_matches(&key_code, &bindings.refresh) {
+            return ScreenState::Refresh;
+        }
         match key_code.code {
             crossterm::event::KeyCode::Char('c') => {
                 ScreenState::SwitchTo(crate::app::state::ScreenType::CurrentSprint)
