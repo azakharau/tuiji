@@ -2754,6 +2754,7 @@ dependencies = [
  "color-eyre",
  "crossterm 0.29.0",
  "env_logger",
+ "futures",
  "gouqi",
  "log",
  "ratatui",

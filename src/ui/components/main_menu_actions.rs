@@ -5,19 +5,7 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::ui::utils::text_params;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ActionItem {
-    pub binding: &'static str,
-    pub description: &'static str,
-}
-
-impl ActionItem {
-    pub fn render(&self) -> String {
-        format!("[{}]  {}", self.binding, self.description)
-    }
-}
+use crate::{app::key_handlers::ActionItem, ui::utils::text_params};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HomeMenuActions(Vec<ActionItem>);

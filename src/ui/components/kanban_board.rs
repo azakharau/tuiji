@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use ratatui::{
     buffer::Buffer,
@@ -12,7 +12,7 @@ use crate::{client::jira::BoardConfig, ui::components::issue_card::IssueCardComp
 pub struct KanbanBoard<'a> {
     pub id: u32,
     pub title: String,
-    pub issues: Rc<Vec<IssueCardComponent>>,
+    pub issues: Arc<Vec<IssueCardComponent>>,
     pub board_cfg: &'a BoardConfig,
 }
 
@@ -20,7 +20,7 @@ impl<'a> KanbanBoard<'a> {
     pub fn new(
         id: u32,
         title: String,
-        issues: Rc<Vec<IssueCardComponent>>,
+        issues: Arc<Vec<IssueCardComponent>>,
         cfg: &'a BoardConfig,
     ) -> Self {
         KanbanBoard {

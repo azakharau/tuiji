@@ -6,7 +6,7 @@ use crate::{AppError, ConfigError};
 const ENV_PREFIX: &str = "TUIJI_";
 const CFG_FILE_PATH: &str = "tuiji/config.toml";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     pub jira: JiraConfig,
     pub key_bindings: KeyBindings,
@@ -50,7 +50,7 @@ impl AppConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JiraConfig {
     pub base_url: String,
     pub username: String,
@@ -71,7 +71,7 @@ impl JiraConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct KeyBindings {
     pub quit: String,
     pub next: String,
@@ -80,7 +80,7 @@ pub struct KeyBindings {
     pub refresh: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UiConfig {
     #[serde(default = "UiConfig::default_theme")]
     pub theme: String,
