@@ -106,7 +106,8 @@ impl Screen for CurrentSprintScreen {
             Constraint::Length(1),
         ])
         .split(frame.area());
-        self.rows_visible = ((layout[1].height.saturating_sub(1)) / issue_height.max(1)).max(1) as usize;
+        self.rows_visible =
+            ((layout[1].height.saturating_sub(1)) / issue_height.max(1)).max(1) as usize;
         self.clamp_selection();
         self.ensure_selection_visible();
         let kanban_board = KanbanBoard::new(
@@ -217,9 +218,14 @@ impl CurrentSprintScreen {
             return;
         }
         // prefer nearest non-empty to the left, then right
-        if let Some(left) = (0..=self.selected_col).rev().find(|&i| counts.get(i).copied().unwrap_or(0) > 0) {
+        if let Some(left) = (0..=self.selected_col)
+            .rev()
+            .find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
+        {
             self.selected_col = left;
-        } else if let Some(right) = (self.selected_col + 1..len).find(|&i| counts.get(i).copied().unwrap_or(0) > 0) {
+        } else if let Some(right) =
+            (self.selected_col + 1..len).find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
+        {
             self.selected_col = right;
         } else {
             // all empty
@@ -338,11 +344,11 @@ impl CurrentSprintScreen {
 
     fn go_bottom(&mut self) {
         let counts = self.column_counts();
-        if let Some(max_rows) = counts.get(self.selected_col) {
-            if *max_rows > 0 {
-                self.selected_row = *max_rows - 1;
-                self.ensure_selection_visible();
-            }
+        if let Some(max_rows) = counts.get(self.selected_col)
+            && *max_rows > 0
+        {
+            self.selected_row = *max_rows - 1;
+            self.ensure_selection_visible();
         }
     }
 }

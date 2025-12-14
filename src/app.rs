@@ -12,7 +12,10 @@ use crate::{
     },
     config::AppConfig,
     ui::screens::{
-        Screen, ScreenState, current_sprint, current_sprint::CurrentSprintScreen, home::HomeScreen,
+        Screen, ScreenState,
+        current_sprint::{self, CurrentSprintScreen},
+        home::HomeScreen,
+        profile_picker::ProfileScreen,
     },
 };
 
@@ -29,10 +32,11 @@ pub struct AppState {
 struct CachedScreens {
     home_screen: Option<HomeScreen>,
     current_sprint_screen: Option<CurrentSprintScreen>,
+    profile_screen: Option<ProfileScreen>,
 }
 
 impl CachedScreens {
-    pub fn active_mut(&mut self, _cfg: &AppConfig, state: &AppState) -> &mut dyn Screen {
+    pub async fn active_mut(&mut self, cfg: &AppConfig, state: &AppState) -> &mut dyn Screen {
         match state.current_screen {
             ScreenType::Home => {
                 if self.home_screen.is_none() {
@@ -41,10 +45,25 @@ impl CachedScreens {
                 // SAFE: We just ensured it's Some above
                 self.home_screen.as_mut().unwrap()
             }
-            ScreenType::CurrentSprint => self
-                .current_sprint_screen
-                .as_mut()
-                .expect("Current sprint screen not loaded"),
+            ScreenType::CurrentSprint => {
+                if self.current_sprint_screen.is_none() {
+                    CurrentSprintScreen::new(cfg, state.mode.clone())
+                        .await
+                        .map(|screen| {
+                            self.current_sprint_screen = Some(screen);
+                        })
+                        .expect("Failed to create Current Sprint Screen");
+                }
+                self.current_sprint_screen
+                    .as_mut()
+                    .expect("Current sprint screen not loaded")
+            }
+            ScreenType::Profiles => {
+                if self.profile_screen.is_none() {
+                    self.profile_screen = Some(ProfileScreen::new(cfg.clone()));
+                }
+                self.profile_screen.as_mut().unwrap()
+            }
             _ => {
                 panic!("Screen {:?} not implemented yet", state.current_screen);
             }
@@ -70,6 +89,7 @@ impl App {
         let screen = CachedScreens {
             home_screen: None,
             current_sprint_screen: None,
+            profile_screen: None,
         };
         let config = AppConfig::load().unwrap();
         Self {
@@ -100,7 +120,7 @@ impl App {
                 AppEvent::Input(key) => {
                     // Ensure we preload any heavy screens before handling input to avoid blocking in async context.
                     self.ensure_screen_ready().await?;
-                    let action = self.handle_input(key)?;
+                    let action = self.handle_input(key).await?;
                     match self.apply_action(action)? {
                         ActionOutcome::Continue { render } => render_requested |= render,
                         ActionOutcome::Quit => {
@@ -124,7 +144,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
+    async fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
         let cmd = parse_command(
             key,
             self.state.mode.clone(),
@@ -136,7 +156,7 @@ impl App {
             Command::Refresh => Ok(ScreenState::Refresh),
             Command::SwitchTo(screen) => Ok(ScreenState::SwitchTo(screen)),
             Command::Motion(_) | Command::Noop | Command::Unhandled(_) => {
-                let screen = self.screens.active_mut(&self.cfg, &self.state);
+                let screen = self.screens.active_mut(&self.cfg, &self.state).await;
                 Ok(screen.handle_command(cmd))
             }
         }
@@ -166,7 +186,7 @@ impl App {
     async fn render(&mut self) -> Result<()> {
         self.ensure_screen_ready().await?;
         let screen_type = self.state.current_screen.clone();
-        let screen = self.screens.active_mut(&self.cfg, &self.state);
+        let screen = self.screens.active_mut(&self.cfg, &self.state).await;
         let hints = match screen_type {
             ScreenType::CurrentSprint => {
                 current_sprint::CurrentSprintScreen::action_hints(&self.cfg.key_bindings)

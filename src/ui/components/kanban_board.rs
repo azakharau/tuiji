@@ -21,6 +21,7 @@ pub struct KanbanBoard<'a> {
 }
 
 impl<'a> KanbanBoard<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: u32,
         title: String,
@@ -53,11 +54,7 @@ impl<'a> KanbanBoard<'a> {
     fn rows_layout(&self) -> Layout {
         let mut constraints: Vec<Constraint> = Vec::new();
         constraints.push(Constraint::Length(1)); // header
-        let issue_height = self
-            .issues
-            .first()
-            .map(|i| i.height())
-            .unwrap_or(8);
+        let issue_height = self.issues.first().map(|i| i.height()).unwrap_or(8);
         (0..self.rows_visible).for_each(|_| {
             constraints.push(Constraint::Length(issue_height));
         });
@@ -88,7 +85,6 @@ impl<'a> KanbanBoard<'a> {
 
         grouped_issues
     }
-
 }
 
 impl Widget for KanbanBoard<'_> {
@@ -110,7 +106,8 @@ impl Widget for KanbanBoard<'_> {
             for row_idx in 0..self.rows_visible {
                 let area = table[i][row_idx + 1];
                 if let Some(issue) = column_issues.get(offset + row_idx) {
-                    let selected = self.selected_col == i && (offset + row_idx) == self.selected_row;
+                    let selected =
+                        self.selected_col == i && (offset + row_idx) == self.selected_row;
                     issue.render_with_selection(area, buf, selected);
                 } else {
                     // Clear the area for empty rows to avoid ghost content.
