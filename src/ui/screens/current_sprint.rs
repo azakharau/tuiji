@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::{
     app::{
-        key_handlers::{ActionHint, KeyHandler},
+        key_handlers::{ActionHint, ActionId, Command, KeyHandler},
         state::Mode,
     },
     client::jira::{BoardConfig, JiraClient},
@@ -134,59 +134,39 @@ impl Screen for CurrentSprintScreen {
 }
 
 impl KeyHandler for CurrentSprintScreen {
-    fn handle_command(&mut self, command: crate::app::key_handlers::Command) -> ScreenState {
-        use crate::app::key_handlers::{Command, Motion};
-        match command {
-            Command::Refresh => ScreenState::Refresh,
-            Command::Quit if matches!(self.mode, Mode::Normal) => ScreenState::Quit,
-            Command::SwitchTo(screen) => ScreenState::SwitchTo(screen),
-            Command::Motion(m) => {
-                match m {
-                    Motion::Down(n) => self.move_down(n),
-                    Motion::Up(n) => self.move_up(n),
-                    Motion::Left(n) => self.move_left(n),
-                    Motion::Right(n) => self.move_right(n),
-                    Motion::Top => self.go_top(),
-                    Motion::Bottom => self.go_bottom(),
-                }
+    fn handle_command(&mut self, command: Command) -> ScreenState {
+        match command.action {
+            ActionId::Refresh => ScreenState::Refresh,
+            ActionId::MoveDown => {
+                self.move_down(command.repeat);
                 ScreenState::Refresh
             }
-            Command::Unhandled(_) => ScreenState::Stay,
+            ActionId::MoveUp => {
+                self.move_up(command.repeat);
+                ScreenState::Refresh
+            }
+            ActionId::MoveLeft => {
+                self.move_left(command.repeat);
+                ScreenState::Refresh
+            }
+            ActionId::MoveRight => {
+                self.move_right(command.repeat);
+                ScreenState::Refresh
+            }
+            ActionId::MoveTop => {
+                self.go_top();
+                ScreenState::Refresh
+            }
+            ActionId::MoveBottom => {
+                self.go_bottom();
+                ScreenState::Refresh
+            }
             _ => ScreenState::Stay,
         }
     }
 }
 
 impl CurrentSprintScreen {
-    pub fn action_hints(bindings: &crate::config::KeyBindings) -> Arc<Vec<ActionHint>> {
-        Arc::new(vec![
-            ActionHint {
-                binding: format!("{}/↑", bindings.previous),
-                description: "Up".to_string(),
-            },
-            ActionHint {
-                binding: format!("{}/↓", bindings.next),
-                description: "Down".to_string(),
-            },
-            ActionHint {
-                binding: "h/←".to_string(),
-                description: "Prev column".to_string(),
-            },
-            ActionHint {
-                binding: "l/→".to_string(),
-                description: "Next column".to_string(),
-            },
-            ActionHint {
-                binding: bindings.refresh.clone(),
-                description: "Refresh".to_string(),
-            },
-            ActionHint {
-                binding: bindings.quit.clone(),
-                description: "Quit".to_string(),
-            },
-        ])
-    }
-
     fn column_counts(&self) -> Vec<usize> {
         let mut counts = vec![0; self.board_cfg.columns.len()];
         for issue in self.issues.iter() {
@@ -294,11 +274,15 @@ impl CurrentSprintScreen {
         }
         let counts = self.column_counts();
         let target = self.selected_col.saturating_sub(steps);
-        let mut idx = self.find_left_from(target, &counts);
-        if counts.get(idx).copied().unwrap_or(0) == 0 {
-            idx = self.find_right_from(target, &counts);
+        if counts.get(target).copied().unwrap_or(0) > 0 {
+            self.selected_col = target;
+        } else if target > 0
+            && let Some(idx) = (0..target)
+                .rev()
+                .find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
+        {
+            self.selected_col = idx;
         }
-        self.selected_col = idx;
         self.clamp_selection();
         self.ensure_selection_visible();
     }
@@ -310,31 +294,15 @@ impl CurrentSprintScreen {
         let counts = self.column_counts();
         let len = self.board_cfg.columns.len();
         let target = (self.selected_col + steps).min(len.saturating_sub(1));
-        let mut idx = self.find_right_from(target, &counts);
-        if counts.get(idx).copied().unwrap_or(0) == 0 {
-            idx = self.find_left_from(target, &counts);
+        if counts.get(target).copied().unwrap_or(0) > 0 {
+            self.selected_col = target;
+        } else if target + 1 < len
+            && let Some(idx) = (target + 1..len).find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
+        {
+            self.selected_col = idx;
         }
-        self.selected_col = idx;
         self.clamp_selection();
         self.ensure_selection_visible();
-    }
-
-    fn find_left_from(&self, start: usize, counts: &[usize]) -> usize {
-        for i in (0..=start).rev() {
-            if counts.get(i).copied().unwrap_or(0) > 0 {
-                return i;
-            }
-        }
-        start
-    }
-
-    fn find_right_from(&self, start: usize, counts: &[usize]) -> usize {
-        for i in start..counts.len() {
-            if counts.get(i).copied().unwrap_or(0) > 0 {
-                return i;
-            }
-        }
-        start
     }
 
     fn go_top(&mut self) {

@@ -10,7 +10,7 @@ async fn main() -> Result<()> {
     });
 
     let state = AppState::default();
-    let mut app = App::new(terminal, state);
+    let mut app = App::new(terminal, state)?;
 
     let result = app.run().await;
     ratatui::restore();

@@ -6,19 +6,14 @@ use ratatui::{
 };
 
 use crate::{
-    app::key_handlers::KeyHandler,
-    config::AppConfig,
+    app::key_handlers::{ActionId, Command, KeyHandler},
     ui::screens::{Screen, ScreenState},
 };
 
-pub struct ProfileScreen {
-    conf: AppConfig,
-}
+pub struct ProfileScreen;
 
 impl ProfileScreen {
-    pub fn new(conf: AppConfig) -> Self {
-        ProfileScreen { conf }
-    }
+    pub fn new(_cfg: crate::config::AppConfig) -> Self { ProfileScreen }
 }
 
 impl Screen for ProfileScreen {
@@ -35,16 +30,10 @@ impl Screen for ProfileScreen {
 }
 
 impl KeyHandler for ProfileScreen {
-    fn handle_command(&mut self, command: crate::app::key_handlers::Command) -> ScreenState {
-        use crate::app::key_handlers::Command;
-        match command {
-            Command::Refresh => ScreenState::Refresh,
-            Command::SwitchTo(screen) => ScreenState::SwitchTo(screen),
-            Command::Unhandled(key) => match key.code {
-                crossterm::event::KeyCode::Char('q') => ScreenState::Quit,
-                _ => ScreenState::Stay,
-            },
-            Command::Quit => ScreenState::Quit,
+    fn handle_command(&mut self, command: Command) -> ScreenState {
+        match command.action {
+            ActionId::Refresh => ScreenState::Refresh,
+            ActionId::Quit => ScreenState::Quit,
             _ => ScreenState::Stay,
         }
     }

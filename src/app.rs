@@ -7,14 +7,12 @@ use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 use crate::{
     app::{
         event::{AppEvent, WorkerMessage},
-        key_handlers::{Command, InputState, global_action_hints, parse_command},
+        key_handlers::{action_hints, parse_command, ActionId, Command, InputState},
         state::ScreenType,
     },
-    config::AppConfig,
+    config::{AppConfig, AppConfigState},
     ui::screens::{
-        Screen, ScreenState,
-        current_sprint::{self, CurrentSprintScreen},
-        home::HomeScreen,
+        Screen, ScreenState, current_sprint::CurrentSprintScreen, home::HomeScreen,
         profile_picker::ProfileScreen,
     },
 };
@@ -36,33 +34,47 @@ struct CachedScreens {
 }
 
 impl CachedScreens {
-    pub async fn active_mut(&mut self, cfg: &AppConfig, state: &AppState) -> &mut dyn Screen {
+    pub async fn active_mut(
+        &mut self,
+        cfg_state: &AppConfigState,
+        state: &AppState,
+    ) -> Result<&mut dyn Screen> {
+        let cfg = match cfg_state {
+            AppConfigState::Loaded(c) => Some(c),
+            AppConfigState::Missing(_) => None,
+        };
         match state.current_screen {
             ScreenType::Home => {
                 if self.home_screen.is_none() {
                     self.home_screen = Some(HomeScreen::default());
                 }
-                // SAFE: We just ensured it's Some above
-                self.home_screen.as_mut().unwrap()
+                Ok(self.home_screen.as_mut().expect("Home screen not loaded"))
             }
             ScreenType::CurrentSprint => {
                 if self.current_sprint_screen.is_none() {
-                    CurrentSprintScreen::new(cfg, state.mode.clone())
-                        .await
-                        .map(|screen| {
-                            self.current_sprint_screen = Some(screen);
-                        })
-                        .expect("Failed to create Current Sprint Screen");
+                    let mode = state.mode.clone();
+                    let cfg = cfg.ok_or_else(|| {
+                        color_eyre::eyre::eyre!("Config missing: cannot open Current Sprint screen")
+                    })?;
+                    let screen = CurrentSprintScreen::new(cfg, mode).await?;
+                    self.current_sprint_screen = Some(screen);
                 }
-                self.current_sprint_screen
+                Ok(self
+                    .current_sprint_screen
                     .as_mut()
-                    .expect("Current sprint screen not loaded")
+                    .expect("Current sprint screen not loaded"))
             }
             ScreenType::Profiles => {
                 if self.profile_screen.is_none() {
+                    let cfg = cfg.ok_or_else(|| {
+                        color_eyre::eyre::eyre!("Config missing: cannot open Profiles screen")
+                    })?;
                     self.profile_screen = Some(ProfileScreen::new(cfg.clone()));
                 }
-                self.profile_screen.as_mut().unwrap()
+                Ok(self
+                    .profile_screen
+                    .as_mut()
+                    .expect("Profile screen not loaded"))
             }
             _ => {
                 panic!("Screen {:?} not implemented yet", state.current_screen);
@@ -80,25 +92,25 @@ pub struct App {
     pub terminal: DefaultTerminal,
     pub state: AppState,
     screens: CachedScreens,
-    cfg: AppConfig,
+    cfg_state: AppConfigState,
     input_state: InputState,
 }
 
 impl App {
-    pub fn new(terminal: DefaultTerminal, state: AppState) -> Self {
+    pub fn new(terminal: DefaultTerminal, state: AppState) -> Result<Self> {
         let screen = CachedScreens {
             home_screen: None,
             current_sprint_screen: None,
             profile_screen: None,
         };
-        let config = AppConfig::load().unwrap();
-        Self {
+        let config = AppConfig::load_state();
+        Ok(Self {
             terminal,
             state,
             screens: screen,
-            cfg: config,
+            cfg_state: config,
             input_state: InputState::default(),
-        }
+        })
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -111,6 +123,7 @@ impl App {
         // let _notification_worker = spawn_notifications(tx.clone());
 
         // Initial paint.
+        self.init_start_screen();
         self.render().await?;
 
         while let Some(event) = rx.recv().await {
@@ -118,8 +131,6 @@ impl App {
 
             match event {
                 AppEvent::Input(key) => {
-                    // Ensure we preload any heavy screens before handling input to avoid blocking in async context.
-                    self.ensure_screen_ready().await?;
                     let action = self.handle_input(key).await?;
                     match self.apply_action(action)? {
                         ActionOutcome::Continue { render } => render_requested |= render,
@@ -145,21 +156,24 @@ impl App {
     }
 
     async fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
-        let cmd = parse_command(
+        let maybe_cmd = parse_command(
             key,
             self.state.mode.clone(),
-            &self.cfg.key_bindings,
             &mut self.input_state,
+            self.state.current_screen.clone(),
         );
-        match cmd {
-            Command::Quit => Ok(ScreenState::Quit),
-            Command::Refresh => Ok(ScreenState::Refresh),
-            Command::SwitchTo(screen) => Ok(ScreenState::SwitchTo(screen)),
-            Command::Motion(_) | Command::Noop | Command::Unhandled(_) => {
-                let screen = self.screens.active_mut(&self.cfg, &self.state).await;
-                Ok(screen.handle_command(cmd))
-            }
+
+        let Some(cmd) = maybe_cmd else {
+            return Ok(ScreenState::Stay);
+        };
+
+        // Global navigation/actions handled here; the rest go to the active screen.
+        if let Some(nav) = self.map_global_action(&cmd) {
+            return Ok(nav);
         }
+
+        let screen = self.screens.active_mut(&self.cfg_state, &self.state).await?;
+        Ok(screen.handle_command(cmd))
     }
 
     fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
@@ -183,16 +197,24 @@ impl App {
         Ok(true)
     }
 
+    fn map_global_action(&self, cmd: &Command) -> Option<ScreenState> {
+        match cmd.action {
+            ActionId::Quit => Some(ScreenState::Quit),
+            ActionId::Refresh => Some(ScreenState::Refresh),
+            ActionId::GoHome => Some(ScreenState::SwitchTo(ScreenType::Home)),
+            ActionId::OpenCurrentSprint => Some(ScreenState::SwitchTo(ScreenType::CurrentSprint)),
+            ActionId::OpenProfiles => Some(ScreenState::SwitchTo(ScreenType::Profiles)),
+            ActionId::OpenMyIssues => Some(ScreenState::SwitchTo(ScreenType::MyIssues)),
+            ActionId::OpenSearchIssues => Some(ScreenState::SwitchTo(ScreenType::SearchIssues)),
+            ActionId::OpenNewIssue => Some(ScreenState::SwitchTo(ScreenType::NewIssue)),
+            _ => None,
+        }
+    }
+
     async fn render(&mut self) -> Result<()> {
-        self.ensure_screen_ready().await?;
         let screen_type = self.state.current_screen.clone();
-        let screen = self.screens.active_mut(&self.cfg, &self.state).await;
-        let hints = match screen_type {
-            ScreenType::CurrentSprint => {
-                current_sprint::CurrentSprintScreen::action_hints(&self.cfg.key_bindings)
-            }
-            _ => global_action_hints(&self.cfg.key_bindings),
-        };
+        let screen = self.screens.active_mut(&self.cfg_state, &self.state).await?;
+        let hints = action_hints(screen_type.clone());
         screen.set_action_hints(hints);
         self.terminal.draw(|frame| {
             screen.draw(frame);
@@ -200,16 +222,16 @@ impl App {
         Ok(())
     }
 
-    async fn ensure_screen_ready(&mut self) -> Result<()> {
-        if matches!(self.state.current_screen, ScreenType::CurrentSprint)
-            && self.screens.current_sprint_screen.is_none()
-        {
-            let cfg = self.cfg.clone();
-            let mode = self.state.mode.clone();
-            let screen = CurrentSprintScreen::new(&cfg, mode).await?;
-            self.screens.current_sprint_screen = Some(screen);
+    fn init_start_screen(&mut self) {
+        match self.cfg_state {
+            AppConfigState::Loaded(_) => {
+                self.state.current_screen = ScreenType::Home;
+            }
+            AppConfigState::Missing(_) => {
+                // Placeholder: could route to Welcome screen later.
+                self.state.current_screen = ScreenType::Home;
+            }
         }
-        Ok(())
     }
 }
 
@@ -264,9 +286,3 @@ fn spawn_input_listener(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
 //         }
 //     })
 // }
-
-// Legacy stub retained to avoid unused warnings when adding more global mappings later.
-#[allow(dead_code)]
-fn map_global(_key: &KeyEvent, _bindings: &crate::config::KeyBindings) -> Option<ScreenState> {
-    None
-}

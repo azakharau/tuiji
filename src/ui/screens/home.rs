@@ -1,5 +1,5 @@
 use crate::{
-    app::key_handlers::KeyHandler,
+    app::key_handlers::{ActionId, Command, KeyHandler},
     ui::{
         components::{logo::AsciiLogoComponent, main_menu_actions::HomeMenuActions},
         screens::{Screen, ScreenState},
@@ -46,32 +46,9 @@ impl Screen for HomeScreen {
 }
 
 impl KeyHandler for HomeScreen {
-    fn handle_command(&mut self, command: crate::app::key_handlers::Command) -> ScreenState {
-        use crate::app::key_handlers::Command;
-        match command {
-            Command::Refresh => ScreenState::Refresh,
-            Command::SwitchTo(screen) => ScreenState::SwitchTo(screen),
-            Command::Unhandled(key) => match key.code {
-                crossterm::event::KeyCode::Char('c') => {
-                    ScreenState::SwitchTo(crate::app::state::ScreenType::CurrentSprint)
-                }
-                crossterm::event::KeyCode::Char('i') => {
-                    ScreenState::SwitchTo(crate::app::state::ScreenType::MyIssues)
-                }
-                crossterm::event::KeyCode::Char('s') => {
-                    ScreenState::SwitchTo(crate::app::state::ScreenType::SearchIssues)
-                }
-                crossterm::event::KeyCode::Char('n') => {
-                    ScreenState::SwitchTo(crate::app::state::ScreenType::NewIssue)
-                }
-                crossterm::event::KeyCode::Char('p') => {
-                    ScreenState::SwitchTo(crate::app::state::ScreenType::Profiles)
-                }
-                crossterm::event::KeyCode::Char('q') | crossterm::event::KeyCode::Char('Q') => {
-                    ScreenState::Quit
-                }
-                _ => ScreenState::Stay,
-            },
+    fn handle_command(&mut self, command: Command) -> ScreenState {
+        match command.action {
+            ActionId::Refresh => ScreenState::Refresh,
             _ => ScreenState::Stay,
         }
     }

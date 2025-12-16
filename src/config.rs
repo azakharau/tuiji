@@ -1,20 +1,38 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::{AppError, ConfigError};
+use crate::ConfigError;
 
 const ENV_PREFIX: &str = "TUIJI_";
 const CFG_FILE_PATH: &str = "tuiji/config.toml";
 
+#[derive(Debug)]
+pub enum AppConfigState {
+    Loaded(AppConfig),
+    Missing(ConfigError),
+}
+
+impl AppConfigState {
+    pub fn is_loaded(&self) -> bool {
+        matches!(self, AppConfigState::Loaded(_))
+    }
+
+    pub fn as_loaded(&self) -> &AppConfig {
+        match self {
+            AppConfigState::Loaded(cfg) => cfg,
+            _ => panic!("App config is not loaded"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     pub jira: JiraConfig,
-    pub key_bindings: KeyBindings,
     pub ui: UiConfig,
 }
 
 impl AppConfig {
-    pub fn load() -> Result<Self, AppError> {
+    pub fn load() -> Result<Self, ConfigError> {
         let cfg_path = resolve_cfg_path();
         let content = std::fs::read_to_string(&cfg_path).map_err(|e| ConfigError::Io {
             source: e,
@@ -28,7 +46,14 @@ impl AppConfig {
         Ok(env_override_config(cfg))
     }
 
-    pub fn save(&self) -> Result<(), AppError> {
+    pub fn load_state() -> AppConfigState {
+        match Self::load() {
+            Ok(cfg) => AppConfigState::Loaded(cfg),
+            Err(err) => AppConfigState::Missing(err),
+        }
+    }
+
+    pub fn save(&self) -> Result<(), ConfigError> {
         let cfg_path = resolve_cfg_path();
         if let Some(parent) = cfg_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| ConfigError::Io {
@@ -41,12 +66,10 @@ impl AppConfig {
             path: cfg_path.clone(),
         })?;
 
-        std::fs::write(&cfg_path, content)
-            .map_err(|e| ConfigError::Io {
-                source: e,
-                path: cfg_path.clone(),
-            })
-            .map_err(AppError::from)
+        std::fs::write(&cfg_path, content).map_err(|e| ConfigError::Io {
+            source: e,
+            path: cfg_path.clone(),
+        })
     }
 }
 
@@ -71,14 +94,7 @@ impl JiraConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct KeyBindings {
-    pub quit: String,
-    pub next: String,
-    pub previous: String,
-    pub open_in_browser: String,
-    pub refresh: String,
-}
+// Key bindings are currently fixed in code (vim-like) and not configurable via config.
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UiConfig {

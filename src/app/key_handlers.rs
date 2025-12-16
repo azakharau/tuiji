@@ -1,32 +1,37 @@
 use std::sync::Arc;
 
+use crossterm::event::{KeyCode, KeyEvent};
+
 use crate::{
     app::state::{Mode, ScreenType},
-    config::KeyBindings,
     ui::screens::ScreenState,
 };
-use crossterm::event::KeyEvent;
 
-pub mod navigation_hanler;
-
+/// Universal action identifiers; each screen declares which ones it supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Motion {
-    Up(usize),
-    Down(usize),
-    Left(usize),
-    Right(usize),
-    Top,
-    Bottom,
+pub enum ActionId {
+    Quit,
+    Refresh,
+    GoHome,
+    OpenCurrentSprint,
+    OpenMyIssues,
+    OpenSearchIssues,
+    OpenNewIssue,
+    OpenProfiles,
+    OpenInBrowser,
+    MoveUp,
+    MoveDown,
+    MoveLeft,
+    MoveRight,
+    MoveTop,
+    MoveBottom,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Command {
-    Motion(Motion),
-    Refresh,
-    Quit,
-    SwitchTo(ScreenType),
-    Unhandled(KeyEvent),
-    Noop,
+pub struct Command {
+    pub action: ActionId,
+    /// For motions, `repeat` tells how many times to perform the action.
+    pub repeat: usize,
 }
 
 pub trait KeyHandler {
@@ -45,36 +50,78 @@ impl ActionHint {
     }
 }
 
-pub fn global_action_hints(bindings: &KeyBindings) -> Arc<Vec<ActionHint>> {
-    Arc::new(vec![
-        ActionHint {
-            binding: bindings.quit.clone(),
-            description: "Quit".to_string(),
-        },
-        ActionHint {
-            binding: bindings.refresh.clone(),
-            description: "Refresh".to_string(),
-        },
-        ActionHint {
-            binding: bindings.next.clone(),
-            description: "Next".to_string(),
-        },
-        ActionHint {
-            binding: bindings.previous.clone(),
-            description: "Previous".to_string(),
-        },
-        ActionHint {
-            binding: bindings.open_in_browser.clone(),
-            description: "Open".to_string(),
-        },
-    ])
+#[derive(Default)]
+pub struct InputState {
+    pending_count: Option<usize>,
+    pending_g: bool,
 }
 
-pub fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
-    use crossterm::event::KeyCode;
-    if binding.is_empty() {
-        return false;
+/// Main parser: maps a key event to an ActionId for the active screen.
+pub fn parse_command(
+    key_event: KeyEvent,
+    mode: Mode,
+    state: &mut InputState,
+    screen: ScreenType,
+) -> Option<Command> {
+    // In Insert/Command modes we don't intercept yet — can be extended later.
+    if matches!(mode, Mode::Insert | Mode::Command) {
+        reset_state(state);
+        return None;
     }
+
+    // Numeric prefixes (e.g. 3j)
+    if let KeyCode::Char(d @ '0'..='9') = key_event.code {
+        let digit = d.to_digit(10).unwrap_or(0) as usize;
+        let new_count = state
+            .pending_count
+            .unwrap_or(0)
+            .saturating_mul(10)
+            .saturating_add(digit);
+        state.pending_count = Some(new_count);
+        return None;
+    }
+
+    // gg is a special case
+    if key_event.code == KeyCode::Char('g') {
+        if state.pending_g && screen_bindings(screen)
+            .iter()
+            .any(|(action, key)| *action == ActionId::MoveTop && key == "gg")
+        {
+            state.pending_g = false;
+            let repeat = take_count_or(state, 1);
+            return Some(Command {
+                action: ActionId::MoveTop,
+                repeat,
+            });
+        } else {
+            state.pending_g = true;
+            return None;
+        }
+    } else {
+        state.pending_g = false;
+    }
+
+    let candidates = screen_bindings(screen);
+    for (action, binding) in candidates {
+        if binding == "gg" {
+            continue;
+        }
+        if binding_matches(&key_event, &binding) {
+            let repeat = if is_motion(action) {
+                take_count_or(state, 1)
+            } else {
+                reset_count(state);
+                1
+            };
+            return Some(Command { action, repeat });
+        }
+    }
+
+    reset_state(state);
+    None
+}
+
+fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
     match key.code {
         KeyCode::Char(c) => binding.len() == 1 && binding.starts_with(c),
         KeyCode::Enter => binding.eq_ignore_ascii_case("enter") || binding == "<enter>",
@@ -87,100 +134,116 @@ pub fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
     }
 }
 
-#[derive(Default)]
-pub struct InputState {
-    pending_count: Option<usize>,
-    pending_g: bool,
-}
-
-pub fn parse_command(
-    key_event: KeyEvent,
-    mode: crate::app::state::Mode,
-    bindings: &KeyBindings,
-    state: &mut InputState,
-) -> Command {
-    use crossterm::event::KeyCode;
-
-    // Refresh
-    if binding_matches(&key_event, &bindings.refresh) {
-        state.pending_count = None;
-        state.pending_g = false;
-        return Command::Refresh;
-    }
-
-    // Quit (only in Normal)
-    if (key_event.code == KeyCode::Char('q') || key_event.code == KeyCode::Char('Q'))
-        && matches!(mode, Mode::Normal)
-    {
-        state.pending_count = None;
-        state.pending_g = false;
-        return Command::Quit;
-    }
-
-    // Esc -> Home
-    if key_event.code == KeyCode::Esc {
-        state.pending_count = None;
-        state.pending_g = false;
-        return Command::SwitchTo(ScreenType::Home);
-    }
-
-    // In Insert/Command modes we don't interpret motions or counts — pass raw input through.
-    if matches!(mode, Mode::Insert | Mode::Command) {
-        state.pending_count = None;
-        state.pending_g = false;
-        return Command::Unhandled(key_event);
-    }
-
-    // Counts
-    if let KeyCode::Char(d @ '0'..='9') = key_event.code {
-        let digit = d.to_digit(10).unwrap() as usize;
-        let new_count = state
-            .pending_count
-            .unwrap_or(0)
-            .saturating_mul(10)
-            .saturating_add(digit);
-        state.pending_count = Some(new_count);
-        return Command::Noop;
-    }
-
-    // gg / g
-    if key_event.code == KeyCode::Char('g') {
-        if state.pending_g {
-            state.pending_g = false;
-            let _ = take_count(state);
-            return Command::Motion(Motion::Top);
-        } else {
-            state.pending_g = true;
-            return Command::Noop;
-        }
-    }
+fn reset_state(state: &mut InputState) {
     state.pending_g = false;
-
-    // Motions
-    let motion = match key_event.code {
-        KeyCode::Char('j') | KeyCode::Down => Some(Motion::Down(take_count_or(state, 1))),
-        KeyCode::Char('k') | KeyCode::Up => Some(Motion::Up(take_count_or(state, 1))),
-        KeyCode::Char('h') | KeyCode::Left => Some(Motion::Left(take_count_or(state, 1))),
-        KeyCode::Char('l') | KeyCode::Right => Some(Motion::Right(take_count_or(state, 1))),
-        KeyCode::Char('G') => Some(Motion::Bottom),
-        _ => None,
-    };
-
-    if let Some(m) = motion {
-        return Command::Motion(m);
-    }
-
-    // Default: pass raw key to screen-level handler
     state.pending_count = None;
-    Command::Unhandled(key_event)
 }
 
-fn take_count(state: &mut InputState) -> usize {
-    let n = state.pending_count.take().unwrap_or(1);
-    if n == 0 { 1 } else { n }
+fn reset_count(state: &mut InputState) {
+    state.pending_count = None;
 }
 
 fn take_count_or(state: &mut InputState, default: usize) -> usize {
     let n = state.pending_count.take().unwrap_or(default);
     if n == 0 { default } else { n }
+}
+
+fn is_motion(action: ActionId) -> bool {
+    matches!(
+        action,
+        ActionId::MoveUp
+            | ActionId::MoveDown
+            | ActionId::MoveLeft
+            | ActionId::MoveRight
+            | ActionId::MoveTop
+            | ActionId::MoveBottom
+    )
+}
+
+/// Mapping: actions available on a screen and their bindings.
+pub fn screen_bindings(screen: ScreenType) -> Vec<(ActionId, String)> {
+    let mut map = vec![
+        (ActionId::Quit, "q".to_string()),
+        (ActionId::Refresh, "r".to_string()),
+        (ActionId::GoHome, "<esc>".to_string()),
+        (ActionId::OpenInBrowser, "o".to_string()),
+    ];
+
+    match screen {
+        ScreenType::Home => map.extend(home_defaults()),
+        ScreenType::CurrentSprint => map.extend(current_sprint_defaults()),
+        ScreenType::Profiles | ScreenType::MyIssues | ScreenType::SearchIssues | ScreenType::NewIssue => {}
+    }
+
+    map
+}
+
+fn home_defaults() -> Vec<(ActionId, String)> {
+    vec![
+        (ActionId::OpenCurrentSprint, "c".to_string()),
+        (ActionId::OpenMyIssues, "i".to_string()),
+        (ActionId::OpenSearchIssues, "s".to_string()),
+        (ActionId::OpenNewIssue, "n".to_string()),
+        (ActionId::OpenProfiles, "p".to_string()),
+    ]
+}
+
+fn current_sprint_defaults() -> Vec<(ActionId, String)> {
+    vec![
+        (ActionId::MoveUp, "k".to_string()),
+        (ActionId::MoveUp, "<up>".to_string()),
+        (ActionId::MoveDown, "j".to_string()),
+        (ActionId::MoveDown, "<down>".to_string()),
+        (ActionId::MoveLeft, "h".to_string()),
+        (ActionId::MoveLeft, "<left>".to_string()),
+        (ActionId::MoveRight, "l".to_string()),
+        (ActionId::MoveRight, "<right>".to_string()),
+        (ActionId::MoveTop, "gg".to_string()),
+        (ActionId::MoveBottom, "G".to_string()),
+    ]
+}
+
+/// Generates bottom-bar hints from the current bindings.
+pub fn action_hints(screen: ScreenType) -> Arc<Vec<ActionHint>> {
+    let mut hints = Vec::new();
+    let bindings = screen_bindings(screen.clone());
+    let first = |id: ActionId| {
+        bindings
+            .iter()
+            .find(|(a, _)| *a == id)
+            .map(|(_, b)| b.clone())
+    };
+
+    let mut push = |id: ActionId, description: &str| {
+        if let Some(b) = first(id) {
+            hints.push(ActionHint {
+                binding: b,
+                description: description.to_string(),
+            });
+        }
+    };
+
+    push(ActionId::Quit, "Quit");
+    push(ActionId::Refresh, "Refresh");
+
+    match screen {
+        ScreenType::Home => {
+            push(ActionId::OpenCurrentSprint, "Current sprint");
+            push(ActionId::OpenMyIssues, "My issues");
+            push(ActionId::OpenSearchIssues, "Search issues");
+            push(ActionId::OpenNewIssue, "New issue");
+            push(ActionId::OpenProfiles, "Profiles");
+        }
+        ScreenType::CurrentSprint => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::MoveLeft, "Prev column");
+            push(ActionId::MoveRight, "Next column");
+            push(ActionId::MoveTop, "Top");
+            push(ActionId::MoveBottom, "Bottom");
+        }
+        _ => {}
+    }
+
+    Arc::new(hints)
 }
