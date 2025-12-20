@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use ratatui::Frame;
 
-use crate::app::{
-    key_handlers::{ActionHint, KeyHandler},
-    state::ScreenType,
+use crate::{
+    app::{
+        key_handlers::{ActionHint, KeyHandler},
+        state::ScreenType,
+    },
+    config::AppConfig,
 };
 
 pub mod current_sprint;
@@ -26,4 +29,5 @@ pub enum ScreenState {
     Refresh,
     SwitchTo(ScreenType),
     Quit,
+    SaveConfig(AppConfig),
 }

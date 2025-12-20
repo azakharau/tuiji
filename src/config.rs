@@ -25,7 +25,7 @@ impl AppConfigState {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct AppConfig {
     pub jira: JiraConfig,
     pub ui: UiConfig,
@@ -73,7 +73,7 @@ impl AppConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct JiraConfig {
     pub base_url: String,
     pub username: String,
@@ -96,7 +96,7 @@ impl JiraConfig {
 
 // Key bindings are currently fixed in code (vim-like) and not configurable via config.
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct UiConfig {
     #[serde(default = "UiConfig::default_theme")]
     pub theme: String,

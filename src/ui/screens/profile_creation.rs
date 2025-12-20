@@ -1,7 +1,6 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
-    style::Style,
     widgets::{Block, BorderType, Borders, Clear},
 };
 
@@ -11,7 +10,7 @@ use crate::{
     ui::screens::{Screen, ScreenState},
 };
 
-struct ProofileFormItem {
+struct ProfileFormItem {
     label: &'static str,
     value: String,
     is_password: bool,
@@ -19,32 +18,37 @@ struct ProofileFormItem {
 }
 
 struct ProfileForm {
-    items: Vec<ProofileFormItem>,
+    items: Vec<ProfileFormItem>,
     selected_index: usize,
 }
 
-pub struct ProfileCreationScreen<'a> {
+pub struct ProfileCreationScreen {
     form: ProfileForm,
-    cfg: &'a mut AppConfigState,
 }
 
-impl<'a> ProfileCreationScreen<'a> {
-    pub fn new(cfg: &'a mut AppConfigState) -> Self {
+impl ProfileCreationScreen {
+    pub fn new() -> Self {
         let form = ProfileForm {
             items: vec![
-                ProofileFormItem {
+                ProfileFormItem {
+                    label: "Profile Name",
+                    value: String::new(),
+                    is_password: false,
+                    cursor_position: 0,
+                },
+                ProfileFormItem {
                     label: "Jira URL",
                     value: String::new(),
                     is_password: false,
                     cursor_position: 0,
                 },
-                ProofileFormItem {
+                ProfileFormItem {
                     label: "Email",
                     value: String::new(),
                     is_password: false,
                     cursor_position: 0,
                 },
-                ProofileFormItem {
+                ProfileFormItem {
                     label: "API Token",
                     value: String::new(),
                     is_password: true,
@@ -53,11 +57,11 @@ impl<'a> ProfileCreationScreen<'a> {
             ],
             selected_index: 0,
         };
-        Self { form, cfg }
+        Self { form }
     }
 }
 
-impl Screen for ProfileCreationScreen<'_> {
+impl Screen for ProfileCreationScreen {
     fn draw(&mut self, frame: &mut Frame) {
         let [_, vertical_layout] = Layout::vertical([
             Constraint::Percentage(20),
@@ -85,7 +89,7 @@ impl Screen for ProfileCreationScreen<'_> {
     }
 }
 
-impl KeyHandler for ProfileCreationScreen<'_> {
+impl KeyHandler for ProfileCreationScreen {
     fn handle_command(&mut self, command: Command) -> ScreenState {
         // Handle commands specific to profile creation here
         ScreenState::Stay

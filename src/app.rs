@@ -30,16 +30,16 @@ pub struct AppState {
     pub current_screen: state::ScreenType,
 }
 
-struct CachedScreens<'a> {
+struct CachedScreens {
     home_screen: Option<HomeScreen>,
     current_sprint_screen: Option<CurrentSprintScreen>,
-    profile_creation: Option<ProfileCreationScreen<'a>>,
+    profile_creation: Option<ProfileCreationScreen>,
 }
 
-impl<'a> CachedScreens<'a> {
+impl CachedScreens {
     pub async fn active_mut(
         &mut self,
-        cfg_state: &'a mut AppConfigState,
+        cfg_state: &AppConfigState,
         state: &AppState,
     ) -> Result<&mut dyn Screen> {
         let cfg = match cfg_state {
@@ -70,12 +70,21 @@ impl<'a> CachedScreens<'a> {
             }
             ScreenType::Profiles => {
                 if self.profile_creation.is_none() {
-                    self.profile_creation = Some(ProfileCreationScreen::new(cfg_state));
+                    self.profile_creation = Some(ProfileCreationScreen::new());
                 }
                 Ok(self
                     .profile_creation
                     .as_mut()
                     .expect("Profile screen not loaded"))
+            }
+            ScreenType::ProfileCreation => {
+                if self.profile_creation.is_none() {
+                    self.profile_creation = Some(ProfileCreationScreen::new());
+                }
+                Ok(self
+                    .profile_creation
+                    .as_mut()
+                    .expect("Profile creation screen not loaded"))
             }
             _ => {
                 panic!("Screen {:?} not implemented yet", state.current_screen);
@@ -89,15 +98,15 @@ enum ActionOutcome {
     Quit,
 }
 
-pub struct App<'a> {
+pub struct App {
     pub terminal: DefaultTerminal,
     pub state: AppState,
-    screens: CachedScreens<'a>,
+    screens: CachedScreens,
     cfg_state: AppConfigState,
     input_state: InputState,
 }
 
-impl<'a> App<'a> {
+impl App {
     pub fn new(terminal: DefaultTerminal, state: AppState) -> Result<Self> {
         let screen = CachedScreens {
             home_screen: None,
@@ -193,6 +202,10 @@ impl<'a> App<'a> {
             }
             ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
             ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
+            _ => {
+                // Other actions (e.g., SaveConfig) can be handled here.
+                Ok(ActionOutcome::Continue { render: false })
+            }
         }
     }
 
