@@ -85,5 +85,6 @@ pub enum ScreenType {
     MyIssues,
     SearchIssues,
     NewIssue,
+    ProfileCreation,
     Profiles,
 }

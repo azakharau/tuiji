@@ -9,7 +9,7 @@ use crate::app::{
 
 pub mod current_sprint;
 pub mod home;
-pub mod profile_picker;
+pub mod profile_creation;
 
 pub trait Screen: KeyHandler {
     fn draw(&mut self, frame: &mut Frame);

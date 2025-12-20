@@ -12,6 +12,7 @@ use crate::{
 pub enum ActionId {
     Quit,
     Refresh,
+    Confirm,
     GoHome,
     OpenCurrentSprint,
     OpenMyIssues,
@@ -25,6 +26,8 @@ pub enum ActionId {
     MoveRight,
     MoveTop,
     MoveBottom,
+    NextRow,
+    RawInput(KeyCode),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,9 +86,10 @@ pub fn parse_command(
 
     // gg is a special case
     if key_event.code == KeyCode::Char('g') {
-        if state.pending_g && screen_bindings(screen)
-            .iter()
-            .any(|(action, key)| *action == ActionId::MoveTop && key == "gg")
+        if state.pending_g
+            && screen_bindings(screen)
+                .iter()
+                .any(|(action, key)| *action == ActionId::MoveTop && key == "gg")
         {
             state.pending_g = false;
             let repeat = take_count_or(state, 1);
@@ -165,6 +169,7 @@ pub fn screen_bindings(screen: ScreenType) -> Vec<(ActionId, String)> {
     let mut map = vec![
         (ActionId::Quit, "q".to_string()),
         (ActionId::Refresh, "r".to_string()),
+        (ActionId::Confirm, "<enter>".to_string()),
         (ActionId::GoHome, "<esc>".to_string()),
         (ActionId::OpenInBrowser, "o".to_string()),
     ];
@@ -172,7 +177,11 @@ pub fn screen_bindings(screen: ScreenType) -> Vec<(ActionId, String)> {
     match screen {
         ScreenType::Home => map.extend(home_defaults()),
         ScreenType::CurrentSprint => map.extend(current_sprint_defaults()),
-        ScreenType::Profiles | ScreenType::MyIssues | ScreenType::SearchIssues | ScreenType::NewIssue => {}
+        ScreenType::Profiles
+        | ScreenType::MyIssues
+        | ScreenType::SearchIssues
+        | ScreenType::NewIssue
+        | ScreenType::ProfileCreation => {}
     }
 
     map
@@ -185,6 +194,10 @@ fn home_defaults() -> Vec<(ActionId, String)> {
         (ActionId::OpenSearchIssues, "s".to_string()),
         (ActionId::OpenNewIssue, "n".to_string()),
         (ActionId::OpenProfiles, "p".to_string()),
+        (ActionId::MoveUp, "k".to_string()),
+        (ActionId::MoveUp, "<up>".to_string()),
+        (ActionId::MoveDown, "j".to_string()),
+        (ActionId::MoveDown, "<down>".to_string()),
     ]
 }
 
@@ -200,6 +213,15 @@ fn current_sprint_defaults() -> Vec<(ActionId, String)> {
         (ActionId::MoveRight, "<right>".to_string()),
         (ActionId::MoveTop, "gg".to_string()),
         (ActionId::MoveBottom, "G".to_string()),
+    ]
+}
+
+fn form_defaults() -> Vec<(ActionId, String)> {
+    vec![
+        (ActionId::MoveUp, "k".to_string()),
+        (ActionId::MoveUp, "<up>".to_string()),
+        (ActionId::MoveDown, "j".to_string()),
+        (ActionId::MoveDown, "<down>".to_string()),
     ]
 }
 
@@ -228,6 +250,9 @@ pub fn action_hints(screen: ScreenType) -> Arc<Vec<ActionHint>> {
 
     match screen {
         ScreenType::Home => {
+            push(ActionId::Confirm, "Select");
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
             push(ActionId::OpenCurrentSprint, "Current sprint");
             push(ActionId::OpenMyIssues, "My issues");
             push(ActionId::OpenSearchIssues, "Search issues");

@@ -7,13 +7,16 @@ use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 use crate::{
     app::{
         event::{AppEvent, WorkerMessage},
-        key_handlers::{action_hints, parse_command, ActionId, Command, InputState},
+        key_handlers::{ActionId, Command, InputState, action_hints, parse_command},
         state::ScreenType,
     },
     config::{AppConfig, AppConfigState},
-    ui::screens::{
-        Screen, ScreenState, current_sprint::CurrentSprintScreen, home::HomeScreen,
-        profile_picker::ProfileScreen,
+    ui::{
+        components::logo::AsciiLogoComponent,
+        screens::{
+            Screen, ScreenState, current_sprint::CurrentSprintScreen, home::HomeScreen,
+            profile_creation::ProfileCreationScreen,
+        },
     },
 };
 
@@ -27,16 +30,16 @@ pub struct AppState {
     pub current_screen: state::ScreenType,
 }
 
-struct CachedScreens {
+struct CachedScreens<'a> {
     home_screen: Option<HomeScreen>,
     current_sprint_screen: Option<CurrentSprintScreen>,
-    profile_screen: Option<ProfileScreen>,
+    profile_creation: Option<ProfileCreationScreen<'a>>,
 }
 
-impl CachedScreens {
+impl<'a> CachedScreens<'a> {
     pub async fn active_mut(
         &mut self,
-        cfg_state: &AppConfigState,
+        cfg_state: &'a mut AppConfigState,
         state: &AppState,
     ) -> Result<&mut dyn Screen> {
         let cfg = match cfg_state {
@@ -46,7 +49,8 @@ impl CachedScreens {
         match state.current_screen {
             ScreenType::Home => {
                 if self.home_screen.is_none() {
-                    self.home_screen = Some(HomeScreen::default());
+                    let logo = AsciiLogoComponent::default();
+                    self.home_screen = Some(HomeScreen::new(logo, cfg_state));
                 }
                 Ok(self.home_screen.as_mut().expect("Home screen not loaded"))
             }
@@ -65,14 +69,11 @@ impl CachedScreens {
                     .expect("Current sprint screen not loaded"))
             }
             ScreenType::Profiles => {
-                if self.profile_screen.is_none() {
-                    let cfg = cfg.ok_or_else(|| {
-                        color_eyre::eyre::eyre!("Config missing: cannot open Profiles screen")
-                    })?;
-                    self.profile_screen = Some(ProfileScreen::new(cfg.clone()));
+                if self.profile_creation.is_none() {
+                    self.profile_creation = Some(ProfileCreationScreen::new(cfg_state));
                 }
                 Ok(self
-                    .profile_screen
+                    .profile_creation
                     .as_mut()
                     .expect("Profile screen not loaded"))
             }
@@ -88,20 +89,20 @@ enum ActionOutcome {
     Quit,
 }
 
-pub struct App {
+pub struct App<'a> {
     pub terminal: DefaultTerminal,
     pub state: AppState,
-    screens: CachedScreens,
+    screens: CachedScreens<'a>,
     cfg_state: AppConfigState,
     input_state: InputState,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new(terminal: DefaultTerminal, state: AppState) -> Result<Self> {
         let screen = CachedScreens {
             home_screen: None,
             current_sprint_screen: None,
-            profile_screen: None,
+            profile_creation: None,
         };
         let config = AppConfig::load_state();
         Ok(Self {
@@ -172,7 +173,10 @@ impl App {
             return Ok(nav);
         }
 
-        let screen = self.screens.active_mut(&self.cfg_state, &self.state).await?;
+        let screen = self
+            .screens
+            .active_mut(&self.cfg_state, &self.state)
+            .await?;
         Ok(screen.handle_command(cmd))
     }
 
@@ -213,7 +217,10 @@ impl App {
 
     async fn render(&mut self) -> Result<()> {
         let screen_type = self.state.current_screen.clone();
-        let screen = self.screens.active_mut(&self.cfg_state, &self.state).await?;
+        let screen = self
+            .screens
+            .active_mut(&self.cfg_state, &self.state)
+            .await?;
         let hints = action_hints(screen_type.clone());
         screen.set_action_hints(hints);
         self.terminal.draw(|frame| {
