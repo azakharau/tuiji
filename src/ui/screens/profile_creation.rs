@@ -1,7 +1,9 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout},
-    widgets::{Block, BorderType, Borders, Clear},
+    buffer::Buffer,
+    layout::{Constraint, Flex, Layout, Rect},
+    text::Line,
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, WidgetRef, block::Title},
 };
 
 use crate::{
@@ -10,6 +12,7 @@ use crate::{
     ui::screens::{Screen, ScreenState},
 };
 
+#[derive(Clone, Debug)]
 struct ProfileFormItem {
     label: &'static str,
     value: String,
@@ -17,9 +20,54 @@ struct ProfileFormItem {
     cursor_position: usize,
 }
 
+#[derive(Clone, Debug)]
 struct ProfileForm {
     items: Vec<ProfileFormItem>,
     selected_index: usize,
+}
+
+impl Widget for ProfileForm {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let rows = Layout::vertical([
+            Constraint::Min(5),
+            Constraint::Length(4),
+            Constraint::Length(4),
+            Constraint::Length(4),
+            Constraint::Length(4),
+            Constraint::Min(5),
+        ])
+        .flex(Flex::Center)
+        .split(area);
+        let lines = rows[1..rows.len() - 1]
+            .iter()
+            .map(|r| {
+                let [_, line, _] = Layout::horizontal([
+                    Constraint::Percentage(5),
+                    Constraint::Fill(1),
+                    Constraint::Percentage(5),
+                ])
+                .flex(Flex::Center)
+                .areas(*r);
+                line
+            })
+            .collect::<Vec<Rect>>();
+
+        for (item, line) in self.items.iter().zip(lines) {
+            let block = Block::bordered()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(Line::from(item.label));
+            let inner_area = block.inner(line);
+            block.render(line, buf);
+            let display_value = if item.is_password {
+                "*".repeat(item.value.len())
+            } else {
+                item.value.clone()
+            };
+            let paragraph = Paragraph::new(display_value);
+            paragraph.render(inner_area, buf);
+        }
+    }
 }
 
 pub struct ProfileCreationScreen {
@@ -28,6 +76,12 @@ pub struct ProfileCreationScreen {
 
 impl ProfileCreationScreen {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for ProfileCreationScreen {
+    fn default() -> Self {
         let form = ProfileForm {
             items: vec![
                 ProfileFormItem {
@@ -63,25 +117,29 @@ impl ProfileCreationScreen {
 
 impl Screen for ProfileCreationScreen {
     fn draw(&mut self, frame: &mut Frame) {
-        let [_, vertical_layout] = Layout::vertical([
+        let [_, vertical_layout, _] = Layout::vertical([
             Constraint::Percentage(20),
             Constraint::Fill(1),
             Constraint::Percentage(20),
         ])
         .areas(frame.area());
         let [_, center, _] = Layout::horizontal([
-            Constraint::Percentage(20),
+            Constraint::Percentage(30),
             Constraint::Fill(1),
-            Constraint::Percentage(20),
+            Constraint::Percentage(30),
         ])
+        .flex(Flex::Center)
         .areas(vertical_layout);
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
-            .borders(Borders::ALL);
+            .borders(Borders::ALL)
+            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black))
+            .title(Line::from("Create New Profile").centered());
 
-        let inner_area = block.inner(center);
+        let body = block.inner(center);
         frame.render_widget(Clear, center);
         frame.render_widget(block, center);
+        frame.render_widget(self.form.clone(), body);
     }
 
     fn name(&self) -> &'static str {
