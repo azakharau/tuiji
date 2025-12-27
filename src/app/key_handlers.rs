@@ -134,6 +134,7 @@ fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
         KeyCode::Down => binding.eq_ignore_ascii_case("down") || binding == "<down>",
         KeyCode::Left => binding.eq_ignore_ascii_case("left") || binding == "<left>",
         KeyCode::Right => binding.eq_ignore_ascii_case("right") || binding == "<right>",
+        KeyCode::Tab => binding.eq_ignore_ascii_case("tab") || binding == "<tab>",
         _ => false,
     }
 }
@@ -177,11 +178,11 @@ pub fn screen_bindings(screen: ScreenType) -> Vec<(ActionId, String)> {
     match screen {
         ScreenType::Home => map.extend(home_defaults()),
         ScreenType::CurrentSprint => map.extend(current_sprint_defaults()),
+        ScreenType::ProfileCreation => map.extend(form_defaults()),
         ScreenType::Profiles
         | ScreenType::MyIssues
         | ScreenType::SearchIssues
-        | ScreenType::NewIssue
-        | ScreenType::ProfileCreation => {}
+        | ScreenType::NewIssue => {}
     }
 
     map
@@ -217,12 +218,7 @@ fn current_sprint_defaults() -> Vec<(ActionId, String)> {
 }
 
 fn form_defaults() -> Vec<(ActionId, String)> {
-    vec![
-        (ActionId::MoveUp, "k".to_string()),
-        (ActionId::MoveUp, "<up>".to_string()),
-        (ActionId::MoveDown, "j".to_string()),
-        (ActionId::MoveDown, "<down>".to_string()),
-    ]
+    vec![(ActionId::NextRow, "<tab>".to_string())]
 }
 
 /// Generates bottom-bar hints from the current bindings.
