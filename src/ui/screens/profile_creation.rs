@@ -1,17 +1,24 @@
-use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
     Frame,
     buffer::Buffer,
     layout::{Constraint, Flex, Layout, Rect},
-    style::Style,
+    style::{Color, Style},
     text::Line,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, WidgetRef, block::Title},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
 };
 
+use std::sync::Arc;
+
 use crate::{
-    app::key_handlers::{ActionId, Command, KeyHandler},
-    config::AppConfigState,
-    ui::screens::{Screen, ScreenState},
+    app::{
+        key_handlers::{ActionHint, ActionId, Command, KeyHandler},
+        state::Mode,
+    },
+    config::{AppConfig, JiraConfig, UiConfig},
+    ui::{
+        components::bottom_bar::BottomBar,
+        screens::{CommandLineCommand, Screen, ScreenState},
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -22,14 +29,40 @@ struct ProfileFormItem {
     cursor_position: usize,
 }
 
+impl ProfileFormItem {
+    fn render_cursor(&self, line: Rect, buf: &mut Buffer) {
+        let cursor_x = line.x + 1 + self.cursor_position as u16;
+        let cursor_y = line.y + 1;
+        let rect = Rect {
+            x: cursor_x,
+            y: cursor_y,
+            width: 1,
+            height: 1,
+        };
+        let cursor_block = Block::default()
+            .borders(Borders::NONE)
+            .style(Style::default().bg(ratatui::style::Color::White));
+        cursor_block.render(rect, buf);
+    }
+    fn render_content(&self, area: Rect, buf: &mut Buffer) {
+        let display_value = if self.is_password {
+            "*".repeat(self.value.len())
+        } else {
+            self.value.clone()
+        };
+        let paragraph = Paragraph::new(display_value);
+        paragraph.render(area, buf);
+    }
+}
+
 #[derive(Clone, Debug)]
 struct ProfileForm {
     items: Vec<ProfileFormItem>,
     selected_index: usize,
 }
 
-impl Widget for ProfileForm {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+impl ProfileForm {
+    fn layut(&self, area: Rect) -> Vec<Rect> {
         let rows = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Length(3),
@@ -40,7 +73,8 @@ impl Widget for ProfileForm {
         ])
         .flex(Flex::Center)
         .split(area);
-        let lines = rows[1..rows.len() - 1]
+
+        rows[1..rows.len() - 1]
             .iter()
             .map(|r| {
                 let [_, line, _] = Layout::horizontal([
@@ -52,8 +86,144 @@ impl Widget for ProfileForm {
                 .areas(*r);
                 line
             })
-            .collect::<Vec<Rect>>();
+            .collect::<Vec<Rect>>()
+    }
 
+    fn go_to_next_row(&mut self) {
+        if self.selected_index + 1 < self.items.len() {
+            self.selected_index += 1;
+        } else {
+            self.selected_index = 0;
+        }
+    }
+
+    fn go_to_prev_row(&mut self) {
+        if self.items.is_empty() {
+            self.selected_index = 0;
+            return;
+        }
+        if self.selected_index == 0 {
+            self.selected_index = self.items.len() - 1;
+        } else {
+            self.selected_index -= 1;
+        }
+    }
+
+    fn go_to_top(&mut self) {
+        self.selected_index = 0;
+    }
+
+    fn go_to_bottom(&mut self) {
+        if !self.items.is_empty() {
+            self.selected_index = self.items.len() - 1;
+        }
+    }
+}
+
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
+}
+
+fn word_forward(value: &str, pos: usize) -> usize {
+    let chars = value.char_indices().collect::<Vec<(usize, char)>>();
+    if chars.is_empty() {
+        return 0;
+    }
+    let len = value.len();
+    if pos >= len {
+        return len;
+    }
+
+    let mut idx = chars
+        .iter()
+        .position(|(i, _)| *i >= pos)
+        .unwrap_or(chars.len());
+
+    if idx >= chars.len() {
+        return len;
+    }
+
+    if is_word_char(chars[idx].1) {
+        while idx < chars.len() && is_word_char(chars[idx].1) {
+            idx += 1;
+        }
+    }
+
+    while idx < chars.len() && !is_word_char(chars[idx].1) {
+        idx += 1;
+    }
+
+    if idx < chars.len() {
+        chars[idx].0
+    } else {
+        len
+    }
+}
+
+fn word_end(value: &str, pos: usize) -> usize {
+    let chars = value.char_indices().collect::<Vec<(usize, char)>>();
+    if chars.is_empty() {
+        return 0;
+    }
+    let len = value.len();
+    if pos >= len {
+        return len;
+    }
+    let mut idx = chars
+        .iter()
+        .position(|(i, _)| *i >= pos)
+        .unwrap_or(chars.len().saturating_sub(1));
+
+    if idx >= chars.len() {
+        return len;
+    }
+
+    if !is_word_char(chars[idx].1) {
+        while idx < chars.len() && !is_word_char(chars[idx].1) {
+            idx += 1;
+        }
+    }
+    if idx >= chars.len() {
+        return len;
+    }
+    while idx + 1 < chars.len() && is_word_char(chars[idx + 1].1) {
+        idx += 1;
+    }
+    chars[idx].0
+}
+
+fn word_backward(value: &str, pos: usize) -> usize {
+    let chars = value.char_indices().collect::<Vec<(usize, char)>>();
+    if chars.is_empty() {
+        return 0;
+    }
+    if pos == 0 {
+        return 0;
+    }
+    let mut idx = chars
+        .iter()
+        .position(|(i, _)| *i >= pos)
+        .unwrap_or(chars.len());
+    idx = idx.saturating_sub(1);
+
+    if !is_word_char(chars[idx].1) {
+        while idx > 0 && !is_word_char(chars[idx].1) {
+            idx -= 1;
+        }
+        if !is_word_char(chars[idx].1) {
+            return 0;
+        }
+    }
+
+    while idx > 0 && is_word_char(chars[idx - 1].1) {
+        idx -= 1;
+    }
+    chars[idx].0
+}
+
+impl Widget for ProfileForm {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let lines = self.layut(area);
         for ((i, item), line) in self.items.iter().enumerate().zip(lines) {
             let mut block = Block::bordered()
                 .borders(Borders::ALL)
@@ -61,40 +231,52 @@ impl Widget for ProfileForm {
                 .title(Line::from(item.label));
 
             if self.selected_index == i {
-                block = block.style(Style::default().fg(ratatui::style::Color::Cyan));
-                let cursor_x = line.x + 1 + item.cursor_position as u16;
-                let cursor_y = line.y + 1;
-                let rect = Rect {
-                    x: cursor_x,
-                    y: cursor_y,
-                    width: 1,
-                    height: 1,
-                };
-                let cursor_block = Block::default()
-                    .borders(Borders::NONE)
-                    .style(Style::default().bg(ratatui::style::Color::White));
-                cursor_block.render(rect, buf);
+                block = block.style(Style::default().fg(Color::Cyan));
+                item.render_cursor(line, buf);
             }
             let inner_area = block.inner(line);
             block.render(line, buf);
-            let display_value = if item.is_password {
-                "*".repeat(item.value.len())
-            } else {
-                item.value.clone()
-            };
-            let paragraph = Paragraph::new(display_value);
-            paragraph.render(inner_area, buf);
+            item.render_content(inner_area, buf);
         }
     }
 }
 
 pub struct ProfileCreationScreen {
     form: ProfileForm,
+    actions: Arc<Vec<ActionHint>>,
+    mode: Mode,
 }
 
 impl ProfileCreationScreen {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn build_config(&self) -> AppConfig {
+        let mut jira_url = String::new();
+        let mut username = String::new();
+        let mut api_token = String::new();
+
+        if let Some(item) = self.form.items.get(1) {
+            jira_url = item.value.clone();
+        }
+        if let Some(item) = self.form.items.get(2) {
+            username = item.value.clone();
+        }
+        if let Some(item) = self.form.items.get(3) {
+            api_token = item.value.clone();
+        }
+
+        AppConfig {
+            jira: JiraConfig {
+                base_url: jira_url,
+                username,
+                api_token,
+            },
+            ui: UiConfig {
+                theme: "dark".to_string(),
+            },
+        }
     }
 }
 
@@ -129,18 +311,24 @@ impl Default for ProfileCreationScreen {
             ],
             selected_index: 0,
         };
-        Self { form }
+        Self {
+            form,
+            actions: Arc::new(Vec::new()),
+            mode: Mode::Normal,
+        }
     }
 }
 
 impl Screen for ProfileCreationScreen {
     fn draw(&mut self, frame: &mut Frame) {
+        let [body_area, bar_area] =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(frame.area());
         let [_, vertical_layout, _] = Layout::vertical([
             Constraint::Percentage(30),
             Constraint::Fill(1),
             Constraint::Percentage(30),
         ])
-        .areas(frame.area());
+        .areas(body_area);
         let [_, center, _] = Layout::horizontal([
             Constraint::Percentage(30),
             Constraint::Fill(1),
@@ -158,10 +346,29 @@ impl Screen for ProfileCreationScreen {
         frame.render_widget(Clear, center);
         frame.render_widget(block, center);
         frame.render_widget(self.form.clone(), body);
+
+        let bottom_bar = BottomBar::new(self.mode, self.actions.clone());
+        frame.render_widget(bottom_bar, bar_area);
     }
 
     fn name(&self) -> &'static str {
         "Profile Creation"
+    }
+
+    fn set_action_hints(&mut self, actions: Arc<Vec<ActionHint>>) {
+        self.actions = actions;
+    }
+
+    fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+    }
+
+    fn handle_command_line(&mut self, cmd: CommandLineCommand) -> ScreenState {
+        let cfg = self.build_config();
+        match cmd {
+            CommandLineCommand::Write => ScreenState::SaveConfig(cfg),
+            CommandLineCommand::WriteQuit => ScreenState::SaveAndClose(cfg),
+        }
     }
 }
 
@@ -169,10 +376,119 @@ impl KeyHandler for ProfileCreationScreen {
     fn handle_command(&mut self, command: Command) -> ScreenState {
         match command.action {
             ActionId::NextRow => {
-                if self.form.selected_index + 1 < self.form.items.len() {
-                    self.form.selected_index += 1;
-                } else {
-                    self.form.selected_index = 0;
+                self.form.go_to_next_row();
+                ScreenState::Refresh
+            }
+            ActionId::MoveDown => {
+                for _ in 0..command.repeat {
+                    self.form.go_to_next_row();
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveUp => {
+                for _ in 0..command.repeat {
+                    self.form.go_to_prev_row();
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveTop => {
+                self.form.go_to_top();
+                ScreenState::Refresh
+            }
+            ActionId::MoveBottom => {
+                self.form.go_to_bottom();
+                ScreenState::Refresh
+            }
+            ActionId::MoveLeft => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index)
+                    && item.cursor_position > 0
+                {
+                    item.cursor_position = item.cursor_position.saturating_sub(command.repeat);
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveRight => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    let max = item.value.len();
+                    item.cursor_position = (item.cursor_position + command.repeat).min(max);
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveLineStart => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    item.cursor_position = 0;
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveLineEnd => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    item.cursor_position = item.value.len();
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveWordForward => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    for _ in 0..command.repeat {
+                        item.cursor_position = word_forward(&item.value, item.cursor_position);
+                    }
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveWordBackward => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    for _ in 0..command.repeat {
+                        item.cursor_position = word_backward(&item.value, item.cursor_position);
+                    }
+                }
+                ScreenState::Refresh
+            }
+            ActionId::MoveWordEnd => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    for _ in 0..command.repeat {
+                        item.cursor_position = word_end(&item.value, item.cursor_position);
+                    }
+                }
+                ScreenState::Refresh
+            }
+            ActionId::EnterInsert(mode) => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    match mode {
+                        crate::app::key_handlers::InsertMode::Before => {}
+                        crate::app::key_handlers::InsertMode::After => {
+                            if item.cursor_position < item.value.len() {
+                                item.cursor_position += 1;
+                            }
+                        }
+                        crate::app::key_handlers::InsertMode::LineStart => {
+                            item.cursor_position = 0;
+                        }
+                        crate::app::key_handlers::InsertMode::LineEnd => {
+                            item.cursor_position = item.value.len();
+                        }
+                    }
+                }
+                ScreenState::Refresh
+            }
+            ActionId::RawInput(c) => {
+                if let Some(item) = self.form.items.get_mut(self.form.selected_index) {
+                    match c {
+                        crossterm::event::KeyCode::Char(ch) => {
+                            item.value.insert(item.cursor_position, ch);
+                            item.cursor_position += 1;
+                        }
+                        crossterm::event::KeyCode::Backspace => {
+                            if item.cursor_position > 0 {
+                                item.cursor_position -= 1;
+                                item.value.remove(item.cursor_position);
+                            }
+                        }
+                        crossterm::event::KeyCode::Delete => {
+                            if item.cursor_position < item.value.len() {
+                                item.value.remove(item.cursor_position);
+                            }
+                        }
+                        _ => {}
+                    }
                 }
                 ScreenState::Refresh
             }

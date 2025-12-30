@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub enum Mode {
     #[default]
     Normal,
@@ -77,7 +77,7 @@ impl Widget for Mode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScreenType {
     #[default]
     Home,

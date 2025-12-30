@@ -27,12 +27,13 @@ impl Widget for BottomBar {
             .iter()
             .map(|action| action.render())
             .collect::<Vec<String>>()
-            .join(" ");
+            .join("  ");
         let actions_paragraph = Paragraph::new(actions_str)
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Left);
 
-        let chunks = Layout::horizontal([Constraint::Length(10), Constraint::Min(0)]).split(area);
+        let chunks =
+            Layout::horizontal([Constraint::Length(12), Constraint::Min(0)]).split(area);
 
         self.mode.render(chunks[0], buf);
         actions_paragraph.render(chunks[1], buf);

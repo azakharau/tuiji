@@ -131,6 +131,10 @@ impl Screen for CurrentSprintScreen {
     fn set_action_hints(&mut self, actions: Arc<Vec<ActionHint>>) {
         self.actions = actions;
     }
+
+    fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+    }
 }
 
 impl KeyHandler for CurrentSprintScreen {

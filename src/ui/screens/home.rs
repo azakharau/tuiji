@@ -57,11 +57,6 @@ impl HomeScreen {
         }
     }
 
-    fn set_variant(&mut self, variant: HomeVariant) {
-        self.variant = variant;
-        self.menu = Self::menu_for_variant(variant);
-    }
-
     fn menu_for_variant(variant: HomeVariant) -> Menu {
         match variant {
             HomeVariant::Welcome => Menu::new(vec![

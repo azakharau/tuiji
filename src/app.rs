@@ -1,26 +1,43 @@
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, EventStream, KeyEvent};
 use futures::StreamExt;
-use ratatui::DefaultTerminal;
+use ratatui::{
+    DefaultTerminal,
+    style::{Color, Style},
+    text::Line,
+    widgets::{Block, Borders, Clear},
+};
 use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 
 use crate::{
     app::{
         event::{AppEvent, WorkerMessage},
-        key_handlers::{ActionId, Command, InputState, action_hints, parse_command},
-        state::ScreenType,
+        input::{
+            CommandLineAction, CommandLineOutcome, CommandLineState, InputEvent, InputParser,
+            is_question_mark,
+        },
+        input::overlay::command_line_area,
+        key_handlers::{
+            ActionId, Command, action_hints, binding_hints_for_prefix, binding_hints_for_screen,
+        },
+        state::{Mode, ScreenType},
     },
     config::{AppConfig, AppConfigState},
     ui::{
-        components::logo::AsciiLogoComponent,
+        components::{
+            command_line::CommandLine,
+            logo::AsciiLogoComponent,
+            which_key_popup::WhichKeyPopup,
+        },
         screens::{
-            Screen, ScreenState, current_sprint::CurrentSprintScreen, home::HomeScreen,
-            profile_creation::ProfileCreationScreen,
+            CommandLineCommand, Screen, ScreenState, current_sprint::CurrentSprintScreen,
+            home::HomeScreen, profile_creation::ProfileCreationScreen,
         },
     },
 };
 
 pub mod event;
+pub mod input;
 pub mod key_handlers;
 pub mod state;
 
@@ -56,7 +73,7 @@ impl CachedScreens {
             }
             ScreenType::CurrentSprint => {
                 if self.current_sprint_screen.is_none() {
-                    let mode = state.mode.clone();
+                    let mode = state.mode;
                     let cfg = cfg.ok_or_else(|| {
                         color_eyre::eyre::eyre!("Config missing: cannot open Current Sprint screen")
                     })?;
@@ -103,7 +120,10 @@ pub struct App {
     pub state: AppState,
     screens: CachedScreens,
     cfg_state: AppConfigState,
-    input_state: InputState,
+    input: InputParser,
+    screen_stack: Vec<ScreenType>,
+    command_line: CommandLineState,
+    show_hints: bool,
 }
 
 impl App {
@@ -119,7 +139,10 @@ impl App {
             state,
             screens: screen,
             cfg_state: config,
-            input_state: InputState::default(),
+            input: InputParser::default(),
+            screen_stack: Vec::new(),
+            command_line: CommandLineState::new(),
+            show_hints: false,
         })
     }
 
@@ -166,17 +189,106 @@ impl App {
     }
 
     async fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
-        let maybe_cmd = parse_command(
-            key,
-            self.state.mode.clone(),
-            &mut self.input_state,
-            self.state.current_screen.clone(),
-        );
+        if self.show_hints && !is_question_mark(&key) {
+            self.show_hints = false;
+        }
+        let had_prefix = self.input.pending_prefix().is_some();
+        let event = self
+            .input
+            .parse(key, self.state.mode, self.state.current_screen);
+        let has_prefix = self.input.pending_prefix().is_some();
 
-        let Some(cmd) = maybe_cmd else {
+        let Some(event) = event else {
+            if had_prefix != has_prefix || has_prefix {
+                return Ok(ScreenState::Refresh);
+            }
             return Ok(ScreenState::Stay);
         };
 
+        self.handle_input_event(event).await
+    }
+
+    async fn handle_input_event(&mut self, event: InputEvent) -> Result<ScreenState> {
+        match event {
+            InputEvent::Action(cmd) => self.handle_action_command(cmd).await,
+            InputEvent::ModeSwitch(mode) => {
+                if mode == Mode::Command && !self.command_mode_allowed() {
+                    return Ok(ScreenState::Stay);
+                }
+                self.set_mode(mode);
+                Ok(ScreenState::Refresh)
+            }
+            InputEvent::ToggleHints => {
+                self.show_hints = !self.show_hints;
+                Ok(ScreenState::Refresh)
+            }
+            InputEvent::Text(ch) => {
+                match self.state.mode {
+                    Mode::Command => self.handle_command_line_event(InputEvent::Text(ch)).await,
+                    Mode::Insert => {
+                        self.forward_raw_input(crossterm::event::KeyCode::Char(ch))
+                            .await
+                    }
+                    _ => Ok(ScreenState::Stay),
+                }
+            }
+            InputEvent::Backspace => {
+                match self.state.mode {
+                    Mode::Command => self.handle_command_line_event(InputEvent::Backspace).await,
+                    Mode::Insert => {
+                        self.forward_raw_input(crossterm::event::KeyCode::Backspace)
+                            .await
+                    }
+                    _ => Ok(ScreenState::Stay),
+                }
+            }
+            InputEvent::Delete => {
+                match self.state.mode {
+                    Mode::Command => self.handle_command_line_event(InputEvent::Delete).await,
+                    Mode::Insert => {
+                        self.forward_raw_input(crossterm::event::KeyCode::Delete)
+                            .await
+                    }
+                    _ => Ok(ScreenState::Stay),
+                }
+            }
+            InputEvent::Enter => {
+                match self.state.mode {
+                    Mode::Command => self.handle_command_line_event(InputEvent::Enter).await,
+                    Mode::Insert => {
+                        self.forward_raw_input(crossterm::event::KeyCode::Enter)
+                            .await
+                    }
+                    _ => Ok(ScreenState::Stay),
+                }
+            }
+            InputEvent::Tab => {
+                match self.state.mode {
+                    Mode::Command => self.handle_command_line_event(InputEvent::Tab).await,
+                    Mode::Insert => {
+                        self.forward_raw_input(crossterm::event::KeyCode::Tab)
+                            .await
+                    }
+                    _ => Ok(ScreenState::Stay),
+                }
+            }
+            InputEvent::Esc => {
+                match self.state.mode {
+                    Mode::Command => self.handle_command_line_event(InputEvent::Esc).await,
+                    Mode::Insert | Mode::Visual => {
+                        self.set_mode(Mode::Normal);
+                        Ok(ScreenState::Refresh)
+                    }
+                    _ => Ok(ScreenState::Stay),
+                }
+            }
+        }
+    }
+
+    async fn handle_action_command(&mut self, cmd: Command) -> Result<ScreenState> {
+        if let ActionId::EnterInsert(_) = cmd.action {
+            self.set_mode(Mode::Insert);
+        }
         // Global navigation/actions handled here; the rest go to the active screen.
         if let Some(nav) = self.map_global_action(&cmd) {
             return Ok(nav);
@@ -189,6 +301,17 @@ impl App {
         Ok(screen.handle_command(cmd))
     }
 
+    async fn forward_raw_input(&mut self, code: crossterm::event::KeyCode) -> Result<ScreenState> {
+        let screen = self
+            .screens
+            .active_mut(&self.cfg_state, &self.state)
+            .await?;
+        Ok(screen.handle_command(Command {
+            action: ActionId::RawInput(code),
+            repeat: 1,
+        }))
+    }
+
     fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
         match action {
             ScreenState::Quit => {
@@ -196,16 +319,29 @@ impl App {
                 Ok(ActionOutcome::Quit)
             }
             ScreenState::SwitchTo(new_screen) => {
+                if new_screen == ScreenType::Home {
+                    self.screen_stack.clear();
+                } else if new_screen != self.state.current_screen {
+                    self.screen_stack.push(self.state.current_screen);
+                }
                 self.state.current_screen = new_screen;
+                if self.state.mode == Mode::Command && !self.command_mode_allowed() {
+                    self.set_mode(Mode::Normal);
+                }
                 self.terminal.clear()?;
                 Ok(ActionOutcome::Continue { render: true })
             }
             ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
             ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
-            _ => {
-                // Other actions (e.g., SaveConfig) can be handled here.
-                Ok(ActionOutcome::Continue { render: false })
+            ScreenState::SaveConfig(cfg) => {
+                self.save_config(cfg)?;
+                Ok(ActionOutcome::Continue { render: true })
             }
+            ScreenState::SaveAndClose(cfg) => {
+                self.save_config(cfg)?;
+                self.close_screen()
+            }
+            ScreenState::Close => self.close_screen(),
         }
     }
 
@@ -214,7 +350,7 @@ impl App {
         Ok(true)
     }
 
-    fn map_global_action(&self, cmd: &Command) -> Option<ScreenState> {
+    fn map_global_action(&mut self, cmd: &Command) -> Option<ScreenState> {
         match cmd.action {
             ActionId::Quit => Some(ScreenState::Quit),
             ActionId::Refresh => Some(ScreenState::Refresh),
@@ -229,17 +365,130 @@ impl App {
     }
 
     async fn render(&mut self) -> Result<()> {
-        let screen_type = self.state.current_screen.clone();
+        let screen_type = self.state.current_screen;
         let screen = self
             .screens
             .active_mut(&self.cfg_state, &self.state)
             .await?;
-        let hints = action_hints(screen_type.clone());
+        let hints = action_hints(screen_type);
         screen.set_action_hints(hints);
+        screen.set_mode(self.state.mode);
         self.terminal.draw(|frame| {
             screen.draw(frame);
+            if self.show_hints {
+                let hints = binding_hints_for_screen(screen_type);
+                let popup = WhichKeyPopup::new("Key Hints".to_string(), hints);
+                frame.render_widget(&popup, frame.area());
+            } else if let Some(prefix) = self.input.pending_prefix() {
+                let hints = binding_hints_for_prefix(screen_type, &prefix);
+                let popup = WhichKeyPopup::new(prefix, hints);
+                frame.render_widget(&popup, frame.area());
+            }
+            if let Some(buffer) = self.command_line.buffer() {
+                let area = command_line_area(frame.area());
+                let block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Yellow))
+                    .title(Line::from("Command").centered())
+                    .title_style(Style::default().fg(Color::Yellow));
+                frame.render_widget(Clear, area);
+                frame.render_widget(&block, area);
+                frame.render_widget(CommandLine::new(buffer), block.inner(area));
+            }
         })?;
         Ok(())
+    }
+
+    fn set_mode(&mut self, mode: Mode) {
+        self.state.mode = mode;
+        self.input.clear_pending();
+        if mode == Mode::Command {
+            if !self.command_mode_allowed() {
+                self.state.mode = Mode::Normal;
+                self.command_line.stop();
+                return;
+            }
+            self.command_line.start();
+        } else {
+            self.command_line.stop();
+        }
+    }
+
+    async fn handle_command_line_event(&mut self, event: InputEvent) -> Result<ScreenState> {
+        match self.command_line.handle_event(event) {
+            CommandLineOutcome::Updated => Ok(ScreenState::Refresh),
+            CommandLineOutcome::Cancelled => {
+                self.set_mode(Mode::Normal);
+                Ok(ScreenState::Refresh)
+            }
+            CommandLineOutcome::Submitted(action) => {
+                self.set_mode(Mode::Normal);
+                if let Some(action) = action {
+                    self.handle_command_line_action(action).await
+                } else {
+                    Ok(ScreenState::Stay)
+                }
+            }
+            CommandLineOutcome::Noop => Ok(ScreenState::Stay),
+        }
+    }
+
+    async fn handle_command_line_action(
+        &mut self,
+        action: CommandLineAction,
+    ) -> Result<ScreenState> {
+        match action {
+            CommandLineAction::Write => {
+                let screen = self
+                    .screens
+                    .active_mut(&self.cfg_state, &self.state)
+                    .await?;
+                Ok(screen.handle_command_line(CommandLineCommand::Write))
+            }
+            CommandLineAction::WriteQuit => {
+                let screen = self
+                    .screens
+                    .active_mut(&self.cfg_state, &self.state)
+                    .await?;
+                Ok(screen.handle_command_line(CommandLineCommand::WriteQuit))
+            }
+            CommandLineAction::WriteQuitAll => {
+                let screen = self
+                    .screens
+                    .active_mut(&self.cfg_state, &self.state)
+                    .await?;
+                let res = screen.handle_command_line(CommandLineCommand::Write);
+                if let ScreenState::SaveConfig(cfg) | ScreenState::SaveAndClose(cfg) = res {
+                    self.save_config(cfg)?;
+                }
+                Ok(ScreenState::Quit)
+            }
+            CommandLineAction::Quit => Ok(ScreenState::Close),
+            CommandLineAction::QuitAll => Ok(ScreenState::Quit),
+        }
+    }
+
+    fn save_config(&mut self, cfg: AppConfig) -> Result<()> {
+        cfg.save()?;
+        self.cfg_state = AppConfigState::Loaded(cfg);
+        self.screens.home_screen = None;
+        self.screens.current_sprint_screen = None;
+        Ok(())
+    }
+
+    fn command_mode_allowed(&self) -> bool {
+        !matches!(self.state.current_screen, ScreenType::Home)
+    }
+
+    fn close_screen(&mut self) -> Result<ActionOutcome> {
+        if let Some(prev) = self.screen_stack.pop() {
+            self.state.current_screen = prev;
+            self.terminal.clear()?;
+            Ok(ActionOutcome::Continue { render: true })
+        } else {
+            self.terminal.clear()?;
+            Ok(ActionOutcome::Quit)
+        }
     }
 
     fn init_start_screen(&mut self) {
