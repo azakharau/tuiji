@@ -1,9 +1,10 @@
 # Repository Guidelines
 
 ## Project Structure & Modules
-- Core app logic: `src/app.rs` (event loop, screens cache) plus submodules `src/app/{event,key_handlers,state}.rs`.
+- Core app logic: `src/app.rs` (event loop, screen manager) plus submodules `src/app/{event,input,key_handlers,screen_manager,state}.rs`.
 - UI: `src/ui` (screens, components). Screens live in `src/ui/screens/*`, shared widgets in `src/ui/components/*`.
 - Jira client: `src/client/jira.rs` (async gouqi wrapper).
+- Repository hub: `src/data/repository/local.rs` (`RepositoryHub`) plus `AppRepository` trait in `src/data/repository/mod.rs`.
 - Config and types: `src/config.rs`.
 - Entry point: `src/main.rs`.
 - Build artifacts: `target/`; configuration files under `tuiji/config.toml` in your config dir.
@@ -19,6 +20,9 @@
 - Prefer `Arc` for shared data in async contexts; avoid `Rc` in new code.
 - Screen interfaces: implement `Screen` + `KeyHandler`; avoid long-lived borrows of `AppState`.
 - Config-driven key bindings: use `KeyBindings` instead of hardcoded keys.
+## Configuration Notes
+- UI settings live under `[ui]` in `config.toml` (e.g., `screen_cache_ttl_seconds`).
+- Key bindings live under `[keybindings]` in `config.toml`; defaults mirror the built-in vim-style bindings.
 
 ## Testing Guidelines
 - Add unit tests alongside modules (e.g., `src/app/state.rs` → `state.rs` tests in the same file or `state_tests.rs`).

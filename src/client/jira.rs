@@ -1,7 +1,4 @@
-use gouqi::{
-    r#async::Jira,
-    Board, Credentials, Issue, Project, SearchOptions, Sprint,
-};
+use gouqi::{Board, Credentials, Issue, Project, SearchOptions, Sprint, r#async::Jira};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -100,6 +97,10 @@ impl JiraClient {
         self.client.projects().list().await
     }
 
+    pub async fn get_board(&self, board_id: u64) -> gouqi::Result<Board> {
+        self.client.boards().get(board_id).await
+    }
+
     pub async fn get_project_boards(&self, project_key: &str) -> gouqi::Result<Vec<Board>> {
         let res = self
             .client
@@ -132,8 +133,11 @@ impl JiraClient {
 
     pub async fn get_current_sprint_issues(&self, board_id: u64) -> gouqi::Result<Issues> {
         let sprint = self.get_current_sprint(board_id).await?;
-        let jql = format!("sprint = {}", sprint.id);
-        // Pass JQL directly to search; keep options free of JQL to avoid double injection (caused 400 with stray comma).
+        self.get_sprint_issues(sprint.id).await
+    }
+
+    pub async fn get_sprint_issues(&self, sprint_id: u64) -> gouqi::Result<Issues> {
+        let jql = format!("sprint = {}", sprint_id);
         let opts = SearchOptions::builder().all_fields().build();
         let res = self.client.search().list(&jql, &opts).await?;
         Ok(res.issues)

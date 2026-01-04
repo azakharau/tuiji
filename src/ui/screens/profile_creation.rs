@@ -1,10 +1,10 @@
 use ratatui::{
     Frame,
     buffer::Buffer,
-    layout::{Constraint, Flex, Layout, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Style},
-    text::Line,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
+    text::{Line, Text},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
 };
 
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::{
         key_handlers::{ActionHint, ActionId, Command, KeyHandler},
         state::Mode,
     },
-    config::{AppConfig, JiraConfig, UiConfig},
+    config::{JiraConfig, ProfileConfig},
     ui::{
         components::bottom_bar::BottomBar,
         screens::{CommandLineCommand, Screen, ScreenState},
@@ -153,11 +153,7 @@ fn word_forward(value: &str, pos: usize) -> usize {
         idx += 1;
     }
 
-    if idx < chars.len() {
-        chars[idx].0
-    } else {
-        len
-    }
+    if idx < chars.len() { chars[idx].0 } else { len }
 }
 
 fn word_end(value: &str, pos: usize) -> usize {
@@ -245,38 +241,97 @@ pub struct ProfileCreationScreen {
     form: ProfileForm,
     actions: Arc<Vec<ActionHint>>,
     mode: Mode,
+    profile_id: Option<String>,
+    error: Option<String>,
 }
 
 impl ProfileCreationScreen {
-    pub fn new() -> Self {
+    pub fn new(profile: Option<ProfileConfig>) -> Self {
+        if let Some(profile) = profile {
+            return Self::from_profile(profile);
+        }
         Self::default()
     }
 
-    fn build_config(&self) -> AppConfig {
-        let mut jira_url = String::new();
-        let mut username = String::new();
-        let mut api_token = String::new();
+    pub fn set_profile_id(&mut self, id: String) {
+        self.profile_id = Some(id);
+    }
 
-        if let Some(item) = self.form.items.get(1) {
-            jira_url = item.value.clone();
-        }
-        if let Some(item) = self.form.items.get(2) {
-            username = item.value.clone();
-        }
-        if let Some(item) = self.form.items.get(3) {
-            api_token = item.value.clone();
+    fn build_profile(&self) -> Result<ProfileConfig, String> {
+        let name = self
+            .form
+            .items
+            .get(0)
+            .map(|v| v.value.trim().to_string())
+            .unwrap_or_default();
+        if name.is_empty() {
+            return Err("Profile name is required".to_string());
         }
 
-        AppConfig {
+        let jira_url = self
+            .form
+            .items
+            .get(1)
+            .map(|v| v.value.trim().to_string())
+            .unwrap_or_default();
+        validate_url(&jira_url)?;
+
+        let username = self
+            .form
+            .items
+            .get(2)
+            .map(|v| v.value.trim().to_string())
+            .unwrap_or_default();
+        if username.is_empty() {
+            return Err("Email is required".to_string());
+        }
+        validate_email(&username)?;
+
+        let api_token = self
+            .form
+            .items
+            .get(3)
+            .map(|v| v.value.trim().to_string())
+            .unwrap_or_default();
+        if api_token.is_empty() {
+            return Err("Jira API token is required".to_string());
+        }
+
+        let id = self
+            .profile_id
+            .clone()
+            .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+        Ok(ProfileConfig {
+            id,
+            name,
             jira: JiraConfig {
                 base_url: jira_url,
                 username,
                 api_token,
             },
-            ui: UiConfig {
-                theme: "dark".to_string(),
-            },
+        })
+    }
+
+    fn from_profile(profile: ProfileConfig) -> Self {
+        let mut screen = Self::default();
+        screen.profile_id = Some(profile.id);
+        if let Some(item) = screen.form.items.get_mut(0) {
+            item.value = profile.name;
+            item.cursor_position = item.value.len();
         }
+        if let Some(item) = screen.form.items.get_mut(1) {
+            item.value = profile.jira.base_url;
+            item.cursor_position = item.value.len();
+        }
+        if let Some(item) = screen.form.items.get_mut(2) {
+            item.value = profile.jira.username;
+            item.cursor_position = item.value.len();
+        }
+        if let Some(item) = screen.form.items.get_mut(3) {
+            item.value = profile.jira.api_token;
+            item.cursor_position = item.value.len();
+        }
+        screen
     }
 }
 
@@ -315,44 +370,49 @@ impl Default for ProfileCreationScreen {
             form,
             actions: Arc::new(Vec::new()),
             mode: Mode::Normal,
+            profile_id: None,
+            error: None,
         }
     }
 }
 
 impl Screen for ProfileCreationScreen {
     fn draw(&mut self, frame: &mut Frame) {
-        let [body_area, bar_area] =
-            Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(frame.area());
-        let [_, vertical_layout, _] = Layout::vertical([
-            Constraint::Percentage(30),
-            Constraint::Fill(1),
-            Constraint::Percentage(30),
-        ])
-        .areas(body_area);
-        let [_, center, _] = Layout::horizontal([
-            Constraint::Percentage(30),
-            Constraint::Fill(1),
-            Constraint::Percentage(30),
-        ])
-        .flex(Flex::Center)
-        .areas(vertical_layout);
+        let area = crate::app::input::overlay::modal_dialog_area(frame.area());
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
             .borders(Borders::ALL)
             .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black))
             .title(Line::from(self.name()).centered());
 
-        let body = block.inner(center);
-        frame.render_widget(Clear, center);
-        frame.render_widget(block, center);
-        frame.render_widget(self.form.clone(), body);
+        let inner = block.inner(area);
+        let [form_area, error_area, bar_area] = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .areas(inner);
+        frame.render_widget(Clear, area);
+        frame.render_widget(block, area);
+        frame.render_widget(self.form.clone(), form_area);
+        if let Some(err) = &self.error {
+            let msg = Paragraph::new(Text::from(err.clone()))
+                .alignment(Alignment::Center)
+                .wrap(Wrap::default())
+                .style(Style::default().fg(Color::Red));
+            frame.render_widget(msg, error_area);
+        }
 
         let bottom_bar = BottomBar::new(self.mode, self.actions.clone());
         frame.render_widget(bottom_bar, bar_area);
     }
 
     fn name(&self) -> &'static str {
-        "Profile Creation"
+        if self.profile_id.is_some() {
+            "Edit Profile"
+        } else {
+            "Profile Creation"
+        }
     }
 
     fn set_action_hints(&mut self, actions: Arc<Vec<ActionHint>>) {
@@ -364,21 +424,30 @@ impl Screen for ProfileCreationScreen {
     }
 
     fn handle_command_line(&mut self, cmd: CommandLineCommand) -> ScreenState {
-        let cfg = self.build_config();
         match cmd {
-            CommandLineCommand::Write => ScreenState::SaveConfig(cfg),
-            CommandLineCommand::WriteQuit => ScreenState::SaveAndClose(cfg),
+            CommandLineCommand::Write => match self.build_profile() {
+                Ok(profile) => ScreenState::SaveProfile(profile),
+                Err(err) => {
+                    self.error = Some(err);
+                    ScreenState::Refresh
+                }
+            },
+            CommandLineCommand::WriteQuit => match self.build_profile() {
+                Ok(profile) => ScreenState::SaveProfileAndClose(profile),
+                Err(err) => {
+                    self.error = Some(err);
+                    ScreenState::Refresh
+                }
+            },
+            CommandLineCommand::Quit => ScreenState::Close,
         }
     }
 }
 
 impl KeyHandler for ProfileCreationScreen {
     fn handle_command(&mut self, command: Command) -> ScreenState {
+        self.error = None;
         match command.action {
-            ActionId::NextRow => {
-                self.form.go_to_next_row();
-                ScreenState::Refresh
-            }
             ActionId::MoveDown => {
                 for _ in 0..command.repeat {
                     self.form.go_to_next_row();
@@ -476,6 +545,10 @@ impl KeyHandler for ProfileCreationScreen {
                             item.value.insert(item.cursor_position, ch);
                             item.cursor_position += 1;
                         }
+                        crossterm::event::KeyCode::Tab => {
+                            item.value.insert(item.cursor_position, '\t');
+                            item.cursor_position += 1;
+                        }
                         crossterm::event::KeyCode::Backspace => {
                             if item.cursor_position > 0 {
                                 item.cursor_position -= 1;
@@ -495,4 +568,31 @@ impl KeyHandler for ProfileCreationScreen {
             _ => ScreenState::Stay,
         }
     }
+}
+
+fn validate_url(url: &str) -> Result<(), String> {
+    if url.is_empty() {
+        return Err("Jira base URL is required".to_string());
+    }
+    let parsed = reqwest::Url::parse(url).map_err(|_| "Jira base URL is invalid".to_string())?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(()),
+        _ => Err("Jira base URL must start with http:// or https://".to_string()),
+    }
+}
+
+fn validate_email(email: &str) -> Result<(), String> {
+    if email.chars().any(|c| c.is_whitespace()) {
+        return Err("Email must not contain spaces".to_string());
+    }
+    let mut parts = email.split('@');
+    let local = parts.next().unwrap_or("");
+    let domain = parts.next().unwrap_or("");
+    if local.is_empty() || domain.is_empty() || parts.next().is_some() {
+        return Err("Email address is invalid".to_string());
+    }
+    if domain.starts_with('.') || domain.ends_with('.') || !domain.contains('.') {
+        return Err("Email address is invalid".to_string());
+    }
+    Ok(())
 }

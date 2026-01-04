@@ -1,4 +1,4 @@
-use super::InputEvent;
+use super::TextInput;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandLineAction {
@@ -53,20 +53,20 @@ impl CommandLineState {
         }
     }
 
-    pub fn handle_event(&mut self, event: InputEvent) -> CommandLineOutcome {
+    pub fn handle_event(&mut self, event: TextInput) -> CommandLineOutcome {
         if !self.active {
             return CommandLineOutcome::Noop;
         }
         match event {
-            InputEvent::Text(ch) => {
+            TextInput::Char(ch) => {
                 self.buffer.push(ch);
                 CommandLineOutcome::Updated
             }
-            InputEvent::Backspace | InputEvent::Delete => {
+            TextInput::Backspace | TextInput::Delete => {
                 self.buffer.pop();
                 CommandLineOutcome::Updated
             }
-            InputEvent::Enter => {
+            TextInput::Enter => {
                 let cmd = self.buffer.trim().to_string();
                 self.buffer.clear();
                 self.active = false;
@@ -76,12 +76,12 @@ impl CommandLineState {
                     CommandLineOutcome::Submitted(parse_command(&cmd))
                 }
             }
-            InputEvent::Esc => {
+            TextInput::Esc => {
                 self.buffer.clear();
                 self.active = false;
                 CommandLineOutcome::Cancelled
             }
-            _ => CommandLineOutcome::Noop,
+            TextInput::Tab => CommandLineOutcome::Noop,
         }
     }
 }

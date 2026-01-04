@@ -36,10 +36,7 @@ pub struct Menu {
 
 impl Menu {
     pub fn new(items: Vec<MenuItem>) -> Self {
-        Self {
-            items,
-            selected: 0,
-        }
+        Self { items, selected: 0 }
     }
 
     pub fn set_items(&mut self, items: Vec<MenuItem>) {
@@ -67,8 +64,30 @@ impl Menu {
         self.selected = (self.selected + step).min(self.items.len() - 1);
     }
 
+    pub fn move_top(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        self.selected = 0;
+    }
+
+    pub fn move_bottom(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        self.selected = self.items.len() - 1;
+    }
+
     pub fn selected(&self) -> Option<&MenuItem> {
         self.items.get(self.selected)
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        if self.items.is_empty() {
+            None
+        } else {
+            Some(self.selected)
+        }
     }
 
     pub fn height(&self) -> u16 {
@@ -103,9 +122,10 @@ impl Widget for &Menu {
             ])
             .split(area);
 
-        let list_items = self.items.iter().map(|item| {
-            ListItem::new(render_line(item, max_hint_width as usize))
-        });
+        let list_items = self
+            .items
+            .iter()
+            .map(|item| ListItem::new(render_line(item, max_hint_width as usize)));
 
         let mut state = ListState::default();
         if !self.items.is_empty() {
@@ -122,7 +142,13 @@ impl Widget for &Menu {
 fn render_line(item: &MenuItem, hint_width: usize) -> Line<'static> {
     match &item.hint {
         Some(hint) => Line::from(vec![
-            Span::raw(format!("{:pad$}[{:<width$}] ", "", hint, pad = LEFT_PAD, width = hint_width)),
+            Span::raw(format!(
+                "{:pad$}[{:<width$}] ",
+                "",
+                hint,
+                pad = LEFT_PAD,
+                width = hint_width
+            )),
             Span::raw(item.label.clone()),
         ]),
         None => Line::from(format!("{:pad$}{}", "", item.label, pad = LEFT_PAD)),

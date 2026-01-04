@@ -5,6 +5,7 @@ use thiserror::Error;
 pub mod app;
 pub mod client;
 pub mod config;
+pub mod data;
 pub mod ui;
 
 #[derive(Error, Debug)]

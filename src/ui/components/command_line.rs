@@ -7,18 +7,18 @@ use ratatui::{
 
 pub struct CommandLine<'a> {
     pub buffer: &'a str,
+    pub color: Color,
 }
 
 impl<'a> CommandLine<'a> {
-    pub fn new(buffer: &'a str) -> Self {
-        Self { buffer }
+    pub fn new(buffer: &'a str, color: Color) -> Self {
+        Self { buffer, color }
     }
 }
 
 impl Widget for CommandLine<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let paragraph =
-            Paragraph::new(self.buffer).style(Style::default().fg(Color::Yellow));
+        let paragraph = Paragraph::new(self.buffer).style(Style::default().fg(self.color));
         paragraph.render(area, buf);
 
         if area.width == 0 || area.height == 0 {
@@ -34,7 +34,7 @@ impl Widget for CommandLine<'_> {
         };
         let cursor_block = Block::default()
             .borders(Borders::NONE)
-            .style(Style::default().bg(Color::Yellow).fg(Color::Black));
+            .style(Style::default().bg(self.color).fg(Color::Black));
         cursor_block.render(cursor, buf);
     }
 }

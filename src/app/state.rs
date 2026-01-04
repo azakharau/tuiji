@@ -26,34 +26,24 @@ impl From<Mode> for &'static str {
 }
 
 impl Mode {
-    pub fn as_paragraph(self) -> Paragraph<'static> {
+    pub fn color(self) -> Color {
         match self {
-            Mode::Normal => {
-                let val: &'static str = self.into();
-                Paragraph::new(val)
-                    .style(Style::default().fg(Color::Black))
-                    .centered()
-            }
-
-            Mode::Visual => {
-                let val: &'static str = self.into();
-                Paragraph::new(val)
-                    .style(Style::default().fg(Color::Black))
-                    .centered()
-            }
-            Mode::Insert => {
-                let val: &'static str = self.into();
-                Paragraph::new(val)
-                    .style(Style::default().fg(Color::Black))
-                    .centered()
-            }
-            Mode::Command => {
-                let val: &'static str = self.into();
-                Paragraph::new(val)
-                    .style(Style::default().fg(Color::Black))
-                    .centered()
-            }
+            Self::Normal => Color::Blue,
+            Self::Insert => Color::LightGreen,
+            Self::Visual => Color::LightMagenta,
+            Self::Command => Color::Yellow,
         }
+    }
+
+    pub fn style(self) -> Style {
+        Style::default().bg(self.color()).fg(Color::Black)
+    }
+
+    pub fn as_paragraph(self) -> Paragraph<'static> {
+        let val: &'static str = self.into();
+        Paragraph::new(val)
+            .style(Style::default().fg(Color::Black))
+            .centered()
     }
 }
 
@@ -63,24 +53,17 @@ impl Widget for Mode {
         Self: Sized,
     {
         let border = Block::default().borders(Borders::NONE);
-        let (content, color) = match self {
-            Self::Normal => (self.as_paragraph(), Style::default().bg(Color::Blue)),
-            Self::Insert => (self.as_paragraph(), Style::default().bg(Color::LightGreen)),
-            Self::Visual => (
-                self.as_paragraph(),
-                Style::default().bg(Color::LightMagenta),
-            ),
-            Self::Command => (self.as_paragraph(), Style::default().bg(Color::Yellow)),
-        };
-        border.style(color).render(area, buf);
+        border.style(self.style()).render(area, buf);
+        let content = self.as_paragraph();
         content.render(area, buf);
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 pub enum ScreenType {
     #[default]
     Home,
+    BoardSelection,
     CurrentSprint,
     MyIssues,
     SearchIssues,

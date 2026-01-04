@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crossterm::event::KeyCode;
 
 use crate::{
-    app::state::{Mode, ScreenType},
+    app::state::ScreenType,
+    config::{BindingAction, KeyBindingsConfig},
     ui::screens::ScreenState,
 };
 
@@ -19,6 +20,10 @@ pub enum ActionId {
     OpenSearchIssues,
     OpenNewIssue,
     OpenProfiles,
+    OpenBoards,
+    NewProfile,
+    EditProfile,
+    DeleteProfile,
     OpenInBrowser,
     MoveUp,
     MoveDown,
@@ -31,8 +36,6 @@ pub enum ActionId {
     MoveWordForward,
     MoveWordBackward,
     MoveWordEnd,
-    NextRow,
-    SwitchModeTo(Mode),
     EnterInsert(InsertMode),
     RawInput(KeyCode),
 }
@@ -68,95 +71,92 @@ impl ActionHint {
     }
 }
 
-/// Mapping: actions available on a screen and their bindings.
-pub fn screen_bindings(screen: ScreenType) -> Vec<(ActionId, String)> {
-    let mut map = vec![
-        (ActionId::Refresh, "r".to_string()),
-        (ActionId::Confirm, "<enter>".to_string()),
-        (ActionId::GoHome, "gh".to_string()),
-        (ActionId::OpenInBrowser, "o".to_string()),
-    ];
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeyBinding {
+    pub action: ActionId,
+    pub binding: String,
+}
 
-    match screen {
-        ScreenType::Home => map.extend(home_defaults()),
-        ScreenType::CurrentSprint => map.extend(current_sprint_defaults()),
-        ScreenType::ProfileCreation => map.extend(form_defaults()),
-        ScreenType::Profiles
-        | ScreenType::MyIssues
-        | ScreenType::SearchIssues
-        | ScreenType::NewIssue => {}
+#[derive(Clone, Debug)]
+pub struct KeyBindings {
+    by_screen: HashMap<ScreenType, Arc<Vec<KeyBinding>>>,
+}
+
+impl KeyBindings {
+    pub fn from_config(cfg: &KeyBindingsConfig) -> Self {
+        let global = map_bindings(&cfg.global);
+        let mut by_screen = HashMap::new();
+        by_screen.insert(
+            ScreenType::Home,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.home))),
+        );
+        by_screen.insert(
+            ScreenType::BoardSelection,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.board_selection))),
+        );
+        by_screen.insert(
+            ScreenType::CurrentSprint,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.current_sprint))),
+        );
+        by_screen.insert(
+            ScreenType::ProfileCreation,
+            Arc::new(merge_bindings(
+                &global,
+                &map_bindings(&cfg.profile_creation),
+            )),
+        );
+        by_screen.insert(
+            ScreenType::Profiles,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.profiles))),
+        );
+        by_screen.insert(
+            ScreenType::MyIssues,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.my_issues))),
+        );
+        by_screen.insert(
+            ScreenType::SearchIssues,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.search_issues))),
+        );
+        by_screen.insert(
+            ScreenType::NewIssue,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.new_issue))),
+        );
+        Self { by_screen }
     }
 
-    map
-}
+    pub fn bindings_for_screen(&self, screen: ScreenType) -> Arc<Vec<KeyBinding>> {
+        self.by_screen
+            .get(&screen)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(Vec::new()))
+    }
 
-fn home_defaults() -> Vec<(ActionId, String)> {
-    vec![
-        (ActionId::Quit, "q".to_string()),
-        (ActionId::OpenCurrentSprint, "c".to_string()),
-        (ActionId::OpenMyIssues, "i".to_string()),
-        (ActionId::OpenSearchIssues, "s".to_string()),
-        (ActionId::OpenNewIssue, "n".to_string()),
-        (ActionId::OpenProfiles, "p".to_string()),
-        (ActionId::MoveUp, "k".to_string()),
-        (ActionId::MoveUp, "<up>".to_string()),
-        (ActionId::MoveDown, "j".to_string()),
-        (ActionId::MoveDown, "<down>".to_string()),
-    ]
-}
+    pub fn action_for_binding(&self, screen: ScreenType, binding: &str) -> Option<ActionId> {
+        self.by_screen.get(&screen).and_then(|bindings| {
+            bindings
+                .iter()
+                .find(|entry| entry.binding == binding)
+                .map(|entry| entry.action)
+        })
+    }
 
-fn current_sprint_defaults() -> Vec<(ActionId, String)> {
-    vec![
-        (ActionId::MoveUp, "k".to_string()),
-        (ActionId::MoveUp, "<up>".to_string()),
-        (ActionId::MoveDown, "j".to_string()),
-        (ActionId::MoveDown, "<down>".to_string()),
-        (ActionId::MoveLeft, "h".to_string()),
-        (ActionId::MoveLeft, "<left>".to_string()),
-        (ActionId::MoveRight, "l".to_string()),
-        (ActionId::MoveRight, "<right>".to_string()),
-        (ActionId::MoveTop, "gg".to_string()),
-        (ActionId::MoveBottom, "G".to_string()),
-    ]
-}
-
-fn form_defaults() -> Vec<(ActionId, String)> {
-    vec![
-        (ActionId::MoveUp, "k".to_string()),
-        (ActionId::MoveUp, "<up>".to_string()),
-        (ActionId::MoveDown, "j".to_string()),
-        (ActionId::MoveDown, "<down>".to_string()),
-        (ActionId::MoveLeft, "h".to_string()),
-        (ActionId::MoveLeft, "<left>".to_string()),
-        (ActionId::MoveRight, "l".to_string()),
-        (ActionId::MoveRight, "<right>".to_string()),
-        (ActionId::MoveTop, "gg".to_string()),
-        (ActionId::MoveBottom, "G".to_string()),
-        (ActionId::MoveLineStart, "0".to_string()),
-        (ActionId::MoveLineStart, "^".to_string()),
-        (ActionId::MoveLineEnd, "$".to_string()),
-        (ActionId::MoveWordForward, "w".to_string()),
-        (ActionId::MoveWordForward, "W".to_string()),
-        (ActionId::MoveWordBackward, "b".to_string()),
-        (ActionId::MoveWordBackward, "B".to_string()),
-        (ActionId::MoveWordEnd, "e".to_string()),
-        (ActionId::MoveWordEnd, "E".to_string()),
-        (ActionId::EnterInsert(InsertMode::Before), "i".to_string()),
-        (ActionId::EnterInsert(InsertMode::After), "a".to_string()),
-        (ActionId::EnterInsert(InsertMode::LineStart), "I".to_string()),
-        (ActionId::EnterInsert(InsertMode::LineEnd), "A".to_string()),
-    ]
+    pub fn binding_strings_for_screen(&self, screen: ScreenType) -> Vec<String> {
+        self.by_screen
+            .get(&screen)
+            .map(|bindings| bindings.iter().map(|b| b.binding.clone()).collect())
+            .unwrap_or_default()
+    }
 }
 
 /// Generates bottom-bar hints from the current bindings.
-pub fn action_hints(screen: ScreenType) -> Arc<Vec<ActionHint>> {
+pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<ActionHint>> {
     let mut hints = Vec::new();
-    let bindings = screen_bindings(screen);
+    let bindings = bindings.bindings_for_screen(screen);
     let first = |id: ActionId| {
         bindings
             .iter()
-            .find(|(a, _)| *a == id)
-            .map(|(_, b)| b.clone())
+            .find(|entry| entry.action == id)
+            .map(|entry| entry.binding.clone())
     };
 
     let mut push = |id: ActionId, description: &str| {
@@ -180,6 +180,7 @@ pub fn action_hints(screen: ScreenType) -> Arc<Vec<ActionHint>> {
             push(ActionId::OpenMyIssues, "My issues");
             push(ActionId::OpenSearchIssues, "Search issues");
             push(ActionId::OpenNewIssue, "New issue");
+            push(ActionId::OpenBoards, "Boards");
             push(ActionId::OpenProfiles, "Profiles");
         }
         ScreenType::CurrentSprint => {
@@ -191,41 +192,23 @@ pub fn action_hints(screen: ScreenType) -> Arc<Vec<ActionHint>> {
             push(ActionId::MoveBottom, "Bottom");
             push(ActionId::GoHome, "Home");
         }
+        ScreenType::BoardSelection => {
+            push(ActionId::Quit, "Quit");
+            push(ActionId::GoHome, "Home");
+        }
+        ScreenType::Profiles => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::Confirm, "Activate");
+            push(ActionId::EditProfile, "Edit");
+            push(ActionId::DeleteProfile, "Delete");
+            push(ActionId::NewProfile, "New");
+            push(ActionId::GoHome, "Home");
+        }
         _ => {}
     }
 
     Arc::new(hints)
-}
-
-pub fn binding_hints_for_prefix(screen: ScreenType, prefix: &str) -> Vec<ActionHint> {
-    let mut hints = Vec::new();
-    for (action, binding) in screen_bindings(screen) {
-        if !binding.starts_with(prefix) || binding.len() == prefix.len() {
-            continue;
-        }
-        if let Some(description) = action_description(action) {
-            hints.push(ActionHint {
-                binding,
-                description: description.to_string(),
-            });
-        }
-    }
-    hints.sort_by(|a, b| a.binding.cmp(&b.binding));
-    hints
-}
-
-pub fn binding_hints_for_screen(screen: ScreenType) -> Vec<ActionHint> {
-    let mut hints = Vec::new();
-    for (action, binding) in screen_bindings(screen) {
-        if let Some(description) = action_description(action) {
-            hints.push(ActionHint {
-                binding,
-                description: description.to_string(),
-            });
-        }
-    }
-    hints.sort_by(|a, b| a.binding.cmp(&b.binding));
-    hints
 }
 
 fn action_description(action: ActionId) -> Option<&'static str> {
@@ -239,6 +222,10 @@ fn action_description(action: ActionId) -> Option<&'static str> {
         ActionId::OpenSearchIssues => Some("Search issues"),
         ActionId::OpenNewIssue => Some("New issue"),
         ActionId::OpenProfiles => Some("Profiles"),
+        ActionId::OpenBoards => Some("Boards"),
+        ActionId::NewProfile => Some("New profile"),
+        ActionId::EditProfile => Some("Edit profile"),
+        ActionId::DeleteProfile => Some("Delete profile"),
         ActionId::OpenInBrowser => Some("Open in browser"),
         ActionId::MoveUp => Some("Up"),
         ActionId::MoveDown => Some("Down"),
@@ -251,9 +238,110 @@ fn action_description(action: ActionId) -> Option<&'static str> {
         ActionId::MoveWordForward => Some("Word forward"),
         ActionId::MoveWordBackward => Some("Word back"),
         ActionId::MoveWordEnd => Some("Word end"),
-        ActionId::NextRow => Some("Next row"),
-        ActionId::SwitchModeTo(_) => Some("Switch mode"),
         ActionId::EnterInsert(_) => Some("Insert"),
         ActionId::RawInput(_) => None,
+    }
+}
+
+pub fn binding_hints_for_prefix(
+    screen: ScreenType,
+    prefix: &str,
+    bindings: &KeyBindings,
+) -> Vec<ActionHint> {
+    let mut hints = Vec::new();
+    for entry in bindings.bindings_for_screen(screen).iter() {
+        if !entry.binding.starts_with(prefix) || entry.binding.len() == prefix.len() {
+            continue;
+        }
+        if let Some(description) = action_description(entry.action) {
+            hints.push(ActionHint {
+                binding: entry.binding.clone(),
+                description: description.to_string(),
+            });
+        }
+    }
+    hints.sort_by(|a, b| a.binding.cmp(&b.binding));
+    hints
+}
+
+pub fn binding_hints_for_screen(screen: ScreenType, bindings: &KeyBindings) -> Vec<ActionHint> {
+    let mut hints = Vec::new();
+    for entry in bindings.bindings_for_screen(screen).iter() {
+        if let Some(description) = action_description(entry.action) {
+            hints.push(ActionHint {
+                binding: entry.binding.clone(),
+                description: description.to_string(),
+            });
+        }
+    }
+    hints.sort_by(|a, b| a.binding.cmp(&b.binding));
+    hints
+}
+
+pub fn is_motion_action(action: ActionId) -> bool {
+    matches!(
+        action,
+        ActionId::MoveUp
+            | ActionId::MoveDown
+            | ActionId::MoveLeft
+            | ActionId::MoveRight
+            | ActionId::MoveTop
+            | ActionId::MoveBottom
+            | ActionId::MoveLineStart
+            | ActionId::MoveLineEnd
+            | ActionId::MoveWordForward
+            | ActionId::MoveWordBackward
+            | ActionId::MoveWordEnd
+    )
+}
+
+fn map_bindings(entries: &[crate::config::KeyBindingConfig]) -> Vec<KeyBinding> {
+    entries
+        .iter()
+        .map(|entry| KeyBinding {
+            action: binding_action_to_action_id(entry.action),
+            binding: entry.binding.clone(),
+        })
+        .collect()
+}
+
+fn merge_bindings(global: &[KeyBinding], local: &[KeyBinding]) -> Vec<KeyBinding> {
+    let mut merged = Vec::with_capacity(global.len() + local.len());
+    merged.extend_from_slice(global);
+    merged.extend_from_slice(local);
+    merged
+}
+
+fn binding_action_to_action_id(action: BindingAction) -> ActionId {
+    match action {
+        BindingAction::Quit => ActionId::Quit,
+        BindingAction::Refresh => ActionId::Refresh,
+        BindingAction::Confirm => ActionId::Confirm,
+        BindingAction::GoHome => ActionId::GoHome,
+        BindingAction::OpenCurrentSprint => ActionId::OpenCurrentSprint,
+        BindingAction::OpenMyIssues => ActionId::OpenMyIssues,
+        BindingAction::OpenSearchIssues => ActionId::OpenSearchIssues,
+        BindingAction::OpenNewIssue => ActionId::OpenNewIssue,
+        BindingAction::OpenProfiles => ActionId::OpenProfiles,
+        BindingAction::OpenBoards => ActionId::OpenBoards,
+        BindingAction::NewProfile => ActionId::NewProfile,
+        BindingAction::EditProfile => ActionId::EditProfile,
+        BindingAction::DeleteProfile => ActionId::DeleteProfile,
+        BindingAction::OpenInBrowser => ActionId::OpenInBrowser,
+        BindingAction::MoveUp => ActionId::MoveUp,
+        BindingAction::MoveDown => ActionId::MoveDown,
+        BindingAction::MoveLeft => ActionId::MoveLeft,
+        BindingAction::MoveRight => ActionId::MoveRight,
+        BindingAction::MoveTop => ActionId::MoveTop,
+        BindingAction::MoveBottom => ActionId::MoveBottom,
+        BindingAction::MoveLineStart => ActionId::MoveLineStart,
+        BindingAction::MoveLineEnd => ActionId::MoveLineEnd,
+        BindingAction::MoveWordForward => ActionId::MoveWordForward,
+        BindingAction::MoveWordBackward => ActionId::MoveWordBackward,
+        BindingAction::MoveWordEnd => ActionId::MoveWordEnd,
+        BindingAction::EnterInsertBefore => ActionId::EnterInsert(InsertMode::Before),
+        BindingAction::EnterInsertAfter => ActionId::EnterInsert(InsertMode::After),
+        BindingAction::EnterInsertLineStart => ActionId::EnterInsert(InsertMode::LineStart),
+        BindingAction::EnterInsertLineEnd => ActionId::EnterInsert(InsertMode::LineEnd),
     }
 }

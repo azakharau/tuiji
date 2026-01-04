@@ -7,12 +7,14 @@ use crate::{
         key_handlers::{ActionHint, KeyHandler},
         state::ScreenType,
     },
-    config::AppConfig,
+    config::ProfileConfig,
 };
 
+pub mod board_selection;
 pub mod current_sprint;
 pub mod home;
 pub mod profile_creation;
+pub mod profiles;
 
 pub trait Screen: KeyHandler {
     fn draw(&mut self, frame: &mut Frame);
@@ -35,6 +37,7 @@ pub trait Screen: KeyHandler {
 pub enum CommandLineCommand {
     Write,
     WriteQuit,
+    Quit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,7 +46,7 @@ pub enum ScreenState {
     Refresh,
     SwitchTo(ScreenType),
     Quit,
-    SaveConfig(AppConfig),
-    SaveAndClose(AppConfig),
+    SaveProfile(ProfileConfig),
+    SaveProfileAndClose(ProfileConfig),
     Close,
 }

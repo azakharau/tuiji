@@ -1,21 +1,13 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{
-    key_handlers::{ActionId, Command, screen_bindings},
-    state::{Mode, ScreenType},
-};
+use crate::app::{key_handlers::KeyBinding, state::Mode};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InputEvent {
-    Action(Command),
+pub enum ParsedInput {
+    Binding { binding: String, repeat: usize },
     ModeSwitch(Mode),
     ToggleHints,
-    Text(char),
-    Backspace,
-    Delete,
-    Enter,
-    Tab,
-    Esc,
+    Text(TextInput),
 }
 
 #[derive(Default, Debug, Clone)]
@@ -25,14 +17,19 @@ pub struct InputParser {
 }
 
 impl InputParser {
-    pub fn parse(&mut self, key: KeyEvent, mode: Mode, screen: ScreenType) -> Option<InputEvent> {
+    pub fn parse(
+        &mut self,
+        key: KeyEvent,
+        mode: Mode,
+        bindings: &[KeyBinding],
+    ) -> Option<ParsedInput> {
         if mode == Mode::Normal && matches!(key.code, KeyCode::Char('?')) {
             self.reset_state();
-            return Some(InputEvent::ToggleHints);
+            return Some(ParsedInput::ToggleHints);
         }
         match mode {
             Mode::Insert | Mode::Command => self.parse_text_mode(key),
-            Mode::Normal | Mode::Visual => self.parse_action_mode(key, screen),
+            Mode::Normal | Mode::Visual => self.parse_action_mode(key, bindings),
         }
     }
 
@@ -44,24 +41,24 @@ impl InputParser {
         self.reset_state();
     }
 
-    fn parse_text_mode(&mut self, key: KeyEvent) -> Option<InputEvent> {
+    fn parse_text_mode(&mut self, key: KeyEvent) -> Option<ParsedInput> {
         self.reset_state();
         if has_ctrl_or_alt(&key) {
             return None;
         }
 
         match key.code {
-            KeyCode::Char(c) => Some(InputEvent::Text(c)),
-            KeyCode::Backspace => Some(InputEvent::Backspace),
-            KeyCode::Delete => Some(InputEvent::Delete),
-            KeyCode::Enter => Some(InputEvent::Enter),
-            KeyCode::Tab => Some(InputEvent::Tab),
-            KeyCode::Esc => Some(InputEvent::Esc),
+            KeyCode::Char(c) => Some(ParsedInput::Text(TextInput::Char(c))),
+            KeyCode::Backspace => Some(ParsedInput::Text(TextInput::Backspace)),
+            KeyCode::Delete => Some(ParsedInput::Text(TextInput::Delete)),
+            KeyCode::Enter => Some(ParsedInput::Text(TextInput::Enter)),
+            KeyCode::Tab => Some(ParsedInput::Text(TextInput::Tab)),
+            KeyCode::Esc => Some(ParsedInput::Text(TextInput::Esc)),
             _ => None,
         }
     }
 
-    fn parse_action_mode(&mut self, key: KeyEvent, screen: ScreenType) -> Option<InputEvent> {
+    fn parse_action_mode(&mut self, key: KeyEvent, bindings: &[KeyBinding]) -> Option<ParsedInput> {
         if has_ctrl_or_alt(&key) {
             self.reset_state();
             return None;
@@ -70,19 +67,19 @@ impl InputParser {
         match key.code {
             KeyCode::Esc => {
                 self.reset_state();
-                return Some(InputEvent::ModeSwitch(Mode::Normal));
+                return Some(ParsedInput::ModeSwitch(Mode::Normal));
             }
             KeyCode::Char('v') => {
                 self.reset_state();
-                return Some(InputEvent::ModeSwitch(Mode::Visual));
+                return Some(ParsedInput::ModeSwitch(Mode::Visual));
             }
             KeyCode::Char(':') => {
                 self.reset_state();
-                return Some(InputEvent::ModeSwitch(Mode::Command));
+                return Some(ParsedInput::ModeSwitch(Mode::Command));
             }
             KeyCode::Char(';') if key.modifiers.contains(KeyModifiers::SHIFT) => {
                 self.reset_state();
-                return Some(InputEvent::ModeSwitch(Mode::Command));
+                return Some(ParsedInput::ModeSwitch(Mode::Command));
             }
             _ => {}
         }
@@ -90,16 +87,13 @@ impl InputParser {
         if let KeyCode::Char(d @ '0'..='9') = key.code {
             if d == '0'
                 && self.pending_count.is_none()
-                && let Some((action, _)) =
-                    screen_bindings(screen).into_iter().find(|(_, b)| b == "0")
+                && bindings.iter().any(|entry| entry.binding == "0")
             {
-                let repeat = if is_motion(action) {
-                    self.take_count_or(1)
-                } else {
-                    self.reset_count();
-                    1
-                };
-                return Some(InputEvent::Action(Command { action, repeat }));
+                let repeat = self.take_count_or(1);
+                return Some(ParsedInput::Binding {
+                    binding: "0".to_string(),
+                    repeat,
+                });
             }
             let digit = d.to_digit(10).unwrap_or(0) as usize;
             let new_count = self
@@ -114,18 +108,10 @@ impl InputParser {
         if let Some(prefix) = self.pending_prefix {
             if let KeyCode::Char(next) = key.code {
                 let binding = format!("{}{}", prefix, next);
-                if let Some((action, _)) = screen_bindings(screen)
-                    .into_iter()
-                    .find(|(_, b)| b == &binding)
-                {
+                if bindings.iter().any(|entry| entry.binding == binding) {
                     self.pending_prefix = None;
-                    let repeat = if is_motion(action) {
-                        self.take_count_or(1)
-                    } else {
-                        self.reset_count();
-                        1
-                    };
-                    return Some(InputEvent::Action(Command { action, repeat }));
+                    let repeat = self.take_count_or(1);
+                    return Some(ParsedInput::Binding { binding, repeat });
                 }
             }
             self.reset_state();
@@ -133,27 +119,24 @@ impl InputParser {
         }
 
         if let KeyCode::Char(prefix) = key.code
-            && screen_bindings(screen)
+            && bindings
                 .iter()
-                .any(|(_, key)| key.starts_with(prefix) && key.len() > 1)
+                .any(|entry| entry.binding.starts_with(prefix) && entry.binding.len() > 1)
         {
             self.pending_prefix = Some(prefix);
             return None;
         }
 
-        let candidates = screen_bindings(screen);
-        for (action, binding) in candidates {
-            if binding.len() > 1 && !binding.starts_with('<') {
+        for entry in bindings {
+            if entry.binding.len() > 1 && !entry.binding.starts_with('<') {
                 continue;
             }
-            if binding_matches(&key, &binding) {
-                let repeat = if is_motion(action) {
-                    self.take_count_or(1)
-                } else {
-                    self.reset_count();
-                    1
-                };
-                return Some(InputEvent::Action(Command { action, repeat }));
+            if binding_matches(&key, &entry.binding) {
+                let repeat = self.take_count_or(1);
+                return Some(ParsedInput::Binding {
+                    binding: entry.binding.clone(),
+                    repeat,
+                });
             }
         }
 
@@ -166,25 +149,26 @@ impl InputParser {
         self.pending_count = None;
     }
 
-    fn reset_count(&mut self) {
-        self.pending_count = None;
-    }
-
     fn take_count_or(&mut self, default: usize) -> usize {
         let n = self.pending_count.take().unwrap_or(default);
         if n == 0 { default } else { n }
     }
 }
 
-pub fn is_question_mark(key: &KeyEvent) -> bool {
-    matches!(key.code, KeyCode::Char('?'))
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextInput {
+    Char(char),
+    Backspace,
+    Delete,
+    Enter,
+    Tab,
+    Esc,
 }
 
 fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
     match key.code {
         KeyCode::Char(c) => binding.len() == 1 && binding.starts_with(c),
         KeyCode::Enter => binding.eq_ignore_ascii_case("enter") || binding == "<enter>",
-        KeyCode::Esc => binding.eq_ignore_ascii_case("esc") || binding == "<esc>",
         KeyCode::Up => binding.eq_ignore_ascii_case("up") || binding == "<up>",
         KeyCode::Down => binding.eq_ignore_ascii_case("down") || binding == "<down>",
         KeyCode::Left => binding.eq_ignore_ascii_case("left") || binding == "<left>",
@@ -192,23 +176,6 @@ fn binding_matches(key: &KeyEvent, binding: &str) -> bool {
         KeyCode::Tab => binding.eq_ignore_ascii_case("tab") || binding == "<tab>",
         _ => false,
     }
-}
-
-fn is_motion(action: ActionId) -> bool {
-    matches!(
-        action,
-        ActionId::MoveUp
-            | ActionId::MoveDown
-            | ActionId::MoveLeft
-            | ActionId::MoveRight
-            | ActionId::MoveTop
-            | ActionId::MoveBottom
-            | ActionId::MoveLineStart
-            | ActionId::MoveLineEnd
-            | ActionId::MoveWordForward
-            | ActionId::MoveWordBackward
-            | ActionId::MoveWordEnd
-    )
 }
 
 fn has_ctrl_or_alt(key: &KeyEvent) -> bool {

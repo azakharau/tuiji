@@ -39,7 +39,13 @@ pub struct HomeScreen {
 impl HomeScreen {
     pub fn new(logo: AsciiLogoComponent, cfg: &AppConfigState) -> Self {
         let variant = match cfg {
-            AppConfigState::Loaded(_) => HomeVariant::Default,
+            AppConfigState::Loaded(cfg) => {
+                if cfg.profiles.is_empty() {
+                    HomeVariant::Welcome
+                } else {
+                    HomeVariant::Default
+                }
+            }
             AppConfigState::Missing(_) => HomeVariant::Welcome,
         };
         Self::with_variant(logo, variant)
@@ -68,6 +74,7 @@ impl HomeScreen {
                 MenuItem::new("my_issues", "My issues").with_hint("i"),
                 MenuItem::new("search_issues", "Search Issues").with_hint("s"),
                 MenuItem::new("new_issue", "New Issue").with_hint("n"),
+                MenuItem::new("boards", "Boards").with_hint("b"),
                 MenuItem::new("refresh", "Refresh").with_hint("r"),
                 MenuItem::new("profiles", "Profiles").with_hint("p"),
                 MenuItem::new("quit", "Quit").with_hint("q"),
@@ -91,6 +98,7 @@ impl HomeScreen {
                 ScreenState::SwitchTo(ScreenType::SearchIssues)
             }
             (HomeVariant::Default, "new_issue") => ScreenState::SwitchTo(ScreenType::NewIssue),
+            (HomeVariant::Default, "boards") => ScreenState::SwitchTo(ScreenType::BoardSelection),
             (HomeVariant::Default, "profiles") => ScreenState::SwitchTo(ScreenType::Profiles),
             (HomeVariant::Default, "refresh") => ScreenState::Refresh,
             (HomeVariant::Default, "quit") => ScreenState::Quit,
@@ -157,6 +165,14 @@ impl KeyHandler for HomeScreen {
             }
             ActionId::MoveDown => {
                 self.menu.move_down(command.repeat);
+                ScreenState::Refresh
+            }
+            ActionId::MoveTop => {
+                self.menu.move_top();
+                ScreenState::Refresh
+            }
+            ActionId::MoveBottom => {
+                self.menu.move_bottom();
                 ScreenState::Refresh
             }
             ActionId::Confirm => self.handle_confirm(),

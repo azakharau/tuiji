@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::ConfigError;
 
 const ENV_PREFIX: &str = "TUIJI_";
-const CFG_FILE_PATH: &str = "tuiji/config.toml";
+const CFG_DIR: &str = "tuiji";
 
 #[derive(Debug)]
 pub enum AppConfigState {
@@ -27,8 +27,13 @@ impl AppConfigState {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct AppConfig {
-    pub jira: JiraConfig,
+    #[serde(default)]
+    pub profiles: Vec<ProfileConfig>,
+    #[serde(default)]
+    pub active_profile_id: Option<String>,
     pub ui: UiConfig,
+    #[serde(default)]
+    pub keybindings: KeyBindingsConfig,
 }
 
 impl AppConfig {
@@ -38,11 +43,28 @@ impl AppConfig {
             source: e,
             path: cfg_path.clone(),
         })?;
-        let cfg =
-            toml::from_str::<AppConfig>(&content).map_err(|e| ConfigError::DeserializeToml {
+
+        let value =
+            toml::from_str::<toml::Value>(&content).map_err(|e| ConfigError::DeserializeToml {
                 source: e,
                 path: cfg_path.clone(),
             })?;
+
+        let cfg = if value.get("profiles").is_some() {
+            toml::from_str::<AppConfig>(&content).map_err(|e| ConfigError::DeserializeToml {
+                source: e,
+                path: cfg_path.clone(),
+            })?
+        } else {
+            let legacy = toml::from_str::<LegacyAppConfig>(&content).map_err(|e| {
+                ConfigError::DeserializeToml {
+                    source: e,
+                    path: cfg_path.clone(),
+                }
+            })?;
+            AppConfig::from_legacy(legacy)
+        };
+
         Ok(env_override_config(cfg))
     }
 
@@ -74,6 +96,13 @@ impl AppConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct ProfileConfig {
+    pub id: String,
+    pub name: String,
+    pub jira: JiraConfig,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct JiraConfig {
     pub base_url: String,
     pub username: String,
@@ -94,12 +123,14 @@ impl JiraConfig {
     }
 }
 
-// Key bindings are currently fixed in code (vim-like) and not configurable via config.
+// Key bindings are configured via [keybindings] with vim-style defaults.
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct UiConfig {
     #[serde(default = "UiConfig::default_theme")]
     pub theme: String,
+    #[serde(default = "UiConfig::default_screen_cache_ttl_seconds")]
+    pub screen_cache_ttl_seconds: u64,
 }
 
 impl UiConfig {
@@ -118,6 +149,42 @@ impl UiConfig {
     fn default_theme() -> String {
         "dark".to_string()
     }
+
+    fn default_screen_cache_ttl_seconds() -> u64 {
+        60
+    }
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        AppConfig {
+            profiles: Vec::new(),
+            active_profile_id: None,
+            ui: UiConfig {
+                theme: UiConfig::default_theme(),
+                screen_cache_ttl_seconds: UiConfig::default_screen_cache_ttl_seconds(),
+            },
+            keybindings: KeyBindingsConfig::default(),
+        }
+    }
+}
+
+pub fn resolve_config_dir() -> PathBuf {
+    if let Ok(path) = std::env::var(format!("{}CFG_FILE_PATH", ENV_PREFIX)) {
+        let path = PathBuf::from(path);
+        return path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf();
+    }
+
+    if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
+        return PathBuf::from(xdg_config_home).join(CFG_DIR);
+    }
+    std::env::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".config")
+        .join(CFG_DIR)
 }
 
 fn resolve_cfg_path() -> PathBuf {
@@ -125,17 +192,238 @@ fn resolve_cfg_path() -> PathBuf {
         return PathBuf::from(path);
     }
 
-    if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
-        return PathBuf::from(xdg_config_home).join(CFG_FILE_PATH);
-    }
-    std::env::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".config")
-        .join(CFG_FILE_PATH)
+    resolve_config_dir().join("config.toml")
 }
 
 fn env_override_config(mut config: AppConfig) -> AppConfig {
-    config.jira.env_override();
+    if let Some(profile) = config.active_profile_mut() {
+        profile.jira.env_override();
+    }
     config.ui.env_override();
     config
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+struct LegacyAppConfig {
+    pub jira: JiraConfig,
+    pub ui: UiConfig,
+}
+
+impl AppConfig {
+    pub fn active_profile(&self) -> Option<&ProfileConfig> {
+        if let Some(id) = &self.active_profile_id {
+            if let Some(profile) = self.profiles.iter().find(|p| &p.id == id) {
+                return Some(profile);
+            }
+        }
+        self.profiles.first()
+    }
+
+    pub fn active_profile_mut(&mut self) -> Option<&mut ProfileConfig> {
+        if let Some(id) = &self.active_profile_id {
+            if let Some(pos) = self.profiles.iter().position(|p| &p.id == id) {
+                return self.profiles.get_mut(pos);
+            }
+        }
+        self.profiles.first_mut()
+    }
+
+    pub fn upsert_profile(&mut self, profile: ProfileConfig) {
+        match self.profiles.iter().position(|p| p.id == profile.id) {
+            Some(idx) => self.profiles[idx] = profile,
+            None => self.profiles.push(profile),
+        }
+    }
+
+    pub fn remove_profile(&mut self, id: &str) -> bool {
+        let Some(pos) = self.profiles.iter().position(|p| p.id == id) else {
+            return false;
+        };
+        self.profiles.remove(pos);
+        if self.active_profile_id.as_deref() == Some(id) {
+            self.active_profile_id = self.profiles.first().map(|p| p.id.clone());
+        }
+        true
+    }
+
+    pub fn set_active_profile(&mut self, id: &str) {
+        self.active_profile_id = Some(id.to_string());
+    }
+
+    fn from_legacy(legacy: LegacyAppConfig) -> Self {
+        let id = uuid::Uuid::now_v7().to_string();
+        let profile = ProfileConfig {
+            id: id.clone(),
+            name: "Default".to_string(),
+            jira: legacy.jira,
+        };
+        AppConfig {
+            profiles: vec![profile],
+            active_profile_id: Some(id),
+            ui: legacy.ui,
+            keybindings: KeyBindingsConfig::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct KeyBindingsConfig {
+    #[serde(default)]
+    pub global: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub home: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub board_selection: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub current_sprint: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub profile_creation: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub profiles: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub my_issues: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub search_issues: Vec<KeyBindingConfig>,
+    #[serde(default)]
+    pub new_issue: Vec<KeyBindingConfig>,
+}
+
+impl Default for KeyBindingsConfig {
+    fn default() -> Self {
+        Self {
+            global: vec![
+                KeyBindingConfig::new(BindingAction::Quit, "q"),
+                KeyBindingConfig::new(BindingAction::Refresh, "r"),
+                KeyBindingConfig::new(BindingAction::Confirm, "<enter>"),
+                KeyBindingConfig::new(BindingAction::GoHome, "gh"),
+                KeyBindingConfig::new(BindingAction::OpenBoards, "b"),
+                KeyBindingConfig::new(BindingAction::OpenInBrowser, "o"),
+            ],
+            home: vec![
+                KeyBindingConfig::new(BindingAction::Quit, "q"),
+                KeyBindingConfig::new(BindingAction::OpenCurrentSprint, "c"),
+                KeyBindingConfig::new(BindingAction::OpenMyIssues, "i"),
+                KeyBindingConfig::new(BindingAction::OpenSearchIssues, "s"),
+                KeyBindingConfig::new(BindingAction::OpenNewIssue, "n"),
+                KeyBindingConfig::new(BindingAction::OpenBoards, "b"),
+                KeyBindingConfig::new(BindingAction::OpenProfiles, "p"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+            ],
+            board_selection: vec![
+                KeyBindingConfig::new(BindingAction::Quit, "q"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+            ],
+            current_sprint: vec![
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveLeft, "h"),
+                KeyBindingConfig::new(BindingAction::MoveLeft, "<left>"),
+                KeyBindingConfig::new(BindingAction::MoveRight, "l"),
+                KeyBindingConfig::new(BindingAction::MoveRight, "<right>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+            ],
+            profile_creation: vec![
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveLeft, "h"),
+                KeyBindingConfig::new(BindingAction::MoveLeft, "<left>"),
+                KeyBindingConfig::new(BindingAction::MoveRight, "l"),
+                KeyBindingConfig::new(BindingAction::MoveRight, "<right>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+                KeyBindingConfig::new(BindingAction::MoveLineStart, "0"),
+                KeyBindingConfig::new(BindingAction::MoveLineStart, "^"),
+                KeyBindingConfig::new(BindingAction::MoveLineEnd, "$"),
+                KeyBindingConfig::new(BindingAction::MoveWordForward, "w"),
+                KeyBindingConfig::new(BindingAction::MoveWordForward, "W"),
+                KeyBindingConfig::new(BindingAction::MoveWordBackward, "b"),
+                KeyBindingConfig::new(BindingAction::MoveWordBackward, "B"),
+                KeyBindingConfig::new(BindingAction::MoveWordEnd, "e"),
+                KeyBindingConfig::new(BindingAction::MoveWordEnd, "E"),
+                KeyBindingConfig::new(BindingAction::EnterInsertBefore, "i"),
+                KeyBindingConfig::new(BindingAction::EnterInsertAfter, "a"),
+                KeyBindingConfig::new(BindingAction::EnterInsertLineStart, "I"),
+                KeyBindingConfig::new(BindingAction::EnterInsertLineEnd, "A"),
+            ],
+            profiles: vec![
+                KeyBindingConfig::new(BindingAction::Quit, "q"),
+                KeyBindingConfig::new(BindingAction::EditProfile, "e"),
+                KeyBindingConfig::new(BindingAction::DeleteProfile, "d"),
+                KeyBindingConfig::new(BindingAction::NewProfile, "n"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+            ],
+            my_issues: Vec::new(),
+            search_issues: Vec::new(),
+            new_issue: Vec::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct KeyBindingConfig {
+    pub action: BindingAction,
+    pub binding: String,
+}
+
+impl KeyBindingConfig {
+    fn new(action: BindingAction, binding: &str) -> Self {
+        Self {
+            action,
+            binding: binding.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BindingAction {
+    Quit,
+    Refresh,
+    Confirm,
+    GoHome,
+    OpenCurrentSprint,
+    OpenMyIssues,
+    OpenSearchIssues,
+    OpenNewIssue,
+    OpenProfiles,
+    OpenBoards,
+    NewProfile,
+    EditProfile,
+    DeleteProfile,
+    OpenInBrowser,
+    MoveUp,
+    MoveDown,
+    MoveLeft,
+    MoveRight,
+    MoveTop,
+    MoveBottom,
+    MoveLineStart,
+    MoveLineEnd,
+    MoveWordForward,
+    MoveWordBackward,
+    MoveWordEnd,
+    EnterInsertBefore,
+    EnterInsertAfter,
+    EnterInsertLineStart,
+    EnterInsertLineEnd,
 }

@@ -33,7 +33,12 @@ impl WhichKeyPopup {
         let y = area
             .y
             .saturating_add(area.height.saturating_sub(height).saturating_sub(1));
-        Rect { x, y, width, height }
+        Rect {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 }
 

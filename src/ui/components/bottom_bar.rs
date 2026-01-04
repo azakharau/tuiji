@@ -32,8 +32,7 @@ impl Widget for BottomBar {
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Left);
 
-        let chunks =
-            Layout::horizontal([Constraint::Length(12), Constraint::Min(0)]).split(area);
+        let chunks = Layout::horizontal([Constraint::Length(12), Constraint::Min(0)]).split(area);
 
         self.mode.render(chunks[0], buf);
         actions_paragraph.render(chunks[1], buf);
