@@ -90,6 +90,14 @@ impl Menu {
         }
     }
 
+    pub fn set_selected_index(&mut self, index: usize) {
+        if self.items.is_empty() {
+            self.selected = 0;
+            return;
+        }
+        self.selected = index.min(self.items.len() - 1);
+    }
+
     pub fn height(&self) -> u16 {
         self.items.len() as u16
     }

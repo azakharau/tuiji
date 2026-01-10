@@ -131,6 +131,13 @@ impl KeyBindings {
             .unwrap_or_else(|| Arc::new(Vec::new()))
     }
 
+    pub fn bindings_for_screen_ref(&self, screen: ScreenType) -> &[KeyBinding] {
+        self.by_screen
+            .get(&screen)
+            .map(|bindings| bindings.as_slice())
+            .unwrap_or(&[])
+    }
+
     pub fn action_for_binding(&self, screen: ScreenType, binding: &str) -> Option<ActionId> {
         self.by_screen.get(&screen).and_then(|bindings| {
             bindings
@@ -245,12 +252,12 @@ fn action_description(action: ActionId) -> Option<&'static str> {
 
 pub fn binding_hints_for_prefix(
     screen: ScreenType,
-    prefix: &str,
+    prefix: char,
     bindings: &KeyBindings,
 ) -> Vec<ActionHint> {
     let mut hints = Vec::new();
     for entry in bindings.bindings_for_screen(screen).iter() {
-        if !entry.binding.starts_with(prefix) || entry.binding.len() == prefix.len() {
+        if !entry.binding.starts_with(prefix) || entry.binding.chars().nth(1).is_none() {
             continue;
         }
         if let Some(description) = action_description(entry.action) {

@@ -8,6 +8,14 @@ CREATE TABLE sync_state (
   updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 
+CREATE TABLE sync_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  direction TEXT NOT NULL,
+  status TEXT NOT NULL,
+  error TEXT,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
 CREATE TABLE boards (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -103,3 +111,4 @@ CREATE INDEX idx_outbox_status ON outbox(status, created_at);
 CREATE INDEX idx_board_columns_board ON board_columns(board_id, position);
 CREATE INDEX idx_sprints_board_state ON sprints(board_id, state);
 CREATE INDEX idx_selected_boards_default ON selected_boards(is_default);
+CREATE INDEX idx_sync_log_created_at ON sync_log(created_at);

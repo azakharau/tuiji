@@ -13,6 +13,9 @@ use crate::{
     },
 };
 
+const OUTBOX_BATCH_SIZE: i64 = 20;
+const MAX_OUTBOX_ATTEMPTS: i64 = 5;
+
 #[derive(Debug, Clone)]
 pub struct SqliteRepositoryConfig {
     pub db_path: PathBuf,
@@ -47,6 +50,26 @@ impl SqliteRepository {
 
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
+    }
+
+    pub async fn log_sync_event(
+        &self,
+        direction: &str,
+        status: &str,
+        error: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO sync_log (direction, status, error, created_at)
+            VALUES (?, ?, ?, strftime('%s','now'))
+            "#,
+        )
+        .bind(direction)
+        .bind(status)
+        .bind(error)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn seed_mock_data_if_empty(&self) -> Result<Option<u64>> {
@@ -503,6 +526,21 @@ impl SqliteRepository {
         .bind(id)
         .execute(&self.pool)
         .await?;
+        Ok(())
+    }
+
+    pub async fn push_outbox(&self) -> Result<()> {
+        let items = self.fetch_pending_outbox(OUTBOX_BATCH_SIZE).await?;
+        for item in items {
+            if item.attempts >= MAX_OUTBOX_ATTEMPTS {
+                self.mark_outbox_failed(&item.id, "max attempts reached")
+                    .await?;
+                continue;
+            }
+            self.mark_outbox_processing(&item.id).await?;
+            self.mark_outbox_failed(&item.id, "jira push not implemented")
+                .await?;
+        }
         Ok(())
     }
 }

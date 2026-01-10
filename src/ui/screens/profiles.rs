@@ -33,11 +33,11 @@ pub struct ProfilesScreen {
 
 impl ProfilesScreen {
     pub fn new(profiles: &[ProfileConfig], active_id: Option<&str>) -> Self {
-        let (menu, profile_ids, message) = build_menu(profiles, active_id);
+        let (items, profile_ids, message) = build_menu(profiles, active_id);
         Self {
             mode: Mode::Normal,
             actions: Arc::new(Vec::new()),
-            menu,
+            menu: Menu::new(items),
             profile_ids,
             message,
         }
@@ -71,6 +71,23 @@ impl ProfilesScreen {
 
     pub fn selected_menu_id(&self) -> Option<&'static str> {
         self.menu.selected().map(|item| item.id)
+    }
+
+    pub fn refresh(
+        &mut self,
+        profiles: &[ProfileConfig],
+        active_id: Option<&str>,
+        selected_id: Option<&str>,
+    ) {
+        let (items, profile_ids, message) = build_menu(profiles, active_id);
+        self.menu.set_items(items);
+        self.profile_ids = profile_ids;
+        self.message = message;
+        if let Some(selected_id) = selected_id {
+            if let Some(idx) = self.profile_ids.iter().position(|id| id == selected_id) {
+                self.menu.set_selected_index(idx);
+            }
+        }
     }
 }
 
@@ -137,15 +154,18 @@ impl KeyHandler for ProfilesScreen {
     }
 }
 
-fn build_menu(profiles: &[ProfileConfig], active_id: Option<&str>) -> (Menu, Vec<String>, String) {
+fn build_menu(
+    profiles: &[ProfileConfig],
+    active_id: Option<&str>,
+) -> (Vec<MenuItem>, Vec<String>, String) {
     if profiles.is_empty() {
-        let menu = Menu::new(vec![
+        let items = vec![
             MenuItem::new("empty", "No profiles found"),
             MenuItem::new("new", "New profile").with_hint("n"),
             MenuItem::new("quit", "Quit").with_hint("q"),
-        ]);
+        ];
         let message = "No profiles available.\nCreate one to continue.".to_string();
-        return (menu, Vec::new(), message);
+        return (items, Vec::new(), message);
     }
 
     let mut items = Vec::with_capacity(profiles.len());
@@ -161,5 +181,5 @@ fn build_menu(profiles: &[ProfileConfig], active_id: Option<&str>) -> (Menu, Vec
     }
 
     let message = "Enter to activate • e to edit • d to delete • n to add".to_string();
-    (Menu::new(items), ids, message)
+    (items, ids, message)
 }

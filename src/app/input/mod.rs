@@ -4,7 +4,7 @@ pub mod overlay;
 pub mod parser;
 
 pub use command::{CommandResolver, InputCommand};
-pub use command_line::{CommandLineAction, CommandLineOutcome, CommandLineState};
+pub use command_line::{CommandLineAction, CommandLineOutcome, CommandLineState, SyncAction};
 pub use parser::{InputParser, ParsedInput, TextInput};
 
 use crossterm::event::KeyEvent;

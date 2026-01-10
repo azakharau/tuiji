@@ -7,6 +7,7 @@ DROP INDEX IF EXISTS idx_issue_history_issue;
 DROP INDEX IF EXISTS idx_issues_sprint;
 DROP INDEX IF EXISTS idx_issues_status;
 DROP INDEX IF EXISTS idx_selected_boards_default;
+DROP INDEX IF EXISTS idx_sync_log_created_at;
 
 DROP TABLE IF EXISTS selected_boards;
 DROP TABLE IF EXISTS outbox;
@@ -16,4 +17,5 @@ DROP TABLE IF EXISTS sprints;
 DROP TABLE IF EXISTS board_columns;
 DROP TABLE IF EXISTS board_config;
 DROP TABLE IF EXISTS boards;
+DROP TABLE IF EXISTS sync_log;
 DROP TABLE IF EXISTS sync_state;

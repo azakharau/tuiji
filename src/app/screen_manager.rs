@@ -113,6 +113,15 @@ impl ScreenManager {
         }
     }
 
+    pub fn profiles_mut(&mut self) -> Option<&mut ProfilesScreen> {
+        let slot = self.screens.get_mut(&ScreenType::Profiles)?;
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::Profiles(screen) => Some(screen),
+            _ => None,
+        }
+    }
+
     pub fn board_selection_mut(&mut self) -> Option<&mut BoardSelectionScreen> {
         let slot = self.screens.get_mut(&ScreenType::BoardSelection)?;
         slot.last_used = Instant::now();

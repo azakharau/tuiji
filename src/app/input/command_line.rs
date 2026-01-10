@@ -7,6 +7,14 @@ pub enum CommandLineAction {
     Quit,
     QuitAll,
     WriteQuitAll,
+    Sync(SyncAction),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncAction {
+    Pull,
+    Push,
+    SwitchOffline,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,12 +95,30 @@ impl CommandLineState {
 }
 
 fn parse_command(cmd: &str) -> Option<CommandLineAction> {
+    let cmd = cmd.trim();
     match cmd {
         "w" => Some(CommandLineAction::Write),
         "wq" | "x" => Some(CommandLineAction::WriteQuit),
         "q" | "q!" => Some(CommandLineAction::Quit),
         "qa" | "qall" | "quitall" | "qa!" | "qall!" => Some(CommandLineAction::QuitAll),
         "wqa" | "wqall" | "xall" | "xa" => Some(CommandLineAction::WriteQuitAll),
-        _ => None,
+        _ => {
+            let mut parts = cmd.split_whitespace();
+            let Some(head) = parts.next() else {
+                return None;
+            };
+            if head != "sync" {
+                return None;
+            }
+            match parts.next() {
+                None => Some(CommandLineAction::Sync(SyncAction::Pull)),
+                Some("pull") => Some(CommandLineAction::Sync(SyncAction::Pull)),
+                Some("push") => Some(CommandLineAction::Sync(SyncAction::Push)),
+                Some("offline") | Some("cache") => {
+                    Some(CommandLineAction::Sync(SyncAction::SwitchOffline))
+                }
+                _ => None,
+            }
+        }
     }
 }

@@ -1,22 +1,24 @@
 use ratatui::{
     Frame,
     buffer::Buffer,
-    layout::{Alignment, Constraint, Flex, Layout, Rect},
+    layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Style},
-    text::{Line, Text},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
+    text::Line,
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
 };
 
 use std::sync::Arc;
 
 use crate::{
     app::{
+        error::AppErrorState,
         key_handlers::{ActionHint, ActionId, Command, KeyHandler},
         state::Mode,
     },
     config::{JiraConfig, ProfileConfig},
     ui::{
         components::bottom_bar::BottomBar,
+        overlays::ErrorModal,
         screens::{CommandLineCommand, Screen, ScreenState},
     },
 };
@@ -242,7 +244,8 @@ pub struct ProfileCreationScreen {
     actions: Arc<Vec<ActionHint>>,
     mode: Mode,
     profile_id: Option<String>,
-    error: Option<String>,
+    sync_mode: Option<String>,
+    error: Option<AppErrorState>,
 }
 
 impl ProfileCreationScreen {
@@ -309,12 +312,14 @@ impl ProfileCreationScreen {
                 username,
                 api_token,
             },
+            sync_mode: self.sync_mode.clone(),
         })
     }
 
     fn from_profile(profile: ProfileConfig) -> Self {
         let mut screen = Self::default();
         screen.profile_id = Some(profile.id);
+        screen.sync_mode = profile.sync_mode;
         if let Some(item) = screen.form.items.get_mut(0) {
             item.value = profile.name;
             item.cursor_position = item.value.len();
@@ -371,6 +376,7 @@ impl Default for ProfileCreationScreen {
             actions: Arc::new(Vec::new()),
             mode: Mode::Normal,
             profile_id: None,
+            sync_mode: None,
             error: None,
         }
     }
@@ -386,25 +392,17 @@ impl Screen for ProfileCreationScreen {
             .title(Line::from(self.name()).centered());
 
         let inner = block.inner(area);
-        let [form_area, error_area, bar_area] = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ])
-        .areas(inner);
+        let [form_area, bar_area] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(inner);
         frame.render_widget(Clear, area);
         frame.render_widget(block, area);
         frame.render_widget(self.form.clone(), form_area);
-        if let Some(err) = &self.error {
-            let msg = Paragraph::new(Text::from(err.clone()))
-                .alignment(Alignment::Center)
-                .wrap(Wrap::default())
-                .style(Style::default().fg(Color::Red));
-            frame.render_widget(msg, error_area);
-        }
 
         let bottom_bar = BottomBar::new(self.mode, self.actions.clone());
         frame.render_widget(bottom_bar, bar_area);
+        if let Some(err) = &self.error {
+            frame.render_widget(ErrorModal::new(err), frame.area());
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -428,14 +426,14 @@ impl Screen for ProfileCreationScreen {
             CommandLineCommand::Write => match self.build_profile() {
                 Ok(profile) => ScreenState::SaveProfile(profile),
                 Err(err) => {
-                    self.error = Some(err);
+                    self.error = Some(AppErrorState::new("Validation Error", err));
                     ScreenState::Refresh
                 }
             },
             CommandLineCommand::WriteQuit => match self.build_profile() {
                 Ok(profile) => ScreenState::SaveProfileAndClose(profile),
                 Err(err) => {
-                    self.error = Some(err);
+                    self.error = Some(AppErrorState::new("Validation Error", err));
                     ScreenState::Refresh
                 }
             },

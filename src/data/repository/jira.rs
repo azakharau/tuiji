@@ -21,6 +21,10 @@ impl JiraRepository {
         )?;
         Ok(Self { client })
     }
+
+    pub async fn list_boards(&self) -> Result<Vec<gouqi::Board>> {
+        Ok(self.client.get_boards().await?)
+    }
 }
 
 #[async_trait]

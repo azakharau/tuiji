@@ -100,6 +100,40 @@ pub struct ProfileConfig {
     pub id: String,
     pub name: String,
     pub jira: JiraConfig,
+    #[serde(default)]
+    pub sync_mode: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SyncMode {
+    Cache,
+    Online,
+}
+
+impl SyncMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SyncMode::Cache => "cache",
+            SyncMode::Online => "online",
+        }
+    }
+
+    pub fn from_opt_str(value: Option<&str>) -> Self {
+        match value {
+            Some("online") => SyncMode::Online,
+            _ => SyncMode::Cache,
+        }
+    }
+}
+
+impl ProfileConfig {
+    pub fn sync_mode(&self) -> SyncMode {
+        SyncMode::from_opt_str(self.sync_mode.as_deref())
+    }
+
+    pub fn set_sync_mode(&mut self, mode: SyncMode) {
+        self.sync_mode = Some(mode.as_str().to_string());
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -131,6 +165,12 @@ pub struct UiConfig {
     pub theme: String,
     #[serde(default = "UiConfig::default_screen_cache_ttl_seconds")]
     pub screen_cache_ttl_seconds: u64,
+    #[serde(default = "UiConfig::default_notification_ttl_seconds")]
+    pub notification_ttl_seconds: u64,
+    #[serde(default = "UiConfig::default_notification_stack_limit")]
+    pub notification_stack_limit: usize,
+    #[serde(default = "UiConfig::default_error_ttl_seconds")]
+    pub error_ttl_seconds: u64,
 }
 
 impl UiConfig {
@@ -141,6 +181,21 @@ impl UiConfig {
     pub fn env_override(&mut self) {
         if let Ok(theme) = std::env::var(format!("{}UI_THEME", ENV_PREFIX)) {
             self.theme = theme;
+        }
+        if let Ok(ttl) = std::env::var(format!("{}UI_NOTIFICATION_TTL_SECONDS", ENV_PREFIX)) {
+            if let Ok(value) = ttl.parse::<u64>() {
+                self.notification_ttl_seconds = value;
+            }
+        }
+        if let Ok(limit) = std::env::var(format!("{}UI_NOTIFICATION_STACK_LIMIT", ENV_PREFIX)) {
+            if let Ok(value) = limit.parse::<usize>() {
+                self.notification_stack_limit = value;
+            }
+        }
+        if let Ok(ttl) = std::env::var(format!("{}UI_ERROR_TTL_SECONDS", ENV_PREFIX)) {
+            if let Ok(value) = ttl.parse::<u64>() {
+                self.error_ttl_seconds = value;
+            }
         }
     }
 }
@@ -153,6 +208,18 @@ impl UiConfig {
     fn default_screen_cache_ttl_seconds() -> u64 {
         60
     }
+
+    fn default_notification_ttl_seconds() -> u64 {
+        5
+    }
+
+    fn default_notification_stack_limit() -> usize {
+        5
+    }
+
+    fn default_error_ttl_seconds() -> u64 {
+        6
+    }
 }
 
 impl Default for AppConfig {
@@ -163,6 +230,9 @@ impl Default for AppConfig {
             ui: UiConfig {
                 theme: UiConfig::default_theme(),
                 screen_cache_ttl_seconds: UiConfig::default_screen_cache_ttl_seconds(),
+                notification_ttl_seconds: UiConfig::default_notification_ttl_seconds(),
+                notification_stack_limit: UiConfig::default_notification_stack_limit(),
+                error_ttl_seconds: UiConfig::default_error_ttl_seconds(),
             },
             keybindings: KeyBindingsConfig::default(),
         }
@@ -256,6 +326,7 @@ impl AppConfig {
             id: id.clone(),
             name: "Default".to_string(),
             jira: legacy.jira,
+            sync_mode: None,
         };
         AppConfig {
             profiles: vec![profile],

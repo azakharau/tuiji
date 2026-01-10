@@ -1,0 +1,134 @@
+use std::{collections::VecDeque, sync::Arc};
+
+use color_eyre::eyre::Result;
+use ratatui::DefaultTerminal;
+
+use crate::{
+    app::{
+        AppState,
+        error::AppErrorState,
+        key_handlers::{
+            KeyBindings, action_hints, binding_hints_for_prefix, binding_hints_for_screen,
+        },
+        notification::AppNotification,
+        overlay::{OverlayBus, OverlayItem, WhichKeyMode},
+        screen_manager::{ScreenContext, ScreenManager},
+        state::{Mode, ScreenType},
+    },
+    config::AppConfigState,
+    data::RepositoryHub,
+    ui::overlays::{
+        BoardRequiredModal, CommandLineModal, ErrorModal, NotificationModal, WhichKeyPopup,
+    },
+};
+
+#[derive(Clone, Copy, Debug)]
+pub struct RenderStack<'a> {
+    current: ScreenType,
+    stack: &'a [ScreenType],
+    include_stack: bool,
+}
+
+impl<'a> RenderStack<'a> {
+    pub fn new(current: ScreenType, stack: &'a [ScreenType], include_stack: bool) -> Self {
+        Self {
+            current,
+            stack,
+            include_stack,
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = ScreenType> + '_ {
+        let stack = if self.include_stack { self.stack } else { &[] };
+        stack.iter().copied().chain(std::iter::once(self.current))
+    }
+}
+
+pub struct RenderState<'a> {
+    pub cfg_state: &'a AppConfigState,
+    pub app_state: &'a AppState,
+    pub repo: &'a Arc<RepositoryHub>,
+    pub render_stack: RenderStack<'a>,
+    pub key_bindings: &'a KeyBindings,
+    pub error: Option<&'a AppErrorState>,
+    pub notifications: &'a VecDeque<AppNotification>,
+    pub command_buffer: Option<&'a str>,
+    pub pending_prefix: Option<char>,
+    pub show_hints: bool,
+    pub board_required: Option<crate::app::overlay::BoardRequiredBindings<'a>>,
+    pub mode: Mode,
+}
+
+pub struct AppRenderer;
+
+impl AppRenderer {
+    pub async fn prepare(
+        screen_manager: &mut ScreenManager,
+        state: &RenderState<'_>,
+    ) -> Result<()> {
+        for screen_type in state.render_stack.iter() {
+            let ctx = ScreenContext {
+                cfg_state: state.cfg_state,
+                app_state: state.app_state,
+                repo: state.repo.clone(),
+            };
+            let _ = screen_manager.active_screen_mut(screen_type, ctx).await?;
+        }
+        Ok(())
+    }
+
+    pub fn draw(
+        screen_manager: &mut ScreenManager,
+        state: &RenderState<'_>,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<()> {
+        let overlay = OverlayBus::top_overlay(state);
+        let render_stack = state.render_stack;
+        let key_bindings = state.key_bindings;
+        let mode = state.mode;
+        let screen_type = state.app_state.current_screen;
+        let cmd_color = Mode::Command.color();
+
+        terminal.draw(|frame| {
+            for screen_type in render_stack.iter() {
+                if let Some(screen) = screen_manager.screen_mut_existing(screen_type) {
+                    let hints = action_hints(screen_type, key_bindings);
+                    screen.set_action_hints(hints);
+                    screen.set_mode(mode);
+                    screen.draw(frame);
+                }
+            }
+
+            match overlay {
+                Some(OverlayItem::Error(error)) => {
+                    frame.render_widget(ErrorModal::new(error), frame.area());
+                }
+                Some(OverlayItem::Notification(notifications)) => {
+                    frame.render_widget(NotificationModal::new(notifications), frame.area());
+                }
+                Some(OverlayItem::CommandLine(buffer)) => {
+                    frame.render_widget(CommandLineModal::new(buffer, cmd_color), frame.area());
+                }
+                Some(OverlayItem::WhichKey(mode)) => {
+                    let popup = match mode {
+                        WhichKeyMode::Screen => WhichKeyPopup::new(
+                            "Key Hints".to_string(),
+                            binding_hints_for_screen(screen_type, key_bindings),
+                        ),
+                        WhichKeyMode::Prefix(prefix) => WhichKeyPopup::new(
+                            format!("Keys: {prefix}"),
+                            binding_hints_for_prefix(screen_type, prefix, key_bindings),
+                        ),
+                    };
+                    frame.render_widget(&popup, frame.area());
+                }
+                Some(OverlayItem::BoardRequired(bindings)) => {
+                    frame.render_widget(BoardRequiredModal::new(bindings, cmd_color), frame.area());
+                }
+                None => {}
+            }
+        })?;
+
+        Ok(())
+    }
+}

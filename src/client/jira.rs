@@ -97,6 +97,15 @@ impl JiraClient {
         self.client.projects().list().await
     }
 
+    pub async fn get_boards(&self) -> gouqi::Result<Vec<Board>> {
+        let res = self
+            .client
+            .boards()
+            .list(&SearchOptions::builder().build())
+            .await?;
+        Ok(res.values)
+    }
+
     pub async fn get_board(&self, board_id: u64) -> gouqi::Result<Board> {
         self.client.boards().get(board_id).await
     }

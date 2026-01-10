@@ -33,8 +33,8 @@ impl InputParser {
         }
     }
 
-    pub fn pending_prefix(&self) -> Option<String> {
-        self.pending_prefix.map(|c| c.to_string())
+    pub fn pending_prefix(&self) -> Option<char> {
+        self.pending_prefix
     }
 
     pub fn clear_pending(&mut self) {

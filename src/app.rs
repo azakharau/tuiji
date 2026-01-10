@@ -3,41 +3,38 @@ use std::{sync::Arc, time::Duration};
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, EventStream, KeyEvent};
 use futures::StreamExt;
-use ratatui::{
-    DefaultTerminal,
-    layout::{Alignment, Constraint, Layout},
-    style::{Color, Style},
-    text::Line,
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
-};
-use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
+use ratatui::DefaultTerminal;
+use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle, time};
 
 use crate::{
     app::{
+        error::{AppErrorLevel, AppErrorState},
         event::{AppEvent, InputEvent, SystemEvent, WorkerEvent},
-        input::overlay::{command_line_area, modal_area},
         input::{
             CommandLineAction, CommandLineOutcome, CommandLineState, CommandResolver, InputCommand,
-            InputParser, TextInput, is_question_mark,
+            InputParser, SyncAction, TextInput, is_question_mark,
         },
-        key_handlers::{
-            ActionId, Command, KeyBindings, action_hints, binding_hints_for_prefix,
-            binding_hints_for_screen,
-        },
+        key_handlers::{ActionId, Command, KeyBindings},
+        notification::AppNotificationKind,
+        notification_service::NotificationService,
+        overlay::BoardRequiredBindings,
+        render::{AppRenderer, RenderStack, RenderState},
         screen_manager::{ScreenContext, ScreenManager},
         state::{Mode, ScreenType},
     },
-    config::{AppConfig, AppConfigState, ProfileConfig},
+    config::{AppConfig, AppConfigState, ProfileConfig, SyncMode},
     data::{AppRepository, RepositoryHub, SqliteRepository, SqliteRepositoryConfig},
-    ui::{
-        components::{command_line::CommandLine, which_key_popup::WhichKeyPopup},
-        screens::{CommandLineCommand, ScreenState},
-    },
+    ui::screens::{CommandLineCommand, ScreenState},
 };
 
+pub mod error;
 pub mod event;
 pub mod input;
 pub mod key_handlers;
+pub mod notification;
+pub mod notification_service;
+pub mod overlay;
+pub mod render;
 pub mod screen_manager;
 pub mod state;
 pub mod workers;
@@ -72,7 +69,7 @@ pub struct App {
     screen_stack: Vec<ScreenType>,
     command_line: CommandLineState,
     show_hints: bool,
-    error_message: Option<String>,
+    notification_service: NotificationService,
 }
 
 impl App {
@@ -90,6 +87,11 @@ impl App {
             }
             AppConfigState::Missing(_) => ScreenManager::default(),
         };
+        let ui_cfg = match &config {
+            AppConfigState::Loaded(cfg) => cfg.ui.clone(),
+            AppConfigState::Missing(_) => AppConfig::default().ui,
+        };
+        let notification_service = NotificationService::from_ui(&ui_cfg);
         Ok(Self {
             terminal,
             state,
@@ -101,7 +103,7 @@ impl App {
             screen_stack: Vec::new(),
             command_line: CommandLineState::new(),
             show_hints: false,
-            error_message: None,
+            notification_service,
         })
     }
 
@@ -111,7 +113,7 @@ impl App {
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let _input = spawn_input_listener(tx.clone());
-        // let _tick = spawn_tick(tx.clone(), Duration::from_millis(250));
+        let _tick = spawn_tick(tx.clone(), Duration::from_millis(250));
         // let _cache_worker = spawn_worker(tx.clone());
         // let _notification_worker = spawn_notifications(tx.clone());
 
@@ -133,15 +135,29 @@ impl App {
                     }
                 }
                 AppEvent::System(SystemEvent::Tick) => {
-                    render_requested = true;
+                    render_requested |= self.notification_service.tick();
                 }
                 AppEvent::Worker(msg) => {
                     render_requested |= self.handle_worker(msg)?;
                 }
-                AppEvent::Ui(_)
-                | AppEvent::Nav(_)
-                | AppEvent::Repo(_)
-                | AppEvent::Notification(_) => {}
+                AppEvent::Ui(ui_event) => {
+                    if let crate::app::event::UiEvent::Error(err) = ui_event {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err));
+                        render_requested = true;
+                    }
+                }
+                AppEvent::Notification(notification) => {
+                    let crate::app::event::NotificationEvent::Message(msg) = notification;
+                    self.notification_service.push_notification(
+                        msg,
+                        AppErrorLevel::Info,
+                        AppNotificationKind::Reminder,
+                    );
+                    render_requested = true;
+                }
+
+                AppEvent::Nav(_) | AppEvent::Repo(_) => {}
             }
 
             if render_requested {
@@ -153,8 +169,8 @@ impl App {
     }
 
     async fn handle_input(&mut self, key: KeyEvent) -> Result<ScreenState> {
-        if self.error_message.is_some() {
-            self.error_message = None;
+        if self.notification_service.has_error() {
+            self.notification_service.clear_error();
             return Ok(ScreenState::Refresh);
         }
         if self.show_hints && !is_question_mark(&key) {
@@ -214,10 +230,11 @@ impl App {
         if let ActionId::EnterInsert(_) = cmd.action {
             self.set_mode(Mode::Insert);
         }
-        if self.state.selected_board_id.is_none()
-            && !matches!(self.state.current_screen, ScreenType::BoardSelection)
-        {
+        if self.board_required_active() {
             return self.handle_board_required_action(cmd).await;
+        }
+        if cmd.action == ActionId::Refresh && self.is_jira_screen(self.state.current_screen) {
+            return self.handle_sync_action(SyncAction::Pull).await;
         }
         if let Some(nav) = self.map_global_action(&cmd) {
             return Ok(nav);
@@ -263,6 +280,7 @@ impl App {
     async fn handle_board_required_action(&mut self, cmd: Command) -> Result<ScreenState> {
         match cmd.action {
             ActionId::OpenBoards => Ok(ScreenState::SwitchTo(ScreenType::BoardSelection)),
+            ActionId::OpenProfiles => Ok(ScreenState::SwitchTo(ScreenType::Profiles)),
             ActionId::Quit => {
                 if self.state.current_screen == ScreenType::Home {
                     Ok(ScreenState::Quit)
@@ -327,7 +345,8 @@ impl App {
             ScreenState::SaveProfile(profile) => {
                 let profile_id = profile.id.clone();
                 if let Err(err) = self.save_profile(profile) {
-                    self.error_message = Some(err.to_string());
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
                     return Ok(ActionOutcome::Continue { render: true });
                 }
                 self.state.profile_editor = Some(ProfileEditorIntent::Edit(profile_id.clone()));
@@ -338,7 +357,8 @@ impl App {
             }
             ScreenState::SaveProfileAndClose(profile) => {
                 if let Err(err) = self.save_profile(profile) {
-                    self.error_message = Some(err.to_string());
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
                     return Ok(ActionOutcome::Continue { render: true });
                 }
                 self.close_screen()
@@ -347,9 +367,23 @@ impl App {
         }
     }
 
-    fn handle_worker(&mut self, _msg: WorkerEvent) -> Result<bool> {
-        // Placeholder: update state based on worker notifications when added.
-        Ok(true)
+    fn handle_worker(&mut self, msg: WorkerEvent) -> Result<bool> {
+        match msg {
+            WorkerEvent::JiraUpdated => Ok(true),
+            WorkerEvent::Notification(message) => {
+                self.notification_service.push_notification(
+                    message,
+                    AppErrorLevel::Info,
+                    AppNotificationKind::System,
+                );
+                Ok(true)
+            }
+            WorkerEvent::SyncError(error) => {
+                self.notification_service
+                    .set_error(AppErrorState::error(error));
+                Ok(true)
+            }
+        }
     }
 
     fn map_global_action(&mut self, cmd: &Command) -> Option<ScreenState> {
@@ -374,126 +408,40 @@ impl App {
     }
 
     async fn render(&mut self) -> Result<()> {
-        let screen_type = self.state.current_screen;
-        let render_stack = self.build_render_stack();
-        let show_board_required = self.state.selected_board_id.is_none()
-            && !matches!(self.state.current_screen, ScreenType::BoardSelection);
-        let error_message = self.error_message.clone();
-        let show_hints = self.show_hints;
-        let pending_prefix = self.input.pending_prefix();
-        let command_buffer = self.command_line.buffer().map(|buf| buf.to_string());
-        let board_required_bindings = if show_board_required {
-            Some(self.board_required_bindings(screen_type))
-        } else {
-            None
-        };
-        let hint_popup = if show_hints {
-            Some(WhichKeyPopup::new(
-                "Key Hints".to_string(),
-                binding_hints_for_screen(screen_type, &self.key_bindings),
-            ))
-        } else if let Some(prefix) = pending_prefix.as_deref() {
-            Some(WhichKeyPopup::new(
-                format!("Keys: {prefix}"),
-                binding_hints_for_prefix(screen_type, prefix, &self.key_bindings),
+        let current_screen = self.state.current_screen;
+        let include_stack = matches!(
+            current_screen,
+            ScreenType::Profiles | ScreenType::ProfileCreation | ScreenType::BoardSelection
+        );
+        let render_stack = RenderStack::new(current_screen, &self.screen_stack, include_stack);
+        let board_required = if self.board_required_active() {
+            Some(Self::board_required_bindings(
+                self.key_bindings.as_ref(),
+                current_screen,
             ))
         } else {
             None
         };
-        let repo = self.repo.clone().ok_or_else(|| {
+        let repo = self.repo.as_ref().ok_or_else(|| {
             color_eyre::eyre::eyre!("Repository not initialized: cannot render screens")
         })?;
-        for screen_type in &render_stack {
-            let ctx = ScreenContext {
-                cfg_state: &self.cfg_state,
-                app_state: &self.state,
-                repo: repo.clone(),
-            };
-            let _ = self
-                .screen_manager
-                .active_screen_mut(*screen_type, ctx)
-                .await?;
-        }
-        let key_bindings = self.key_bindings.clone();
-        let mode = self.state.mode;
-        let screen_manager = &mut self.screen_manager;
-        let cmd_color = Mode::Command.color();
-        self.terminal.draw(|frame| {
-            for screen_type in &render_stack {
-                if let Some(screen) = screen_manager.screen_mut_existing(*screen_type) {
-                    let hints = action_hints(*screen_type, &key_bindings);
-                    screen.set_action_hints(hints);
-                    screen.set_mode(mode);
-                    screen.draw(frame);
-                }
-            }
-            if let Some(msg) = &error_message {
-                let height = 5.min(frame.area().height);
-                let area = modal_area(frame.area(), 60.min(frame.area().width), height);
-                let block = Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Red))
-                    .title(Line::from("Error").centered())
-                    .title_style(Style::default().fg(Color::Red));
-                frame.render_widget(Clear, area);
-                frame.render_widget(&block, area);
-                let inner = block.inner(area);
-                let text = Paragraph::new(msg.as_str())
-                    .alignment(Alignment::Center)
-                    .wrap(Wrap::default());
-                frame.render_widget(text, inner);
-            } else if show_board_required {
-                let height = 7.min(frame.area().height);
-                let area = modal_area(frame.area(), 60.min(frame.area().width), height);
-                let block = Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(cmd_color))
-                    .title(Line::from("Board Required").centered())
-                    .title_style(Style::default().fg(cmd_color));
-                frame.render_widget(Clear, area);
-                frame.render_widget(&block, area);
-                let inner = block.inner(area);
-                let sections =
-                    Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(inner);
-                let text = Paragraph::new("No board selected.\nConfigure a board to continue.")
-                    .alignment(Alignment::Center)
-                    .wrap(Wrap::default());
-                frame.render_widget(text, sections[0]);
-                let (open_key, quit_key) = board_required_bindings
-                    .clone()
-                    .unwrap_or_else(|| ("b".to_string(), "q".to_string()));
-                let options =
-                    Paragraph::new(format!("[{open_key}] Configure boards\n[{quit_key}] Quit"))
-                        .alignment(Alignment::Center)
-                        .wrap(Wrap::default());
-                frame.render_widget(options, sections[1]);
-            } else if let Some(popup) = &hint_popup {
-                frame.render_widget(popup, frame.area());
-            }
-            if let Some(buffer) = &command_buffer {
-                let area = command_line_area(frame.area());
-                let block = Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(cmd_color))
-                    .title(Line::from("Command").centered())
-                    .title_style(Style::default().fg(cmd_color));
-                frame.render_widget(Clear, area);
-                frame.render_widget(&block, area);
-                frame.render_widget(CommandLine::new(buffer, cmd_color), block.inner(area));
-            }
-        })?;
+        let render_state = RenderState {
+            cfg_state: &self.cfg_state,
+            app_state: &self.state,
+            repo,
+            render_stack,
+            key_bindings: self.key_bindings.as_ref(),
+            error: self.notification_service.error_state(),
+            notifications: self.notification_service.items(),
+            command_buffer: self.command_line.buffer(),
+            pending_prefix: self.input.pending_prefix(),
+            show_hints: self.show_hints,
+            board_required,
+            mode: self.state.mode,
+        };
+        AppRenderer::prepare(&mut self.screen_manager, &render_state).await?;
+        AppRenderer::draw(&mut self.screen_manager, &render_state, &mut self.terminal)?;
         Ok(())
-    }
-
-    fn build_render_stack(&self) -> Vec<ScreenType> {
-        match self.state.current_screen {
-            ScreenType::Profiles | ScreenType::ProfileCreation | ScreenType::BoardSelection => {
-                let mut stack = self.screen_stack.clone();
-                stack.push(self.state.current_screen);
-                stack
-            }
-            _ => vec![self.state.current_screen],
-        }
     }
 
     fn is_modal_screen(&self, screen: ScreenType) -> bool {
@@ -534,19 +482,46 @@ impl App {
         Ok(ScreenState::Refresh)
     }
 
-    fn board_required_bindings(&self, screen: ScreenType) -> (String, String) {
-        let bindings = self.key_bindings.bindings_for_screen(screen);
+    fn board_required_bindings(
+        key_bindings: &KeyBindings,
+        screen: ScreenType,
+    ) -> BoardRequiredBindings<'_> {
+        let bindings = key_bindings.bindings_for_screen_ref(screen);
         let open_key = bindings
             .iter()
             .find(|entry| entry.action == ActionId::OpenBoards)
-            .map(|entry| entry.binding.clone())
-            .unwrap_or_else(|| "b".to_string());
+            .map(|entry| entry.binding.as_str())
+            .unwrap_or("b");
+        let profiles_key = bindings
+            .iter()
+            .find(|entry| entry.action == ActionId::OpenProfiles)
+            .map(|entry| entry.binding.as_str());
         let quit_key = bindings
             .iter()
             .find(|entry| entry.action == ActionId::Quit)
-            .map(|entry| entry.binding.clone())
-            .unwrap_or_else(|| "q".to_string());
-        (open_key, quit_key)
+            .map(|entry| entry.binding.as_str())
+            .unwrap_or("q");
+        BoardRequiredBindings {
+            open: open_key,
+            profiles: profiles_key,
+            quit: quit_key,
+        }
+    }
+
+    fn board_required_active(&self) -> bool {
+        self.state.selected_board_id.is_none()
+            && self.is_board_required_screen(self.state.current_screen)
+    }
+
+    fn is_board_required_screen(&self, screen: ScreenType) -> bool {
+        matches!(
+            screen,
+            ScreenType::Home
+                | ScreenType::CurrentSprint
+                | ScreenType::MyIssues
+                | ScreenType::SearchIssues
+                | ScreenType::NewIssue
+        )
     }
 
     fn set_mode(&mut self, mode: Mode) {
@@ -682,7 +657,75 @@ impl App {
                 Ok(ScreenState::Close)
             }
             CommandLineAction::QuitAll => self.close_all_modals(),
+            CommandLineAction::Sync(action) => self.handle_sync_action(action).await,
         }
+    }
+
+    async fn handle_sync_action(&mut self, action: SyncAction) -> Result<ScreenState> {
+        if !self.is_jira_screen(self.state.current_screen) {
+            self.notification_service.set_error(AppErrorState::warning(
+                "Sync доступен только на Jira-экранах",
+            ));
+            return Ok(ScreenState::Refresh);
+        }
+
+        if let SyncAction::SwitchOffline = action {
+            self.switch_to_offline()?;
+            return Ok(ScreenState::Refresh);
+        }
+
+        let repo = self
+            .repo
+            .clone()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Repository not initialized: cannot sync"))?;
+        let result = match action {
+            SyncAction::Pull => repo.sync_pull().await,
+            SyncAction::Push => repo.sync_push().await,
+            SyncAction::SwitchOffline => Ok(()),
+        };
+
+        if let Err(err) = result {
+            let message = format!(
+                "Jira недоступна: {err}. Используйте :sync offline для перехода в offline режим."
+            );
+            self.notification_service.push_notification(
+                message,
+                AppErrorLevel::Warning,
+                AppNotificationKind::System,
+            );
+            return Ok(ScreenState::Refresh);
+        }
+
+        self.screen_manager.invalidate(self.state.current_screen);
+        Ok(ScreenState::Refresh)
+    }
+
+    fn switch_to_offline(&mut self) -> Result<()> {
+        let mut cfg = match &self.cfg_state {
+            AppConfigState::Loaded(cfg) => cfg.clone(),
+            AppConfigState::Missing(_) => AppConfig::default(),
+        };
+        if let Some(profile) = cfg.active_profile_mut() {
+            profile.set_sync_mode(SyncMode::Cache);
+            let name = profile.name.clone();
+            self.save_config(cfg)?;
+            self.notification_service.push_notification(
+                format!("Профиль \"{name}\" переключен в offline режим"),
+                AppErrorLevel::Info,
+                AppNotificationKind::System,
+            );
+        }
+        Ok(())
+    }
+
+    fn is_jira_screen(&self, screen: ScreenType) -> bool {
+        matches!(
+            screen,
+            ScreenType::CurrentSprint
+                | ScreenType::MyIssues
+                | ScreenType::SearchIssues
+                | ScreenType::NewIssue
+        )
     }
 
     fn save_config(&mut self, cfg: AppConfig) -> Result<()> {
@@ -696,11 +739,21 @@ impl App {
             ));
         }
         self.cfg_state = AppConfigState::Loaded(cfg);
-        self.screen_manager.invalidate_many(&[
-            ScreenType::Home,
-            ScreenType::CurrentSprint,
-            ScreenType::Profiles,
-        ]);
+        let selected_profile_id = self
+            .screen_manager
+            .profiles_mut()
+            .and_then(|screen| screen.selected_profile_id().map(|id| id.to_string()));
+        if let Some(screen) = self.screen_manager.profiles_mut() {
+            if let AppConfigState::Loaded(cfg) = &self.cfg_state {
+                screen.refresh(
+                    &cfg.profiles,
+                    cfg.active_profile_id.as_deref(),
+                    selected_profile_id.as_deref(),
+                );
+            }
+        }
+        self.screen_manager
+            .invalidate_many(&[ScreenType::Home, ScreenType::CurrentSprint]);
         Ok(())
     }
 
@@ -948,17 +1001,17 @@ fn spawn_input_listener(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
     })
 }
 
-// fn spawn_tick(tx: UnboundedSender<AppEvent>, period: Duration) -> JoinHandle<()> {
-//     tokio::spawn(async move {
-//         let mut ticker = time::interval(period);
-//         loop {
-//             ticker.tick().await;
-//             if tx.send(AppEvent::System(SystemEvent::Tick)).is_err() {
-//                 break;
-//             }
-//         }
-//     })
-// }
+fn spawn_tick(tx: UnboundedSender<AppEvent>, period: Duration) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = time::interval(period);
+        loop {
+            ticker.tick().await;
+            if tx.send(AppEvent::System(SystemEvent::Tick)).is_err() {
+                break;
+            }
+        }
+    })
+}
 //
 // fn spawn_worker(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
 //     tokio::spawn(async move {
