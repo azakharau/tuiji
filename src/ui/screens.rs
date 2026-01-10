@@ -7,17 +7,21 @@ use crate::{
         key_handlers::{ActionHint, KeyHandler},
         state::ScreenType,
     },
-    config::ProfileConfig,
+    config::{CustomThemeConfig, ProfileConfig},
+    ui::context::RenderContext,
 };
 
 pub mod board_selection;
 pub mod current_sprint;
 pub mod home;
+pub mod my_issues;
 pub mod profile_creation;
 pub mod profiles;
+pub mod search_issues;
+pub mod settings;
 
 pub trait Screen: KeyHandler {
-    fn draw(&mut self, frame: &mut Frame);
+    fn draw(&mut self, frame: &mut Frame, context: &RenderContext);
 
     fn name(&self) -> &'static str;
 
@@ -48,5 +52,8 @@ pub enum ScreenState {
     Quit,
     SaveProfile(ProfileConfig),
     SaveProfileAndClose(ProfileConfig),
+    ApplyTheme(String),
+    SaveCustomTheme(CustomThemeConfig),
+    SaveCustomThemeAndClose(CustomThemeConfig),
     Close,
 }

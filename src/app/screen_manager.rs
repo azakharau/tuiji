@@ -15,7 +15,9 @@ use crate::{
         screens::{
             Screen, board_selection::BoardSelectionScreen,
             current_sprint::kanban::CurrentKanbanSprintScreen, home::HomeScreen,
-            profile_creation::ProfileCreationScreen, profiles::ProfilesScreen,
+            my_issues::MyIssuesScreen, profile_creation::ProfileCreationScreen,
+            profiles::ProfilesScreen, search_issues::SearchIssuesScreen,
+            settings::{SettingsScreen, theme_form::SettingsThemeFormScreen, themes::SettingsThemesScreen},
         },
     },
 };
@@ -42,6 +44,11 @@ enum ScreenEntry {
     Home(HomeScreen),
     BoardSelection(BoardSelectionScreen),
     CurrentSprint(CurrentKanbanSprintScreen),
+    MyIssues(MyIssuesScreen),
+    SearchIssues(SearchIssuesScreen),
+    Settings(SettingsScreen),
+    SettingsThemes(SettingsThemesScreen),
+    SettingsThemeForm(SettingsThemeFormScreen),
     Profiles(ProfilesScreen),
     ProfileCreation(ProfileCreationScreen),
 }
@@ -52,6 +59,11 @@ impl ScreenEntry {
             ScreenEntry::Home(screen) => screen,
             ScreenEntry::BoardSelection(screen) => screen,
             ScreenEntry::CurrentSprint(screen) => screen,
+            ScreenEntry::MyIssues(screen) => screen,
+            ScreenEntry::SearchIssues(screen) => screen,
+            ScreenEntry::Settings(screen) => screen,
+            ScreenEntry::SettingsThemes(screen) => screen,
+            ScreenEntry::SettingsThemeForm(screen) => screen,
             ScreenEntry::Profiles(screen) => screen,
             ScreenEntry::ProfileCreation(screen) => screen,
         }
@@ -140,6 +152,52 @@ impl ScreenManager {
         }
     }
 
+    pub fn settings_mut(&mut self) -> Option<&mut SettingsScreen> {
+        let slot = self.screens.get_mut(&ScreenType::Settings)?;
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::Settings(screen) => Some(screen),
+            _ => None,
+        }
+    }
+
+    pub fn settings_themes_mut(&mut self) -> Option<&mut SettingsThemesScreen> {
+        let slot = self.screens.get_mut(&ScreenType::SettingsThemes)?;
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::SettingsThemes(screen) => Some(screen),
+            _ => None,
+        }
+    }
+
+    pub fn settings_theme_form_mut(&mut self) -> Option<&mut SettingsThemeFormScreen> {
+        let slot = self.screens.get_mut(&ScreenType::SettingsThemeForm)?;
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::SettingsThemeForm(screen) => Some(screen),
+            _ => None,
+        }
+    }
+
+    pub fn ensure_settings(&mut self, _cfg_state: &AppConfigState) -> &mut SettingsScreen {
+        self.evict_expired();
+        if !self.screens.contains_key(&ScreenType::Settings) {
+            self.insert(
+                ScreenType::Settings,
+                ScreenEntry::Settings(SettingsScreen::new()),
+            );
+        }
+        let slot = self
+            .screens
+            .get_mut(&ScreenType::Settings)
+            .expect("Settings screen missing");
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::Settings(screen) => screen,
+            _ => panic!("Settings screen mismatch"),
+        }
+    }
+
     pub fn screen_mut_existing(&mut self, screen_type: ScreenType) -> Option<&mut dyn Screen> {
         self.evict_expired();
         let slot = self.screens.get_mut(&screen_type)?;
@@ -222,6 +280,45 @@ impl ScreenManager {
                     CurrentKanbanSprintScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id)
                         .await?;
                 Ok(ScreenEntry::CurrentSprint(screen))
+            }
+            ScreenType::Settings => {
+                Ok(ScreenEntry::Settings(SettingsScreen::new()))
+            }
+            ScreenType::SettingsThemes => {
+                let (theme, custom) = match ctx.cfg_state {
+                    AppConfigState::Loaded(cfg) => (cfg.ui.theme.as_str(), cfg.ui.custom_themes.as_slice()),
+                    AppConfigState::Missing(_) => ("default", &[][..]),
+                };
+                Ok(ScreenEntry::SettingsThemes(SettingsThemesScreen::new(
+                    theme,
+                    custom,
+                )))
+            }
+            ScreenType::SettingsThemeForm => {
+                let (theme, custom) = match ctx.cfg_state {
+                    AppConfigState::Loaded(cfg) => (cfg.ui.theme.as_str(), cfg.ui.custom_themes.as_slice()),
+                    AppConfigState::Missing(_) => ("default", &[][..]),
+                };
+                Ok(ScreenEntry::SettingsThemeForm(SettingsThemeFormScreen::new(
+                    theme,
+                    custom,
+                )))
+            }
+            ScreenType::MyIssues => {
+                let board_id = ctx.app_state.selected_board_id.ok_or_else(|| {
+                    color_eyre::eyre::eyre!("No board selected: cannot open My Issues")
+                })?;
+                let screen = MyIssuesScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id)
+                    .await?;
+                Ok(ScreenEntry::MyIssues(screen))
+            }
+            ScreenType::SearchIssues => {
+                let board_id = ctx.app_state.selected_board_id.ok_or_else(|| {
+                    color_eyre::eyre::eyre!("No board selected: cannot open Search Issues")
+                })?;
+                let screen =
+                    SearchIssuesScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id).await?;
+                Ok(ScreenEntry::SearchIssues(screen))
             }
             _ => Err(color_eyre::eyre::eyre!(
                 "Screen {:?} not implemented yet",

@@ -1,6 +1,9 @@
 use crossterm::event::KeyEvent;
 
-use crate::{app::state::ScreenType, config::ProfileConfig};
+use crate::{
+    app::{state::ScreenType, worker_controller::SyncJob},
+    config::ProfileConfig,
+};
 
 /// Unified event type consumed by the main loop.
 pub enum AppEvent {
@@ -38,7 +41,8 @@ pub enum RepoEvent {
 pub enum WorkerEvent {
     JiraUpdated,
     Notification(String),
-    SyncError(String),
+    SyncCompleted(SyncJob),
+    SyncFailed { job: SyncJob, error: String },
 }
 
 pub enum NotificationEvent {

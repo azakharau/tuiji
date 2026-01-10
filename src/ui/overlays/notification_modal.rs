@@ -10,22 +10,28 @@ use ratatui::{
 use crate::{
     app::input::overlay::modal_area,
     app::notification::{AppNotification, AppNotificationKind},
+    ui::context::RenderContext,
 };
 
 pub struct NotificationModal<'a> {
     notifications: &'a VecDeque<AppNotification>,
+    context: &'a RenderContext,
 }
 
 impl<'a> NotificationModal<'a> {
-    pub fn new(notifications: &'a VecDeque<AppNotification>) -> Self {
-        Self { notifications }
+    pub fn new(notifications: &'a VecDeque<AppNotification>, context: &'a RenderContext) -> Self {
+        Self {
+            notifications,
+            context,
+        }
     }
 
-    fn kind_color(kind: AppNotificationKind) -> Color {
+    fn kind_color(&self, kind: AppNotificationKind) -> Color {
+        let colors = self.context.colors();
         match kind {
-            AppNotificationKind::System => Color::Red,
-            AppNotificationKind::Reminder => Color::Yellow,
-            AppNotificationKind::Info => Color::Cyan,
+            AppNotificationKind::System => colors.error,
+            AppNotificationKind::Reminder => colors.warning,
+            AppNotificationKind::Info => colors.info,
         }
     }
 
@@ -75,8 +81,10 @@ impl Widget for NotificationModal<'_> {
                 AppNotificationKind::Reminder => reminder += 1,
                 AppNotificationKind::Info => info += 1,
             }
-            let color = Self::kind_color(note.kind);
-            let style = Style::default().fg(color);
+            let color = self.kind_color(note.kind);
+        let style = Style::default()
+            .fg(color)
+            .bg(self.context.colors().background);
             let line = Line::from(vec![
                 Span::raw("["),
                 Span::styled(note.kind.label(), style),
@@ -97,7 +105,7 @@ impl Widget for NotificationModal<'_> {
         };
         let height = (total as u16 * 2 + 3).min(area.height).max(5);
         let modal = modal_area(area, 72.min(area.width), height);
-        let border_color = Self::kind_color(dominant);
+        let border_color = self.kind_color(dominant);
         let title = if total == 0 {
             "Notifications"
         } else {
@@ -106,6 +114,11 @@ impl Widget for NotificationModal<'_> {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
+            .style(
+                Style::default()
+                    .fg(self.context.colors().text)
+                    .bg(self.context.colors().background),
+            )
             .title(Line::from(title).centered())
             .title_style(Style::default().fg(border_color));
         Clear.render(modal, buf);

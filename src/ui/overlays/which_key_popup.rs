@@ -1,21 +1,26 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
-use crate::app::key_handlers::ActionHint;
+use crate::{app::key_handlers::ActionHint, ui::context::RenderContext};
 
 pub struct WhichKeyPopup {
     pub prefix: String,
     pub hints: Vec<ActionHint>,
+    context: RenderContext,
 }
 
 impl WhichKeyPopup {
-    pub fn new(prefix: String, hints: Vec<ActionHint>) -> Self {
-        Self { prefix, hints }
+    pub fn new(prefix: String, hints: Vec<ActionHint>, context: &RenderContext) -> Self {
+        Self {
+            prefix,
+            hints,
+            context: context.clone(),
+        }
     }
 
     fn popup_rect(&self, area: Rect) -> Rect {
@@ -53,7 +58,12 @@ impl Widget for &WhichKeyPopup {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(self.context.colors().border))
+            .style(
+                Style::default()
+                    .fg(self.context.colors().text)
+                    .bg(self.context.colors().background),
+            )
             .title(self.prefix.clone());
         let inner = block.inner(rect);
         block.render(rect, buf);
@@ -63,9 +73,15 @@ impl Widget for &WhichKeyPopup {
             .iter()
             .map(|hint| {
                 Line::from(vec![
-                    Span::styled(hint.binding.clone(), Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        hint.binding.clone(),
+                        Style::default().fg(self.context.colors().accent),
+                    ),
                     Span::raw("  "),
-                    Span::raw(hint.description.clone()),
+                    Span::styled(
+                        hint.description.clone(),
+                        Style::default().fg(self.context.colors().text),
+                    ),
                 ])
             })
             .collect::<Vec<Line>>();

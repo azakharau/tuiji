@@ -2,8 +2,9 @@ use ratatui::{
     Frame,
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::Text,
-    widgets::{Paragraph, Widget, Wrap},
+    widgets::{Block, Paragraph, Widget, Wrap},
 };
 
 use crate::{
@@ -17,6 +18,7 @@ use crate::{
             logo::AsciiLogoComponent,
             menu::{Menu, MenuItem},
         },
+        context::RenderContext,
         screens::{Screen, ScreenState},
     },
 };
@@ -75,8 +77,7 @@ impl HomeScreen {
                 MenuItem::new("search_issues", "Search Issues").with_hint("s"),
                 MenuItem::new("new_issue", "New Issue").with_hint("n"),
                 MenuItem::new("boards", "Boards").with_hint("b"),
-                MenuItem::new("refresh", "Refresh").with_hint("r"),
-                MenuItem::new("profiles", "Profiles").with_hint("p"),
+                MenuItem::new("settings", "Settings").with_hint(","),
                 MenuItem::new("quit", "Quit").with_hint("q"),
             ]),
         }
@@ -99,8 +100,7 @@ impl HomeScreen {
             }
             (HomeVariant::Default, "new_issue") => ScreenState::SwitchTo(ScreenType::NewIssue),
             (HomeVariant::Default, "boards") => ScreenState::SwitchTo(ScreenType::BoardSelection),
-            (HomeVariant::Default, "profiles") => ScreenState::SwitchTo(ScreenType::Profiles),
-            (HomeVariant::Default, "refresh") => ScreenState::Refresh,
+            (HomeVariant::Default, "settings") => ScreenState::SwitchTo(ScreenType::Settings),
             (HomeVariant::Default, "quit") => ScreenState::Quit,
             _ => ScreenState::Stay,
         }
@@ -114,7 +114,21 @@ impl Widget for HomeScreen {
 }
 
 impl Screen for HomeScreen {
-    fn draw(&mut self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame, _context: &RenderContext) {
+        let base_style = Style::default()
+            .fg(_context.colors().text)
+            .bg(_context.colors().background);
+        frame.render_widget(Block::default().style(base_style), frame.area());
+
+        self.menu.set_style(base_style);
+        self.menu.set_highlight_style(
+            Style::default()
+                .fg(_context.colors().text)
+                .bg(_context.colors().selection)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        let logo_style = Style::default().fg(Color::White);
         match self.variant {
             HomeVariant::Welcome => {
                 let screen_layout = Layout::vertical([
@@ -126,9 +140,10 @@ impl Screen for HomeScreen {
                 ])
                 .split(frame.area());
 
-                frame.render_widget(self.logo.clone(), screen_layout[1]);
+                frame.render_widget(self.logo.clone().with_style(logo_style), screen_layout[1]);
 
                 let content = Paragraph::new(Text::from(self.welcome_text.clone()))
+                    .style(base_style)
                     .alignment(Alignment::Center)
                     .wrap(Wrap::default());
                 frame.render_widget(content, screen_layout[2]);
@@ -144,7 +159,7 @@ impl Screen for HomeScreen {
                 ])
                 .split(frame.area());
 
-                frame.render_widget(self.logo.clone(), screen_layout[1]);
+                frame.render_widget(self.logo.clone().with_style(logo_style), screen_layout[1]);
                 frame.render_widget(&self.menu, screen_layout[2]);
             }
         }

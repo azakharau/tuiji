@@ -5,6 +5,7 @@ use color_eyre::Result;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
+    widgets::Block,
 };
 
 use crate::{
@@ -20,7 +21,9 @@ use crate::{
             issue_card::{IssueCardComponent, IssueType, Priority},
             kanban_board::KanbanBoard,
         },
+        context::RenderContext,
         screens::{Screen, ScreenState},
+        screens::CommandLineCommand,
     },
 };
 pub struct CurrentKanbanSprintScreen {
@@ -70,7 +73,11 @@ impl CurrentKanbanSprintScreen {
     }
 }
 impl Screen for CurrentKanbanSprintScreen {
-    fn draw(&mut self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame, context: &RenderContext) {
+        let base_style = ratatui::style::Style::default()
+            .fg(context.colors().text)
+            .bg(context.colors().background);
+        frame.render_widget(Block::default().style(base_style), frame.area());
         self.ensure_valid_column();
         let issue_height = self.issues.first().map(|i| i.height()).unwrap_or(8);
         let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone());
@@ -89,6 +96,7 @@ impl Screen for CurrentKanbanSprintScreen {
             "Current Sprint".to_string(),
             self.issues.clone(),
             &self.board_cfg,
+            context,
             self.selected_col,
             self.selected_row,
             self.scroll_offset,
@@ -108,6 +116,14 @@ impl Screen for CurrentKanbanSprintScreen {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+    }
+
+    fn handle_command_line(&mut self, cmd: CommandLineCommand) -> ScreenState {
+        match cmd {
+            CommandLineCommand::Write => ScreenState::Stay,
+            CommandLineCommand::WriteQuit => ScreenState::Close,
+            CommandLineCommand::Quit => ScreenState::Close,
+        }
     }
 }
 

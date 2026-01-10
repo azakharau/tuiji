@@ -15,11 +15,13 @@ use crate::{
         screen_manager::{ScreenContext, ScreenManager},
         state::{Mode, ScreenType},
     },
-    config::AppConfigState,
+    config::{AppConfig, AppConfigState},
     data::RepositoryHub,
     ui::overlays::{
-        BoardRequiredModal, CommandLineModal, ErrorModal, NotificationModal, WhichKeyPopup,
+        BoardRequiredModal, CommandLineModal, ErrorModal, NotificationModal, SyncErrorModal,
+        WhichKeyPopup,
     },
+    ui::context::RenderContext,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -57,6 +59,8 @@ pub struct RenderState<'a> {
     pub show_hints: bool,
     pub board_required: Option<crate::app::overlay::BoardRequiredBindings<'a>>,
     pub mode: Mode,
+    pub sync_paused: bool,
+    pub sync_error: Option<&'a str>,
 }
 
 pub struct AppRenderer;
@@ -88,6 +92,10 @@ impl AppRenderer {
         let mode = state.mode;
         let screen_type = state.app_state.current_screen;
         let cmd_color = Mode::Command.color();
+        let render_ctx = match state.cfg_state {
+            AppConfigState::Loaded(cfg) => RenderContext::from_config(cfg, mode),
+            AppConfigState::Missing(_) => RenderContext::from_config(&AppConfig::default(), mode),
+        };
 
         terminal.draw(|frame| {
             for screen_type in render_stack.iter() {
@@ -95,35 +103,46 @@ impl AppRenderer {
                     let hints = action_hints(screen_type, key_bindings);
                     screen.set_action_hints(hints);
                     screen.set_mode(mode);
-                    screen.draw(frame);
+                    screen.draw(frame, &render_ctx);
                 }
             }
 
             match overlay {
                 Some(OverlayItem::Error(error)) => {
-                    frame.render_widget(ErrorModal::new(error), frame.area());
+                    frame.render_widget(ErrorModal::new(error, &render_ctx), frame.area());
+                }
+                Some(OverlayItem::SyncError(error)) => {
+                    frame.render_widget(SyncErrorModal::new(error, &render_ctx), frame.area());
                 }
                 Some(OverlayItem::Notification(notifications)) => {
-                    frame.render_widget(NotificationModal::new(notifications), frame.area());
+                    frame.render_widget(
+                        NotificationModal::new(notifications, &render_ctx),
+                        frame.area(),
+                    );
                 }
                 Some(OverlayItem::CommandLine(buffer)) => {
-                    frame.render_widget(CommandLineModal::new(buffer, cmd_color), frame.area());
+                    frame.render_widget(
+                        CommandLineModal::new(buffer, cmd_color, &render_ctx),
+                        frame.area(),
+                    );
                 }
                 Some(OverlayItem::WhichKey(mode)) => {
                     let popup = match mode {
                         WhichKeyMode::Screen => WhichKeyPopup::new(
                             "Key Hints".to_string(),
                             binding_hints_for_screen(screen_type, key_bindings),
+                            &render_ctx,
                         ),
                         WhichKeyMode::Prefix(prefix) => WhichKeyPopup::new(
                             format!("Keys: {prefix}"),
                             binding_hints_for_prefix(screen_type, prefix, key_bindings),
+                            &render_ctx,
                         ),
                     };
                     frame.render_widget(&popup, frame.area());
                 }
                 Some(OverlayItem::BoardRequired(bindings)) => {
-                    frame.render_widget(BoardRequiredModal::new(bindings, cmd_color), frame.area());
+                    frame.render_widget(BoardRequiredModal::new(bindings, &render_ctx), frame.area());
                 }
                 None => {}
             }

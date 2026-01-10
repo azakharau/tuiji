@@ -1,21 +1,23 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Style},
-    text::Line,
-    widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
+    style::{Style},
+    widgets::{Paragraph, Widget, Wrap},
 };
 
-use crate::app::{input::overlay::modal_area, overlay::BoardRequiredBindings};
+use crate::{
+    app::{input::overlay::modal_area, overlay::BoardRequiredBindings},
+    ui::{components::layout::ModalFrame, context::RenderContext},
+};
 
 pub struct BoardRequiredModal<'a> {
     bindings: &'a BoardRequiredBindings<'a>,
-    color: Color,
+    context: &'a RenderContext,
 }
 
 impl<'a> BoardRequiredModal<'a> {
-    pub fn new(bindings: &'a BoardRequiredBindings<'a>, color: Color) -> Self {
-        Self { bindings, color }
+    pub fn new(bindings: &'a BoardRequiredBindings<'a>, context: &'a RenderContext) -> Self {
+        Self { bindings, context }
     }
 }
 
@@ -23,14 +25,12 @@ impl Widget for BoardRequiredModal<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let height = 7.min(area.height);
         let modal = modal_area(area, 60.min(area.width), height);
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(self.color))
-            .title(Line::from("Board Required").centered())
-            .title_style(Style::default().fg(self.color));
-        Clear.render(modal, buf);
-        let inner = block.inner(modal);
-        block.render(modal, buf);
+        let border_style = Style::default()
+            .fg(self.context.colors().warning)
+            .bg(self.context.colors().background);
+        let inner =
+            ModalFrame::new("Board Required", modal, border_style, self.context)
+                .render_to_buffer(buf);
         let sections = Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(inner);
         let text = Paragraph::new("No board selected.\nConfigure a board to continue.")
             .alignment(Alignment::Center)

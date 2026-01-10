@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use color_eyre::Result;
 
@@ -9,7 +11,7 @@ use crate::{
 };
 
 pub struct JiraRepository {
-    client: JiraClient,
+    client: Arc<JiraClient>,
 }
 
 impl JiraRepository {
@@ -19,7 +21,9 @@ impl JiraRepository {
             cfg.username.as_str(),
             cfg.api_token.as_str(),
         )?;
-        Ok(Self { client })
+        Ok(Self {
+            client: Arc::new(client),
+        })
     }
 
     pub async fn list_boards(&self) -> Result<Vec<gouqi::Board>> {

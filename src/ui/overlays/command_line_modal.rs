@@ -7,15 +7,21 @@ use ratatui::{
 };
 
 use crate::app::input::overlay::command_line_area;
+use crate::ui::context::RenderContext;
 
 pub struct CommandLineModal<'a> {
     buffer: &'a str,
     color: Color,
+    context: &'a RenderContext,
 }
 
 impl<'a> CommandLineModal<'a> {
-    pub fn new(buffer: &'a str, color: Color) -> Self {
-        Self { buffer, color }
+    pub fn new(buffer: &'a str, color: Color, context: &'a RenderContext) -> Self {
+        Self {
+            buffer,
+            color,
+            context,
+        }
     }
 }
 
@@ -25,29 +31,41 @@ impl Widget for CommandLineModal<'_> {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(self.color))
+            .style(
+                Style::default()
+                    .fg(self.context.colors().text)
+                    .bg(self.context.colors().background),
+            )
             .title(Line::from("Command").centered())
             .title_style(Style::default().fg(self.color));
         Clear.render(area, buf);
         let inner = block.inner(area);
         block.render(area, buf);
-        CommandLineInput::new(self.buffer, self.color).render(inner, buf);
+        CommandLineInput::new(self.buffer, self.color, self.context.colors().background)
+            .render(inner, buf);
     }
 }
 
 struct CommandLineInput<'a> {
     buffer: &'a str,
     color: Color,
+    background: Color,
 }
 
 impl<'a> CommandLineInput<'a> {
-    fn new(buffer: &'a str, color: Color) -> Self {
-        Self { buffer, color }
+    fn new(buffer: &'a str, color: Color, background: Color) -> Self {
+        Self {
+            buffer,
+            color,
+            background,
+        }
     }
 }
 
 impl Widget for CommandLineInput<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let paragraph = Paragraph::new(self.buffer).style(Style::default().fg(self.color));
+        let paragraph = Paragraph::new(self.buffer)
+            .style(Style::default().fg(self.color).bg(self.background));
         paragraph.render(area, buf);
 
         if area.width == 0 || area.height == 0 {
@@ -63,7 +81,7 @@ impl Widget for CommandLineInput<'_> {
         };
         let cursor_block = Block::default()
             .borders(Borders::NONE)
-            .style(Style::default().bg(self.color).fg(Color::Black));
+            .style(Style::default().bg(self.color).fg(self.background));
         cursor_block.render(cursor, buf);
     }
 }

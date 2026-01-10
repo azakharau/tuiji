@@ -68,6 +68,9 @@ pub enum ScreenType {
     MyIssues,
     SearchIssues,
     NewIssue,
+    Settings,
+    SettingsThemes,
+    SettingsThemeForm,
     ProfileCreation,
     Profiles,
 }

@@ -21,6 +21,7 @@ pub enum ActionId {
     OpenNewIssue,
     OpenProfiles,
     OpenBoards,
+    OpenSettings,
     NewProfile,
     EditProfile,
     DeleteProfile,
@@ -84,7 +85,13 @@ pub struct KeyBindings {
 
 impl KeyBindings {
     pub fn from_config(cfg: &KeyBindingsConfig) -> Self {
-        let global = map_bindings(&cfg.global);
+        let mut global = map_bindings(&cfg.global);
+        if !global.iter().any(|entry| entry.action == ActionId::OpenSettings) {
+            global.push(KeyBinding {
+                action: ActionId::OpenSettings,
+                binding: ",".to_string(),
+            });
+        }
         let mut by_screen = HashMap::new();
         by_screen.insert(
             ScreenType::Home,
@@ -120,6 +127,23 @@ impl KeyBindings {
         by_screen.insert(
             ScreenType::NewIssue,
             Arc::new(merge_bindings(&global, &map_bindings(&cfg.new_issue))),
+        );
+        let settings_cfg = if cfg.settings.is_empty() {
+            KeyBindingsConfig::default().settings
+        } else {
+            cfg.settings.clone()
+        };
+        by_screen.insert(
+            ScreenType::Settings,
+            Arc::new(merge_bindings(&global, &map_bindings(&settings_cfg))),
+        );
+        by_screen.insert(
+            ScreenType::SettingsThemes,
+            Arc::new(merge_bindings(&global, &map_bindings(&settings_cfg))),
+        );
+        by_screen.insert(
+            ScreenType::SettingsThemeForm,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.profile_creation))),
         );
         Self { by_screen }
     }
@@ -188,7 +212,7 @@ pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<Actio
             push(ActionId::OpenSearchIssues, "Search issues");
             push(ActionId::OpenNewIssue, "New issue");
             push(ActionId::OpenBoards, "Boards");
-            push(ActionId::OpenProfiles, "Profiles");
+            push(ActionId::OpenSettings, "Settings");
         }
         ScreenType::CurrentSprint => {
             push(ActionId::MoveUp, "Up");
@@ -212,6 +236,24 @@ pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<Actio
             push(ActionId::NewProfile, "New");
             push(ActionId::GoHome, "Home");
         }
+        ScreenType::Settings => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::Confirm, "Open");
+            push(ActionId::GoHome, "Home");
+        }
+        ScreenType::SettingsThemes => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::Confirm, "Apply");
+            push(ActionId::GoHome, "Home");
+        }
+        ScreenType::SettingsThemeForm => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::Confirm, "Save");
+            push(ActionId::GoHome, "Home");
+        }
         _ => {}
     }
 
@@ -230,6 +272,7 @@ fn action_description(action: ActionId) -> Option<&'static str> {
         ActionId::OpenNewIssue => Some("New issue"),
         ActionId::OpenProfiles => Some("Profiles"),
         ActionId::OpenBoards => Some("Boards"),
+        ActionId::OpenSettings => Some("Settings"),
         ActionId::NewProfile => Some("New profile"),
         ActionId::EditProfile => Some("Edit profile"),
         ActionId::DeleteProfile => Some("Delete profile"),
@@ -331,6 +374,7 @@ fn binding_action_to_action_id(action: BindingAction) -> ActionId {
         BindingAction::OpenNewIssue => ActionId::OpenNewIssue,
         BindingAction::OpenProfiles => ActionId::OpenProfiles,
         BindingAction::OpenBoards => ActionId::OpenBoards,
+        BindingAction::OpenSettings => ActionId::OpenSettings,
         BindingAction::NewProfile => ActionId::NewProfile,
         BindingAction::EditProfile => ActionId::EditProfile,
         BindingAction::DeleteProfile => ActionId::DeleteProfile,

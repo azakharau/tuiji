@@ -163,6 +163,8 @@ impl JiraConfig {
 pub struct UiConfig {
     #[serde(default = "UiConfig::default_theme")]
     pub theme: String,
+    #[serde(default)]
+    pub custom_themes: Vec<CustomThemeConfig>,
     #[serde(default = "UiConfig::default_screen_cache_ttl_seconds")]
     pub screen_cache_ttl_seconds: u64,
     #[serde(default = "UiConfig::default_notification_ttl_seconds")]
@@ -202,7 +204,7 @@ impl UiConfig {
 
 impl UiConfig {
     fn default_theme() -> String {
-        "dark".to_string()
+        "default".to_string()
     }
 
     fn default_screen_cache_ttl_seconds() -> u64 {
@@ -229,6 +231,7 @@ impl Default for AppConfig {
             active_profile_id: None,
             ui: UiConfig {
                 theme: UiConfig::default_theme(),
+                custom_themes: Vec::new(),
                 screen_cache_ttl_seconds: UiConfig::default_screen_cache_ttl_seconds(),
                 notification_ttl_seconds: UiConfig::default_notification_ttl_seconds(),
                 notification_stack_limit: UiConfig::default_notification_stack_limit(),
@@ -237,6 +240,26 @@ impl Default for AppConfig {
             keybindings: KeyBindingsConfig::default(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct ThemePaletteConfig {
+    pub background: String,
+    pub text: String,
+    pub accent: String,
+    pub selection: String,
+    pub border: String,
+    pub error: String,
+    pub warning: String,
+    pub info: String,
+    pub success: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct CustomThemeConfig {
+    pub id: String,
+    pub name: String,
+    pub palette: ThemePaletteConfig,
 }
 
 pub fn resolve_config_dir() -> PathBuf {
@@ -352,6 +375,8 @@ pub struct KeyBindingsConfig {
     #[serde(default)]
     pub profiles: Vec<KeyBindingConfig>,
     #[serde(default)]
+    pub settings: Vec<KeyBindingConfig>,
+    #[serde(default)]
     pub my_issues: Vec<KeyBindingConfig>,
     #[serde(default)]
     pub search_issues: Vec<KeyBindingConfig>,
@@ -369,6 +394,7 @@ impl Default for KeyBindingsConfig {
                 KeyBindingConfig::new(BindingAction::GoHome, "gh"),
                 KeyBindingConfig::new(BindingAction::OpenBoards, "b"),
                 KeyBindingConfig::new(BindingAction::OpenInBrowser, "o"),
+                KeyBindingConfig::new(BindingAction::OpenSettings, ","),
             ],
             home: vec![
                 KeyBindingConfig::new(BindingAction::Quit, "q"),
@@ -377,7 +403,7 @@ impl Default for KeyBindingsConfig {
                 KeyBindingConfig::new(BindingAction::OpenSearchIssues, "s"),
                 KeyBindingConfig::new(BindingAction::OpenNewIssue, "n"),
                 KeyBindingConfig::new(BindingAction::OpenBoards, "b"),
-                KeyBindingConfig::new(BindingAction::OpenProfiles, "p"),
+                KeyBindingConfig::new(BindingAction::OpenSettings, ","),
                 KeyBindingConfig::new(BindingAction::MoveUp, "k"),
                 KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
                 KeyBindingConfig::new(BindingAction::MoveDown, "j"),
@@ -443,6 +469,15 @@ impl Default for KeyBindingsConfig {
                 KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
                 KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
             ],
+            settings: vec![
+                KeyBindingConfig::new(BindingAction::Confirm, "<enter>"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+            ],
             my_issues: Vec::new(),
             search_issues: Vec::new(),
             new_issue: Vec::new(),
@@ -478,6 +513,7 @@ pub enum BindingAction {
     OpenNewIssue,
     OpenProfiles,
     OpenBoards,
+    OpenSettings,
     NewProfile,
     EditProfile,
     DeleteProfile,

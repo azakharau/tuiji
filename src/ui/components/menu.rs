@@ -32,11 +32,26 @@ impl MenuItem {
 pub struct Menu {
     items: Vec<MenuItem>,
     selected: usize,
+    style: Style,
+    highlight_style: Style,
 }
 
 impl Menu {
     pub fn new(items: Vec<MenuItem>) -> Self {
-        Self { items, selected: 0 }
+        Self {
+            items,
+            selected: 0,
+            style: Style::default(),
+            highlight_style: Style::default().add_modifier(Modifier::REVERSED),
+        }
+    }
+
+    pub fn set_style(&mut self, style: Style) {
+        self.style = style;
+    }
+
+    pub fn set_highlight_style(&mut self, style: Style) {
+        self.highlight_style = style;
     }
 
     pub fn set_items(&mut self, items: Vec<MenuItem>) {
@@ -141,7 +156,8 @@ impl Widget for &Menu {
         }
 
         let list = List::new(list_items)
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+            .style(self.style)
+            .highlight_style(self.highlight_style);
 
         StatefulWidget::render(list, columns[1], buf, &mut state);
     }

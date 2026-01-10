@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use gouqi::{Board, Credentials, Issue, Project, SearchOptions, Sprint, r#async::Jira};
 use serde::Deserialize;
 use serde_json::Value;
@@ -82,14 +84,15 @@ pub struct ColumnStatusRef {
     pub self_link: String,
 }
 
+#[derive(Clone)]
 pub struct JiraClient {
-    client: Jira,
+    client: Arc<Jira>,
 }
 
 impl JiraClient {
     pub fn new(base_url: &str, username: &str, api_token: &str) -> gouqi::Result<Self> {
         let credentials = Credentials::Basic(username.to_string(), api_token.to_string());
-        let client = Jira::new(base_url, credentials)?;
+        let client = Arc::new(Jira::new(base_url, credentials)?);
         Ok(JiraClient { client })
     }
 

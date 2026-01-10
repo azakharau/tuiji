@@ -2,18 +2,25 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Rect},
     text::Text,
     widgets::{Paragraph, Widget},
 };
 
-use crate::{client::jira::BoardConfig, ui::components::issue_card::IssueCardComponent};
+use crate::{
+    client::jira::BoardConfig,
+    ui::{
+        components::{badges::{StatusBadge, StatusVariant}, issue_card::IssueCardComponent},
+        context::RenderContext,
+    },
+};
 
 pub struct KanbanBoard<'a> {
     pub id: u32,
     pub title: String,
     pub issues: Arc<Vec<IssueCardComponent>>,
     pub board_cfg: &'a BoardConfig,
+    pub context: &'a RenderContext,
     pub selected_col: usize,
     pub selected_row: usize,
     pub scroll_offset: usize,
@@ -27,6 +34,7 @@ impl<'a> KanbanBoard<'a> {
         title: String,
         issues: Arc<Vec<IssueCardComponent>>,
         cfg: &'a BoardConfig,
+        context: &'a RenderContext,
         selected_col: usize,
         selected_row: usize,
         scroll_offset: usize,
@@ -37,6 +45,7 @@ impl<'a> KanbanBoard<'a> {
             title,
             issues,
             board_cfg: cfg,
+            context,
             selected_col,
             selected_row,
             scroll_offset,
@@ -95,9 +104,14 @@ impl Widget for KanbanBoard<'_> {
         let grouped_issues = self.group_issues_by_status();
         let empty: &[IssueCardComponent] = &[];
         for (i, col) in self.board_cfg.columns.iter().enumerate() {
-            Paragraph::new(Text::from(col.name.to_uppercase()))
-                .alignment(Alignment::Center)
-                .render(table[i][header_index], buf);
+            let variant = match col.name.to_uppercase().as_str() {
+                "TODO" => StatusVariant::Todo,
+                "IN PROGRESS" => StatusVariant::InProgress,
+                "DONE" => StatusVariant::Done,
+                _ => StatusVariant::Custom(col.name.as_str()),
+            };
+            let badge = StatusBadge::new(col.name.as_str(), variant, self.context);
+            badge.render(table[i][header_index], buf);
             let column_issues = grouped_issues
                 .get(&col.name)
                 .map(|v| v.as_slice())

@@ -18,6 +18,7 @@ use crate::{
     data::AppRepository,
     ui::{
         components::bottom_bar::BottomBar,
+        context::RenderContext,
         screens::{CommandLineCommand, Screen, ScreenState},
     },
 };
@@ -177,8 +178,11 @@ impl CurrentSprintTableScreen {
 }
 
 impl Screen for CurrentSprintTableScreen {
-    fn draw(&mut self, _frame: &mut Frame) {
-        let main_frame = Block::default().title(self.name());
+    fn draw(&mut self, _frame: &mut Frame, _context: &RenderContext) {
+        let base_style = Style::default()
+            .fg(_context.colors().text)
+            .bg(_context.colors().background);
+        let main_frame = Block::default().title(self.name()).style(base_style);
         let inner_area = main_frame.inner(_frame.area());
         let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone());
 

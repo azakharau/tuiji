@@ -17,6 +17,7 @@ pub struct BoardRequiredBindings<'a> {
 
 pub enum OverlayItem<'a> {
     Error(&'a AppErrorState),
+    SyncError(Option<&'a str>),
     Notification(&'a VecDeque<AppNotification>),
     CommandLine(&'a str),
     WhichKey(WhichKeyMode),
@@ -29,6 +30,9 @@ impl OverlayBus {
     pub fn top_overlay<'a>(state: &'a RenderState<'a>) -> Option<OverlayItem<'a>> {
         if let Some(error) = state.error {
             return Some(OverlayItem::Error(error));
+        }
+        if state.sync_paused {
+            return Some(OverlayItem::SyncError(state.sync_error));
         }
         if !state.notifications.is_empty() {
             return Some(OverlayItem::Notification(state.notifications));
