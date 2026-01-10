@@ -1,10 +1,3 @@
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph, Widget},
-};
-
 #[derive(Debug, Clone, PartialEq, Eq, Default, Copy)]
 pub enum Mode {
     #[default]
@@ -26,36 +19,8 @@ impl From<Mode> for &'static str {
 }
 
 impl Mode {
-    pub fn color(self) -> Color {
-        match self {
-            Self::Normal => Color::Blue,
-            Self::Insert => Color::LightGreen,
-            Self::Visual => Color::LightMagenta,
-            Self::Command => Color::Yellow,
-        }
-    }
-
-    pub fn style(self) -> Style {
-        Style::default().bg(self.color()).fg(Color::Black)
-    }
-
-    pub fn as_paragraph(self) -> Paragraph<'static> {
-        let val: &'static str = self.into();
-        Paragraph::new(val)
-            .style(Style::default().fg(Color::Black))
-            .centered()
-    }
-}
-
-impl Widget for Mode {
-    fn render(self, area: Rect, buf: &mut Buffer)
-    where
-        Self: Sized,
-    {
-        let border = Block::default().borders(Borders::NONE);
-        border.style(self.style()).render(area, buf);
-        let content = self.as_paragraph();
-        content.render(area, buf);
+    pub fn label(self) -> &'static str {
+        self.into()
     }
 }
 

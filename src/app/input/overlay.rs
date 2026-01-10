@@ -26,6 +26,18 @@ pub fn modal_dialog_area(area: Rect) -> Rect {
     modal_area(area, width, height)
 }
 
+pub fn notification_area(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    let [area] = Layout::vertical([Constraint::Length(height)])
+        .flex(Flex::End)
+        .areas(area);
+    let [area] = Layout::horizontal([Constraint::Length(width)])
+        .flex(Flex::End)
+        .areas(area);
+    area
+}
+
 fn popup_area(area: Rect, width: u16, height: u16) -> Rect {
     let [area] = Layout::vertical([Constraint::Length(height)])
         .flex(Flex::Center)

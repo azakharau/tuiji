@@ -75,7 +75,7 @@ impl SettingsView {
             };
             list_view.render(frame, list_area);
         }
-        let bottom_bar = BottomBar::new(mode, actions.clone());
+        let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, layout[3]);
     }
 }

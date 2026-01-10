@@ -3,6 +3,7 @@ use std::{collections::HashMap, rc::Rc, sync::Arc};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
+    style::Style,
     text::Text,
     widgets::{Paragraph, Widget},
 };
@@ -98,19 +99,20 @@ impl<'a> KanbanBoard<'a> {
 
 impl Widget for KanbanBoard<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let base_style = Style::default()
+            .fg(self.context.colors().text)
+            .bg(self.context.colors().background);
         let table = self.table(area);
         let header_index = 0;
         let _footer_index = table.len() - 1;
         let grouped_issues = self.group_issues_by_status();
         let empty: &[IssueCardComponent] = &[];
         for (i, col) in self.board_cfg.columns.iter().enumerate() {
-            let variant = match col.name.to_uppercase().as_str() {
-                "TODO" => StatusVariant::Todo,
-                "IN PROGRESS" => StatusVariant::InProgress,
-                "DONE" => StatusVariant::Done,
-                _ => StatusVariant::Custom(col.name.as_str()),
-            };
-            let badge = StatusBadge::new(col.name.as_str(), variant, self.context);
+            let badge = StatusBadge::new(
+                col.name.as_str(),
+                StatusVariant::Custom(col.name.as_str()),
+                self.context,
+            );
             badge.render(table[i][header_index], buf);
             let column_issues = grouped_issues
                 .get(&col.name)
@@ -122,10 +124,10 @@ impl Widget for KanbanBoard<'_> {
                 if let Some(issue) = column_issues.get(offset + row_idx) {
                     let selected =
                         self.selected_col == i && (offset + row_idx) == self.selected_row;
-                    issue.render_with_selection(area, buf, selected);
+                    issue.render_with_selection(area, buf, selected, self.context);
                 } else {
                     // Clear the area for empty rows to avoid ghost content.
-                    Paragraph::new(Text::raw("")).render(area, buf);
+                    Paragraph::new(Text::raw("")).style(base_style).render(area, buf);
                 }
             }
         }

@@ -1,9 +1,7 @@
-use ratatui::style::Color;
-
 use crate::{
     app::error::AppErrorState,
     ui::components::form::{FormField, FormState},
-    ui::theme::ThemePalette,
+    ui::theme::{ThemePalette, color_to_hex},
 };
 
 pub struct SettingsThemeFormState {
@@ -96,23 +94,6 @@ impl SettingsThemeFormState {
             }
             idx += 1;
         }
-    }
-}
-
-fn color_to_hex(color: Color) -> String {
-    match color {
-        Color::Rgb(r, g, b) => format!("#{:02x}{:02x}{:02x}", r, g, b),
-        Color::Black => "#000000".to_string(),
-        Color::White => "#ffffff".to_string(),
-        Color::Red => "#ff0000".to_string(),
-        Color::Green => "#00ff00".to_string(),
-        Color::Blue => "#0000ff".to_string(),
-        Color::Yellow => "#ffff00".to_string(),
-        Color::Cyan => "#00ffff".to_string(),
-        Color::Magenta => "#ff00ff".to_string(),
-        Color::Gray => "#808080".to_string(),
-        Color::DarkGray => "#404040".to_string(),
-        _ => "#000000".to_string(),
     }
 }
 

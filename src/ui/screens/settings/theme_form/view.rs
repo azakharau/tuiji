@@ -51,7 +51,7 @@ impl SettingsThemeFormView {
         let mut buffer = frame.buffer_mut();
         FormView::render(state.form(), form_area, &mut buffer, context);
 
-        let bottom_bar = BottomBar::new(mode, actions.clone());
+        let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, bar_area);
         if let Some(err) = state.error() {
             frame.render_widget(ErrorModal::new(err, context), frame.area());

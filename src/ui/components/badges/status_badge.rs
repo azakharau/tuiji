@@ -36,7 +36,7 @@ impl<'a> StatusBadge<'a> {
             StatusVariant::Todo => colors.info,
             StatusVariant::InProgress => colors.warning,
             StatusVariant::Done => colors.success,
-            StatusVariant::Custom(_) => colors.accent,
+            StatusVariant::Custom(_) => colors.logo,
         }
     }
 

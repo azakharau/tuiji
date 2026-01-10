@@ -11,37 +11,33 @@ use crate::ui::context::RenderContext;
 
 pub struct CommandLineModal<'a> {
     buffer: &'a str,
-    color: Color,
     context: &'a RenderContext,
 }
 
 impl<'a> CommandLineModal<'a> {
-    pub fn new(buffer: &'a str, color: Color, context: &'a RenderContext) -> Self {
-        Self {
-            buffer,
-            color,
-            context,
-        }
+    pub fn new(buffer: &'a str, context: &'a RenderContext) -> Self {
+        Self { buffer, context }
     }
 }
 
 impl Widget for CommandLineModal<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let accent = self.context.colors().mode_command_bg;
         let area = command_line_area(area);
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(self.color))
+            .border_style(Style::default().fg(accent))
             .style(
                 Style::default()
                     .fg(self.context.colors().text)
                     .bg(self.context.colors().background),
             )
             .title(Line::from("Command").centered())
-            .title_style(Style::default().fg(self.color));
+            .title_style(Style::default().fg(accent));
         Clear.render(area, buf);
         let inner = block.inner(area);
         block.render(area, buf);
-        CommandLineInput::new(self.buffer, self.color, self.context.colors().background)
+        CommandLineInput::new(self.buffer, accent, self.context.colors().background)
             .render(inner, buf);
     }
 }

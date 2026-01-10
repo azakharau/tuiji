@@ -3,24 +3,32 @@ use std::sync::Arc;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Style},
-    widgets::{Paragraph, Widget},
+    style::{Modifier, Style},
+    widgets::{Block, Paragraph, Widget},
 };
 
-use crate::app::{key_handlers::ActionHint, state::Mode};
+use crate::{
+    app::{key_handlers::ActionHint, state::Mode},
+    ui::context::RenderContext,
+};
 
-pub struct BottomBar {
+pub struct BottomBar<'a> {
     pub mode: Mode,
     pub actions: Arc<Vec<ActionHint>>,
+    pub context: &'a RenderContext,
 }
 
-impl BottomBar {
-    pub fn new(mode: Mode, actions: Arc<Vec<ActionHint>>) -> Self {
-        BottomBar { mode, actions }
+impl<'a> BottomBar<'a> {
+    pub fn new(mode: Mode, actions: Arc<Vec<ActionHint>>, context: &'a RenderContext) -> Self {
+        BottomBar {
+            mode,
+            actions,
+            context,
+        }
     }
 }
 
-impl Widget for BottomBar {
+impl Widget for BottomBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let actions_str = self
             .actions
@@ -29,12 +37,37 @@ impl Widget for BottomBar {
             .collect::<Vec<String>>()
             .join("  ");
         let actions_paragraph = Paragraph::new(actions_str)
-            .style(Style::default().fg(Color::White))
+            .style(Style::default().fg(self.context.colors().text))
             .alignment(Alignment::Left);
 
         let chunks = Layout::horizontal([Constraint::Length(12), Constraint::Min(0)]).split(area);
 
-        self.mode.render(chunks[0], buf);
+        let mode_style = Style::default()
+            .fg(self.context.colors().mode_text)
+            .bg(mode_color(self.mode, self.context))
+            .add_modifier(Modifier::BOLD);
+        let mode_area = chunks[0];
+        Block::default().style(mode_style).render(mode_area, buf);
+        let padded_mode_area = Rect {
+            x: mode_area.x.saturating_add(1),
+            y: mode_area.y,
+            width: mode_area.width.saturating_sub(2),
+            height: mode_area.height,
+        };
+        Paragraph::new(self.mode.label())
+            .style(mode_style)
+            .alignment(Alignment::Center)
+            .render(padded_mode_area, buf);
         actions_paragraph.render(chunks[1], buf);
+    }
+}
+
+fn mode_color(mode: Mode, context: &RenderContext) -> ratatui::style::Color {
+    let colors = context.colors();
+    match mode {
+        Mode::Normal => colors.mode_normal_bg,
+        Mode::Insert => colors.mode_insert_bg,
+        Mode::Visual => colors.mode_visual_bg,
+        Mode::Command => colors.mode_command_bg,
     }
 }

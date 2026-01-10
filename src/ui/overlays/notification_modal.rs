@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::input::overlay::modal_area,
+    app::input::overlay::notification_area,
     app::notification::{AppNotification, AppNotificationKind},
     ui::context::RenderContext,
 };
@@ -103,8 +103,11 @@ impl Widget for NotificationModal<'_> {
         } else {
             Self::dominant_kind(system, reminder, info)
         };
-        let height = (total as u16 * 2 + 3).min(area.height).max(5);
-        let modal = modal_area(area, 72.min(area.width), height);
+        let height = (total as u16 * 2 + 5).min(area.height).max(6);
+        let width = (area.width.saturating_mul(3) / 10)
+            .max(24)
+            .min(area.width);
+        let modal = notification_area(area, width, height);
         let border_color = self.kind_color(dominant);
         let title = if total == 0 {
             "Notifications"

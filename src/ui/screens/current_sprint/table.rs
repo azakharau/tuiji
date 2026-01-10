@@ -4,7 +4,7 @@ use color_eyre::Result;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout},
-    style::{Color, Style},
+    style::Style,
     text::Span,
     widgets::{Block, ScrollbarState, TableState},
 };
@@ -23,7 +23,6 @@ use crate::{
     },
 };
 
-const _SELECTED_ROW_COLOR: Color = Color::Cyan;
 #[derive(Debug, Clone)]
 pub enum Status {
     ToDo,
@@ -81,16 +80,27 @@ impl From<&str> for Priority {
 }
 
 impl Priority {
-    pub fn as_span(&'_ self) -> Span<'_> {
+    pub fn as_span<'a>(&'a self, context: &'a RenderContext) -> Span<'a> {
+        let colors = context.colors();
+        let color = match self {
+            Priority::NoBusinessValue => colors.border,
+            Priority::Low => colors.success,
+            Priority::Lowest => colors.info,
+            Priority::Medium => colors.accent,
+            Priority::High => colors.warning,
+            Priority::Critical => colors.error,
+        };
+        Span::styled(self.label(), Style::default().fg(color))
+    }
+
+    fn label(&self) -> &'static str {
         match self {
-            Priority::NoBusinessValue => {
-                Span::styled("No Business Value", Style::default().fg(Color::Gray))
-            }
-            Priority::Low => Span::styled("Low", Style::default().fg(Color::Green)),
-            Priority::Lowest => Span::styled("Lowest", Style::default().fg(Color::Cyan)),
-            Priority::Medium => Span::styled("Medium", Style::default().fg(Color::Yellow)),
-            Priority::High => Span::styled("High", Style::default().fg(Color::Red)),
-            Priority::Critical => Span::styled("Critical", Style::default().fg(Color::Magenta)),
+            Priority::NoBusinessValue => "No Business Value",
+            Priority::Low => "Low",
+            Priority::Lowest => "Lowest",
+            Priority::Medium => "Medium",
+            Priority::High => "High",
+            Priority::Critical => "Critical",
         }
     }
 }
@@ -117,12 +127,23 @@ impl From<&str> for IssueType {
 }
 
 impl IssueType {
-    pub fn as_span(&'_ self) -> Span<'_> {
+    pub fn as_span<'a>(&'a self, context: &'a RenderContext) -> Span<'a> {
+        let colors = context.colors();
+        let color = match self {
+            IssueType::Bug => colors.error,
+            IssueType::Task => colors.info,
+            IssueType::Story => colors.success,
+            IssueType::Subtask => colors.accent,
+        };
+        Span::styled(self.label(), Style::default().fg(color))
+    }
+
+    fn label(&self) -> &'static str {
         match self {
-            IssueType::Bug => Span::styled("B", Style::default().fg(Color::Red)),
-            IssueType::Task => Span::styled("T", Style::default().fg(Color::Blue)),
-            IssueType::Story => Span::styled("S", Style::default().fg(Color::Green)),
-            IssueType::Subtask => Span::styled("ST", Style::default().fg(Color::Cyan)),
+            IssueType::Bug => "B",
+            IssueType::Task => "T",
+            IssueType::Story => "S",
+            IssueType::Subtask => "ST",
         }
     }
 }
@@ -184,7 +205,7 @@ impl Screen for CurrentSprintTableScreen {
             .bg(_context.colors().background);
         let main_frame = Block::default().title(self.name()).style(base_style);
         let inner_area = main_frame.inner(_frame.area());
-        let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone());
+        let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone(), _context);
 
         let [_body, bottom] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(inner_area);

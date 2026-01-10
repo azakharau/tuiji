@@ -1,10 +1,12 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style},
+    style::Style,
     text::{Span, Text},
-    widgets::{Block, BorderType, Borders, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Widget},
 };
+
+use crate::ui::context::RenderContext;
 
 #[derive(Debug, Clone)]
 pub enum Status {
@@ -63,16 +65,27 @@ impl From<&str> for Priority {
 }
 
 impl Priority {
-    pub fn as_span(&'_ self) -> Span<'_> {
+    pub fn as_span<'a>(&'a self, context: &'a RenderContext) -> Span<'a> {
+        let colors = context.colors();
+        let color = match self {
+            Priority::NoBusinessValue => colors.border,
+            Priority::Low => colors.success,
+            Priority::Lowest => colors.info,
+            Priority::Medium => colors.accent,
+            Priority::High => colors.warning,
+            Priority::Critical => colors.error,
+        };
+        Span::styled(self.label(), Style::default().fg(color))
+    }
+
+    fn label(&self) -> &'static str {
         match self {
-            Priority::NoBusinessValue => {
-                Span::styled("No Business Value", Style::default().fg(Color::Gray))
-            }
-            Priority::Low => Span::styled("Low", Style::default().fg(Color::Green)),
-            Priority::Lowest => Span::styled("Lowest", Style::default().fg(Color::Cyan)),
-            Priority::Medium => Span::styled("Medium", Style::default().fg(Color::Yellow)),
-            Priority::High => Span::styled("High", Style::default().fg(Color::Red)),
-            Priority::Critical => Span::styled("Critical", Style::default().fg(Color::Magenta)),
+            Priority::NoBusinessValue => "No Business Value",
+            Priority::Low => "Low",
+            Priority::Lowest => "Lowest",
+            Priority::Medium => "Medium",
+            Priority::High => "High",
+            Priority::Critical => "Critical",
         }
     }
 }
@@ -99,12 +112,23 @@ impl From<&str> for IssueType {
 }
 
 impl IssueType {
-    pub fn as_span(&'_ self) -> Span<'_> {
+    pub fn as_span<'a>(&'a self, context: &'a RenderContext) -> Span<'a> {
+        let colors = context.colors();
+        let color = match self {
+            IssueType::Bug => colors.error,
+            IssueType::Task => colors.info,
+            IssueType::Story => colors.success,
+            IssueType::Subtask => colors.accent,
+        };
+        Span::styled(self.label(), Style::default().fg(color))
+    }
+
+    fn label(&self) -> &'static str {
         match self {
-            IssueType::Bug => Span::styled("B", Style::default().fg(Color::Red)),
-            IssueType::Task => Span::styled("T", Style::default().fg(Color::Blue)),
-            IssueType::Story => Span::styled("S", Style::default().fg(Color::Green)),
-            IssueType::Subtask => Span::styled("ST", Style::default().fg(Color::Cyan)),
+            IssueType::Bug => "B",
+            IssueType::Task => "T",
+            IssueType::Story => "S",
+            IssueType::Subtask => "ST",
         }
     }
 }
@@ -149,17 +173,28 @@ impl IssueCardComponent {
         8
     }
 
-    pub fn render_with_selection(&self, area: Rect, buf: &mut Buffer, selected: bool) {
+    pub fn render_with_selection(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        selected: bool,
+        context: &RenderContext,
+    ) {
+        let colors = context.colors();
         let border_style = if selected {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(colors.accent)
         } else {
-            Style::default()
+            Style::default().fg(colors.border)
         };
+        let base_style = Style::default()
+            .fg(colors.text)
+            .bg(colors.background);
 
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
             .borders(Borders::ALL)
-            .style(border_style);
+            .style(base_style)
+            .border_style(border_style);
         let inner_area = block.inner(area);
         block.render(area, buf);
         let chunks = Layout::vertical([
@@ -171,10 +206,13 @@ impl IssueCardComponent {
         ])
         .split(inner_area);
         Paragraph::new(Text::from(self.summary.clone()))
+            .style(base_style)
             .wrap(Wrap { trim: false })
             .render(chunks[0], buf);
         if let Some(epic) = &self.epic {
-            Paragraph::new(Text::from(epic.clone())).render(chunks[1], buf);
+            Paragraph::new(Text::from(epic.clone()))
+                .style(base_style)
+                .render(chunks[1], buf);
         }
         let sp_prio_layout = Layout::horizontal([
             Constraint::Length(4),
@@ -183,24 +221,29 @@ impl IssueCardComponent {
         ])
         .split(chunks[2]);
         if let Some(sp) = self.story_points {
-            let sp_span = Span::styled(format!("{} SP", sp), Style::default().fg(Color::Yellow));
-            Paragraph::new(Text::from(sp_span)).render(sp_prio_layout[0], buf);
+            let sp_span =
+                Span::styled(format!("{} SP", sp), Style::default().fg(colors.warning));
+            Paragraph::new(Text::from(sp_span))
+                .style(base_style)
+                .render(sp_prio_layout[0], buf);
         }
-        Paragraph::new(Text::from(self.priority.as_span())).render(sp_prio_layout[2], buf);
+        Paragraph::new(Text::from(self.priority.as_span(context)))
+            .style(base_style)
+            .render(sp_prio_layout[2], buf);
         let type_key_layout = Layout::horizontal([
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Fill(1),
         ])
         .split(chunks[3]);
-        Paragraph::new(Text::from(self.issue_type.as_span())).render(type_key_layout[0], buf);
-        Paragraph::new(Text::from(self.key.clone())).render(type_key_layout[2], buf);
-        Paragraph::new(Text::from(self.assignee.clone())).render(chunks[4], buf);
-    }
-}
-
-impl Widget for IssueCardComponent {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        self.render_with_selection(area, buf, false);
+        Paragraph::new(Text::from(self.issue_type.as_span(context)))
+            .style(base_style)
+            .render(type_key_layout[0], buf);
+        Paragraph::new(Text::from(self.key.clone()))
+            .style(base_style)
+            .render(type_key_layout[2], buf);
+        Paragraph::new(Text::from(self.assignee.clone()))
+            .style(base_style)
+            .render(chunks[4], buf);
     }
 }

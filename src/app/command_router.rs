@@ -148,6 +148,11 @@ impl<'a> CommandRouter<'a> {
                 Ok(ScreenState::Refresh)
             }
             CommandLineOutcome::Submitted(action) => {
+                if matches!(action, Some(CommandLineAction::Invalid)) {
+                    return self
+                        .handle_command_line_action(CommandLineAction::Invalid)
+                        .await;
+                }
                 self.set_mode(Mode::Normal);
                 if let Some(action) = action {
                     self.handle_command_line_action(action).await
@@ -203,17 +208,18 @@ impl<'a> CommandRouter<'a> {
                 self.normalize_screen_state(state, true)
             }
             CommandLineAction::QuitAll => {
-                if has_modal_stack(self.state.current_screen, self.screen_stack) {
-                    close_all_modals_impl(self.state, self.screen_stack, self.terminal)
-                } else {
-                    let state = self
-                        .handle_screen_command_line(CommandLineCommand::Quit)
-                        .await?;
-                    self.normalize_screen_state(state, true)
-                }
+                Ok(ScreenState::Quit)
             }
             CommandLineAction::Sync(action) => {
                 self.handle_sync_action(action, SyncSource::Manual).await
+            }
+            CommandLineAction::Invalid => {
+                self.notification_service.push_notification(
+                    "Invalid command".to_string(),
+                    AppErrorLevel::Warning,
+                    AppNotificationKind::System,
+                );
+                Ok(ScreenState::Refresh)
             }
         }
     }
@@ -241,7 +247,7 @@ impl<'a> CommandRouter<'a> {
     ) -> Result<ScreenState> {
         if !self.is_jira_screen(self.state.current_screen) {
             self.notification_service.set_error(AppErrorState::warning(
-                "Sync доступен только на Jira-экранах",
+                "Sync is available only on Jira screens",
             ));
             return Ok(ScreenState::Refresh);
         }
@@ -574,7 +580,7 @@ impl<'a> CommandRouter<'a> {
             .any(|p| p.id != profile_id && p.name.to_lowercase() == name_lower)
         {
             return Err(eyre!(format!(
-                "Профиль с именем \"{}\" уже существует",
+                "A profile named \"{}\" already exists",
                 profile.name
             )));
         }
@@ -698,7 +704,7 @@ impl<'a> CommandRouter<'a> {
             let name = profile.name.clone();
             self.save_config(cfg)?;
             self.notification_service.push_notification(
-                format!("Профиль \"{name}\" переключен в offline режим"),
+                format!("Profile \"{name}\" switched to offline mode"),
                 AppErrorLevel::Info,
                 AppNotificationKind::System,
             );

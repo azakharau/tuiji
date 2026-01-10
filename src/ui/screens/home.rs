@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::Text,
     widgets::{Block, Paragraph, Widget, Wrap},
 };
@@ -74,7 +74,6 @@ impl HomeScreen {
             HomeVariant::Default => Menu::new(vec![
                 MenuItem::new("current_sprint", "Current Sprint").with_hint("c"),
                 MenuItem::new("my_issues", "My issues").with_hint("i"),
-                MenuItem::new("search_issues", "Search Issues").with_hint("s"),
                 MenuItem::new("new_issue", "New Issue").with_hint("n"),
                 MenuItem::new("boards", "Boards").with_hint("b"),
                 MenuItem::new("settings", "Settings").with_hint(","),
@@ -95,9 +94,6 @@ impl HomeScreen {
                 ScreenState::SwitchTo(ScreenType::CurrentSprint)
             }
             (HomeVariant::Default, "my_issues") => ScreenState::SwitchTo(ScreenType::MyIssues),
-            (HomeVariant::Default, "search_issues") => {
-                ScreenState::SwitchTo(ScreenType::SearchIssues)
-            }
             (HomeVariant::Default, "new_issue") => ScreenState::SwitchTo(ScreenType::NewIssue),
             (HomeVariant::Default, "boards") => ScreenState::SwitchTo(ScreenType::BoardSelection),
             (HomeVariant::Default, "settings") => ScreenState::SwitchTo(ScreenType::Settings),
@@ -128,7 +124,7 @@ impl Screen for HomeScreen {
                 .add_modifier(Modifier::BOLD),
         );
 
-        let logo_style = Style::default().fg(Color::White);
+        let logo_style = Style::default().fg(_context.colors().logo);
         match self.variant {
             HomeVariant::Welcome => {
                 let screen_layout = Layout::vertical([

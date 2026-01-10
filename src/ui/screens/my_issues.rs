@@ -76,7 +76,7 @@ impl Screen for MyIssuesScreen {
             table.render(frame, layout[1]);
         }
 
-        let bottom_bar = BottomBar::new(self.mode, self.actions.clone());
+            let bottom_bar = BottomBar::new(self.mode, self.actions.clone(), context);
         frame.render_widget(bottom_bar, layout[2]);
     }
 

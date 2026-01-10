@@ -96,7 +96,7 @@ impl Screen for BoardSelectionScreen {
             };
             list_view.render(frame, list_area);
         }
-        let bottom_bar = BottomBar::new(self.mode, self.actions.clone());
+            let bottom_bar = BottomBar::new(self.mode, self.actions.clone(), context);
         frame.render_widget(bottom_bar, layout[3]);
     }
 

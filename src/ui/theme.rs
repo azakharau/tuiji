@@ -13,6 +13,12 @@ pub struct ThemePalette {
     pub warning: Color,
     pub info: Color,
     pub success: Color,
+    pub logo: Color,
+    pub mode_normal_bg: Color,
+    pub mode_insert_bg: Color,
+    pub mode_visual_bg: Color,
+    pub mode_command_bg: Color,
+    pub mode_text: Color,
 }
 
 #[derive(Clone, Debug)]
@@ -36,6 +42,8 @@ impl ThemeRegistry {
                 warning: Color::Rgb(0xe0, 0xaf, 0x68),
                 info: Color::Rgb(0x7d, 0xcf, 0xff),
                 success: Color::Rgb(0x9e, 0xce, 0x6a),
+                logo: Color::White,
+                ..mode_colors()
             },
             "solarized_dark" => ThemePalette {
                 background: Color::Rgb(0x00, 0x2b, 0x36),
@@ -47,6 +55,8 @@ impl ThemeRegistry {
                 warning: Color::Rgb(0xb5, 0x89, 0x00),
                 info: Color::Rgb(0x2a, 0xa1, 0x98),
                 success: Color::Rgb(0x85, 0x99, 0x00),
+                logo: Color::White,
+                ..mode_colors()
             },
             _ => ThemePalette {
                 background: Color::Black,
@@ -58,6 +68,8 @@ impl ThemeRegistry {
                 warning: Color::Yellow,
                 info: Color::Cyan,
                 success: Color::Green,
+                logo: Color::White,
+                ..mode_colors()
             },
         }
     }
@@ -133,7 +145,46 @@ impl ThemeRegistry {
             warning: parse_hex_color(&theme.palette.warning)?,
             info: parse_hex_color(&theme.palette.info)?,
             success: parse_hex_color(&theme.palette.success)?,
+            logo: Color::White,
+            ..mode_colors()
         })
+    }
+}
+
+fn mode_colors() -> ThemePalette {
+    ThemePalette {
+        background: Color::Black,
+        text: Color::White,
+        accent: Color::Blue,
+        selection: Color::DarkGray,
+        border: Color::Gray,
+        error: Color::Red,
+        warning: Color::Yellow,
+        info: Color::Cyan,
+        success: Color::Green,
+        logo: Color::White,
+        mode_normal_bg: Color::Blue,
+        mode_insert_bg: Color::LightGreen,
+        mode_visual_bg: Color::LightMagenta,
+        mode_command_bg: Color::Yellow,
+        mode_text: Color::Black,
+    }
+}
+
+pub fn color_to_hex(color: Color) -> String {
+    match color {
+        Color::Rgb(r, g, b) => format!("#{:02x}{:02x}{:02x}", r, g, b),
+        Color::Black => "#000000".to_string(),
+        Color::White => "#ffffff".to_string(),
+        Color::Red => "#ff0000".to_string(),
+        Color::Green => "#00ff00".to_string(),
+        Color::Blue => "#0000ff".to_string(),
+        Color::Yellow => "#ffff00".to_string(),
+        Color::Cyan => "#00ffff".to_string(),
+        Color::Magenta => "#ff00ff".to_string(),
+        Color::Gray => "#808080".to_string(),
+        Color::DarkGray => "#404040".to_string(),
+        _ => "#000000".to_string(),
     }
 }
 

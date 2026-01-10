@@ -87,11 +87,12 @@ impl AppRenderer {
         terminal: &mut DefaultTerminal,
     ) -> Result<()> {
         let overlay = OverlayBus::top_overlay(state);
+        let command_buffer = state.command_buffer;
+        let mut command_drawn = false;
         let render_stack = state.render_stack;
         let key_bindings = state.key_bindings;
         let mode = state.mode;
         let screen_type = state.app_state.current_screen;
-        let cmd_color = Mode::Command.color();
         let render_ctx = match state.cfg_state {
             AppConfigState::Loaded(cfg) => RenderContext::from_config(cfg, mode),
             AppConfigState::Missing(_) => RenderContext::from_config(&AppConfig::default(), mode),
@@ -122,9 +123,10 @@ impl AppRenderer {
                 }
                 Some(OverlayItem::CommandLine(buffer)) => {
                     frame.render_widget(
-                        CommandLineModal::new(buffer, cmd_color, &render_ctx),
+                        CommandLineModal::new(buffer, &render_ctx),
                         frame.area(),
                     );
+                    command_drawn = true;
                 }
                 Some(OverlayItem::WhichKey(mode)) => {
                     let popup = match mode {
@@ -145,6 +147,14 @@ impl AppRenderer {
                     frame.render_widget(BoardRequiredModal::new(bindings, &render_ctx), frame.area());
                 }
                 None => {}
+            }
+
+            if !command_drawn {
+                if let Some(buffer) = command_buffer {
+                    if matches!(overlay, Some(OverlayItem::Notification(_)) | None) {
+                        frame.render_widget(CommandLineModal::new(buffer, &render_ctx), frame.area());
+                    }
+                }
             }
         })?;
 

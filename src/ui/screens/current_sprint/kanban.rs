@@ -80,7 +80,7 @@ impl Screen for CurrentKanbanSprintScreen {
         frame.render_widget(Block::default().style(base_style), frame.area());
         self.ensure_valid_column();
         let issue_height = self.issues.first().map(|i| i.height()).unwrap_or(8);
-        let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone());
+        let bottom_bar = BottomBar::new(self.mode.to_owned(), self.actions.clone(), context);
         let layout = Layout::vertical([
             Constraint::Length(2),
             Constraint::Fill(1),

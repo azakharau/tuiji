@@ -8,6 +8,7 @@ pub enum CommandLineAction {
     QuitAll,
     WriteQuitAll,
     Sync(SyncAction),
+    Invalid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,13 +77,18 @@ impl CommandLineState {
             }
             TextInput::Enter => {
                 let cmd = self.buffer.trim().to_string();
+                if cmd.is_empty() {
+                    self.buffer.clear();
+                    self.active = false;
+                    return CommandLineOutcome::Submitted(None);
+                }
+                let action = parse_command(&cmd);
+                if matches!(action, Some(CommandLineAction::Invalid)) {
+                    return CommandLineOutcome::Submitted(action);
+                }
                 self.buffer.clear();
                 self.active = false;
-                if cmd.is_empty() {
-                    CommandLineOutcome::Submitted(None)
-                } else {
-                    CommandLineOutcome::Submitted(parse_command(&cmd))
-                }
+                CommandLineOutcome::Submitted(action)
             }
             TextInput::Esc => {
                 self.buffer.clear();
@@ -105,10 +111,10 @@ fn parse_command(cmd: &str) -> Option<CommandLineAction> {
         _ => {
             let mut parts = cmd.split_whitespace();
             let Some(head) = parts.next() else {
-                return None;
+                return Some(CommandLineAction::Invalid);
             };
             if head != "sync" {
-                return None;
+                return Some(CommandLineAction::Invalid);
             }
             match parts.next() {
                 None => Some(CommandLineAction::Sync(SyncAction::Pull)),
@@ -117,7 +123,7 @@ fn parse_command(cmd: &str) -> Option<CommandLineAction> {
                 Some("offline") | Some("cache") => {
                     Some(CommandLineAction::Sync(SyncAction::SwitchOffline))
                 }
-                _ => None,
+                _ => Some(CommandLineAction::Invalid),
             }
         }
     }
