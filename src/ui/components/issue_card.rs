@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
     text::{Span, Text},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Widget},
+    widgets::{Block, BorderType, Borders, Paragraph, Widget, Wrap},
 };
 
 use crate::ui::context::RenderContext;
@@ -186,9 +186,7 @@ impl IssueCardComponent {
         } else {
             Style::default().fg(colors.border)
         };
-        let base_style = Style::default()
-            .fg(colors.text)
-            .bg(colors.background);
+        let base_style = Style::default().fg(colors.text).bg(colors.background);
 
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
@@ -221,8 +219,7 @@ impl IssueCardComponent {
         ])
         .split(chunks[2]);
         if let Some(sp) = self.story_points {
-            let sp_span =
-                Span::styled(format!("{} SP", sp), Style::default().fg(colors.warning));
+            let sp_span = Span::styled(format!("{} SP", sp), Style::default().fg(colors.warning));
             Paragraph::new(Text::from(sp_span))
                 .style(base_style)
                 .render(sp_prio_layout[0], buf);

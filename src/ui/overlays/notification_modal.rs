@@ -82,9 +82,9 @@ impl Widget for NotificationModal<'_> {
                 AppNotificationKind::Info => info += 1,
             }
             let color = self.kind_color(note.kind);
-        let style = Style::default()
-            .fg(color)
-            .bg(self.context.colors().background);
+            let style = Style::default()
+                .fg(color)
+                .bg(self.context.colors().background);
             let line = Line::from(vec![
                 Span::raw("["),
                 Span::styled(note.kind.label(), style),
@@ -104,9 +104,7 @@ impl Widget for NotificationModal<'_> {
             Self::dominant_kind(system, reminder, info)
         };
         let height = (total as u16 * 2 + 5).min(area.height).max(6);
-        let width = (area.width.saturating_mul(3) / 10)
-            .max(24)
-            .min(area.width);
+        let width = (area.width.saturating_mul(3) / 10).max(24).min(area.width);
         let modal = notification_area(area, width, height);
         let border_color = self.kind_color(dominant);
         let title = if total == 0 {

@@ -1,8 +1,8 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Modifier, Style},
     widgets::{List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    Frame,
 };
 
 use crate::ui::context::RenderContext;

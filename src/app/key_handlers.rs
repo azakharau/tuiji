@@ -22,6 +22,16 @@ pub enum ActionId {
     OpenProfiles,
     OpenBoards,
     OpenSettings,
+    OpenSyncStatus,
+    ResolveConflictLocal,
+    ResolveConflictRemote,
+    SyncNow,
+    SyncPause,
+    SyncRetry,
+    SyncResume,
+    FilterAll,
+    FilterPull,
+    FilterPush,
     NewProfile,
     EditProfile,
     DeleteProfile,
@@ -86,7 +96,10 @@ pub struct KeyBindings {
 impl KeyBindings {
     pub fn from_config(cfg: &KeyBindingsConfig) -> Self {
         let mut global = map_bindings(&cfg.global);
-        if !global.iter().any(|entry| entry.action == ActionId::OpenSettings) {
+        if !global
+            .iter()
+            .any(|entry| entry.action == ActionId::OpenSettings)
+        {
             global.push(KeyBinding {
                 action: ActionId::OpenSettings,
                 binding: ",".to_string(),
@@ -125,6 +138,14 @@ impl KeyBindings {
             Arc::new(merge_bindings(&global, &map_bindings(&cfg.search_issues))),
         );
         by_screen.insert(
+            ScreenType::Conflicts,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.conflicts))),
+        );
+        by_screen.insert(
+            ScreenType::SyncStatus,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.sync_status))),
+        );
+        by_screen.insert(
             ScreenType::NewIssue,
             Arc::new(merge_bindings(&global, &map_bindings(&cfg.new_issue))),
         );
@@ -143,7 +164,10 @@ impl KeyBindings {
         );
         by_screen.insert(
             ScreenType::SettingsThemeForm,
-            Arc::new(merge_bindings(&global, &map_bindings(&cfg.profile_creation))),
+            Arc::new(merge_bindings(
+                &global,
+                &map_bindings(&cfg.profile_creation),
+            )),
         );
         Self { by_screen }
     }
@@ -212,6 +236,7 @@ pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<Actio
             push(ActionId::OpenSearchIssues, "Search issues");
             push(ActionId::OpenNewIssue, "New issue");
             push(ActionId::OpenBoards, "Boards");
+            push(ActionId::OpenSyncStatus, "Sync status");
             push(ActionId::OpenSettings, "Settings");
         }
         ScreenType::CurrentSprint => {
@@ -254,6 +279,28 @@ pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<Actio
             push(ActionId::Confirm, "Save");
             push(ActionId::GoHome, "Home");
         }
+        ScreenType::Conflicts => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::ResolveConflictLocal, "Use local");
+            push(ActionId::ResolveConflictRemote, "Use Jira");
+            push(ActionId::GoHome, "Home");
+        }
+        ScreenType::SyncStatus => {
+            push(ActionId::SyncNow, "Sync now");
+            push(ActionId::SyncPause, "Pause");
+            push(ActionId::SyncRetry, "Retry");
+            push(ActionId::SyncResume, "Resume");
+            push(ActionId::FilterAll, "All");
+            push(ActionId::FilterPull, "Pull");
+            push(ActionId::FilterPush, "Push");
+            push(ActionId::GoHome, "Home");
+        }
+        ScreenType::NewIssue | ScreenType::ProfileCreation => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::GoHome, "Home");
+        }
         _ => {}
     }
 
@@ -273,6 +320,16 @@ fn action_description(action: ActionId) -> Option<&'static str> {
         ActionId::OpenProfiles => Some("Profiles"),
         ActionId::OpenBoards => Some("Boards"),
         ActionId::OpenSettings => Some("Settings"),
+        ActionId::OpenSyncStatus => Some("Sync status"),
+        ActionId::ResolveConflictLocal => Some("Use local"),
+        ActionId::ResolveConflictRemote => Some("Use Jira"),
+        ActionId::SyncNow => Some("Sync now"),
+        ActionId::SyncPause => Some("Pause"),
+        ActionId::SyncRetry => Some("Retry"),
+        ActionId::SyncResume => Some("Resume"),
+        ActionId::FilterAll => Some("Filter all"),
+        ActionId::FilterPull => Some("Filter pull"),
+        ActionId::FilterPush => Some("Filter push"),
         ActionId::NewProfile => Some("New profile"),
         ActionId::EditProfile => Some("Edit profile"),
         ActionId::DeleteProfile => Some("Delete profile"),
@@ -375,6 +432,16 @@ fn binding_action_to_action_id(action: BindingAction) -> ActionId {
         BindingAction::OpenProfiles => ActionId::OpenProfiles,
         BindingAction::OpenBoards => ActionId::OpenBoards,
         BindingAction::OpenSettings => ActionId::OpenSettings,
+        BindingAction::OpenSyncStatus => ActionId::OpenSyncStatus,
+        BindingAction::ResolveConflictLocal => ActionId::ResolveConflictLocal,
+        BindingAction::ResolveConflictRemote => ActionId::ResolveConflictRemote,
+        BindingAction::SyncNow => ActionId::SyncNow,
+        BindingAction::SyncPause => ActionId::SyncPause,
+        BindingAction::SyncRetry => ActionId::SyncRetry,
+        BindingAction::SyncResume => ActionId::SyncResume,
+        BindingAction::FilterAll => ActionId::FilterAll,
+        BindingAction::FilterPull => ActionId::FilterPull,
+        BindingAction::FilterPush => ActionId::FilterPush,
         BindingAction::NewProfile => ActionId::NewProfile,
         BindingAction::EditProfile => ActionId::EditProfile,
         BindingAction::DeleteProfile => ActionId::DeleteProfile,

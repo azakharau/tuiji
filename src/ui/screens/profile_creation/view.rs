@@ -8,10 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{
-        key_handlers::ActionHint,
-        state::Mode,
-    },
+    app::{key_handlers::ActionHint, state::Mode},
     ui::{
         components::{bottom_bar::BottomBar, form::FormView},
         context::RenderContext,
@@ -49,7 +46,7 @@ impl ProfileCreationView {
         frame.render_widget(Clear, area);
         frame.render_widget(block, area);
         let mut buffer = frame.buffer_mut();
-        FormView::render(state.form(), form_area, &mut buffer, context);
+        FormView::render(state.form(), form_area, &mut buffer, context, None);
 
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, bar_area);

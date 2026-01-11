@@ -14,14 +14,15 @@ use crate::{
         overlay::{OverlayBus, OverlayItem, WhichKeyMode},
         screen_manager::{ScreenContext, ScreenManager},
         state::{Mode, ScreenType},
+        worker_controller::SyncStatusSnapshot,
     },
     config::{AppConfig, AppConfigState},
-    data::RepositoryHub,
+    data::{AppRepository, RepositoryHub},
+    ui::context::RenderContext,
     ui::overlays::{
         BoardRequiredModal, CommandLineModal, ErrorModal, NotificationModal, SyncErrorModal,
         WhichKeyPopup,
     },
-    ui::context::RenderContext,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -61,6 +62,7 @@ pub struct RenderState<'a> {
     pub mode: Mode,
     pub sync_paused: bool,
     pub sync_error: Option<&'a str>,
+    pub sync_status: SyncStatusSnapshot,
 }
 
 pub struct AppRenderer;
@@ -77,6 +79,19 @@ impl AppRenderer {
                 repo: state.repo.clone(),
             };
             let _ = screen_manager.active_screen_mut(screen_type, ctx).await?;
+        }
+        if state
+            .render_stack
+            .iter()
+            .any(|screen| screen == ScreenType::SyncStatus)
+        {
+            if let Some(screen) = screen_manager.sync_status_mut() {
+                screen.set_snapshot(state.sync_status.clone());
+                let filter = screen.filter();
+                if let Ok(entries) = state.repo.sync_log(10, filter).await {
+                    screen.set_log(entries);
+                }
+            }
         }
         Ok(())
     }
@@ -122,10 +137,7 @@ impl AppRenderer {
                     );
                 }
                 Some(OverlayItem::CommandLine(buffer)) => {
-                    frame.render_widget(
-                        CommandLineModal::new(buffer, &render_ctx),
-                        frame.area(),
-                    );
+                    frame.render_widget(CommandLineModal::new(buffer, &render_ctx), frame.area());
                     command_drawn = true;
                 }
                 Some(OverlayItem::WhichKey(mode)) => {
@@ -144,7 +156,10 @@ impl AppRenderer {
                     frame.render_widget(&popup, frame.area());
                 }
                 Some(OverlayItem::BoardRequired(bindings)) => {
-                    frame.render_widget(BoardRequiredModal::new(bindings, &render_ctx), frame.area());
+                    frame.render_widget(
+                        BoardRequiredModal::new(bindings, &render_ctx),
+                        frame.area(),
+                    );
                 }
                 None => {}
             }
@@ -152,7 +167,10 @@ impl AppRenderer {
             if !command_drawn {
                 if let Some(buffer) = command_buffer {
                     if matches!(overlay, Some(OverlayItem::Notification(_)) | None) {
-                        frame.render_widget(CommandLineModal::new(buffer, &render_ctx), frame.area());
+                        frame.render_widget(
+                            CommandLineModal::new(buffer, &render_ctx),
+                            frame.area(),
+                        );
                     }
                 }
             }

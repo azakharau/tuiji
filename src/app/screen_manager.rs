@@ -13,11 +13,20 @@ use crate::{
     ui::{
         components::logo::AsciiLogoComponent,
         screens::{
-            Screen, board_selection::BoardSelectionScreen,
-            current_sprint::kanban::CurrentKanbanSprintScreen, home::HomeScreen,
-            my_issues::MyIssuesScreen, profile_creation::ProfileCreationScreen,
-            profiles::ProfilesScreen, search_issues::SearchIssuesScreen,
-            settings::{SettingsScreen, theme_form::SettingsThemeFormScreen, themes::SettingsThemesScreen},
+            Screen,
+            board_selection::BoardSelectionScreen,
+            conflicts::ConflictsScreen,
+            current_sprint::CurrentSprintScreen,
+            home::HomeScreen,
+            issue_form::IssueFormScreen,
+            my_issues::MyIssuesScreen,
+            profile_creation::ProfileCreationScreen,
+            profiles::ProfilesScreen,
+            search_issues::SearchIssuesScreen,
+            settings::{
+                SettingsScreen, theme_form::SettingsThemeFormScreen, themes::SettingsThemesScreen,
+            },
+            sync_status::SyncStatusScreen,
         },
     },
 };
@@ -43,9 +52,12 @@ struct ScreenSlot {
 enum ScreenEntry {
     Home(HomeScreen),
     BoardSelection(BoardSelectionScreen),
-    CurrentSprint(CurrentKanbanSprintScreen),
+    Conflicts(ConflictsScreen),
+    SyncStatus(SyncStatusScreen),
+    CurrentSprint(CurrentSprintScreen),
     MyIssues(MyIssuesScreen),
     SearchIssues(SearchIssuesScreen),
+    IssueForm(IssueFormScreen),
     Settings(SettingsScreen),
     SettingsThemes(SettingsThemesScreen),
     SettingsThemeForm(SettingsThemeFormScreen),
@@ -58,9 +70,12 @@ impl ScreenEntry {
         match self {
             ScreenEntry::Home(screen) => screen,
             ScreenEntry::BoardSelection(screen) => screen,
+            ScreenEntry::Conflicts(screen) => screen,
+            ScreenEntry::SyncStatus(screen) => screen,
             ScreenEntry::CurrentSprint(screen) => screen,
             ScreenEntry::MyIssues(screen) => screen,
             ScreenEntry::SearchIssues(screen) => screen,
+            ScreenEntry::IssueForm(screen) => screen,
             ScreenEntry::Settings(screen) => screen,
             ScreenEntry::SettingsThemes(screen) => screen,
             ScreenEntry::SettingsThemeForm(screen) => screen,
@@ -139,6 +154,24 @@ impl ScreenManager {
         slot.last_used = Instant::now();
         match &mut slot.screen {
             ScreenEntry::BoardSelection(screen) => Some(screen),
+            _ => None,
+        }
+    }
+
+    pub fn conflicts_mut(&mut self) -> Option<&mut ConflictsScreen> {
+        let slot = self.screens.get_mut(&ScreenType::Conflicts)?;
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::Conflicts(screen) => Some(screen),
+            _ => None,
+        }
+    }
+
+    pub fn sync_status_mut(&mut self) -> Option<&mut SyncStatusScreen> {
+        let slot = self.screens.get_mut(&ScreenType::SyncStatus)?;
+        slot.last_used = Instant::now();
+        match &mut slot.screen {
+            ScreenEntry::SyncStatus(screen) => Some(screen),
             _ => None,
         }
     }
@@ -237,10 +270,14 @@ impl ScreenManager {
         ctx: ScreenContext<'_>,
     ) -> Result<ScreenEntry> {
         match screen_type {
-            ScreenType::Home => Ok(ScreenEntry::Home(HomeScreen::new(
-                AsciiLogoComponent::default(),
-                ctx.cfg_state,
-            ))),
+            ScreenType::Home => {
+                let conflict_count = ctx.repo.conflict_count().await.unwrap_or(0);
+                Ok(ScreenEntry::Home(HomeScreen::new(
+                    AsciiLogoComponent::default(),
+                    ctx.cfg_state,
+                    conflict_count,
+                )))
+            }
             ScreenType::BoardSelection => {
                 let boards = ctx.repo.list_boards().await.unwrap_or_default();
                 Ok(ScreenEntry::BoardSelection(BoardSelectionScreen::new(
@@ -277,39 +314,55 @@ impl ScreenManager {
                     color_eyre::eyre::eyre!("No board selected: cannot open Current Sprint")
                 })?;
                 let screen =
-                    CurrentKanbanSprintScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id)
+                    CurrentSprintScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id)
                         .await?;
                 Ok(ScreenEntry::CurrentSprint(screen))
             }
-            ScreenType::Settings => {
-                Ok(ScreenEntry::Settings(SettingsScreen::new()))
+            ScreenType::Conflicts => {
+                let issues = ctx.repo.conflict_issues().await.unwrap_or_default();
+                Ok(ScreenEntry::Conflicts(ConflictsScreen::new(issues)))
             }
+            ScreenType::SyncStatus => {
+                let log = ctx
+                    .repo
+                    .sync_log(10, crate::data::SyncLogFilter::All)
+                    .await
+                    .unwrap_or_default();
+                Ok(ScreenEntry::SyncStatus(SyncStatusScreen::new(
+                    crate::app::worker_controller::SyncStatusSnapshot::default(),
+                    log,
+                    crate::data::SyncLogFilter::All,
+                )))
+            }
+            ScreenType::Settings => Ok(ScreenEntry::Settings(SettingsScreen::new())),
             ScreenType::SettingsThemes => {
                 let (theme, custom) = match ctx.cfg_state {
-                    AppConfigState::Loaded(cfg) => (cfg.ui.theme.as_str(), cfg.ui.custom_themes.as_slice()),
+                    AppConfigState::Loaded(cfg) => {
+                        (cfg.ui.theme.as_str(), cfg.ui.custom_themes.as_slice())
+                    }
                     AppConfigState::Missing(_) => ("default", &[][..]),
                 };
                 Ok(ScreenEntry::SettingsThemes(SettingsThemesScreen::new(
-                    theme,
-                    custom,
+                    theme, custom,
                 )))
             }
             ScreenType::SettingsThemeForm => {
                 let (theme, custom) = match ctx.cfg_state {
-                    AppConfigState::Loaded(cfg) => (cfg.ui.theme.as_str(), cfg.ui.custom_themes.as_slice()),
+                    AppConfigState::Loaded(cfg) => {
+                        (cfg.ui.theme.as_str(), cfg.ui.custom_themes.as_slice())
+                    }
                     AppConfigState::Missing(_) => ("default", &[][..]),
                 };
-                Ok(ScreenEntry::SettingsThemeForm(SettingsThemeFormScreen::new(
-                    theme,
-                    custom,
-                )))
+                Ok(ScreenEntry::SettingsThemeForm(
+                    SettingsThemeFormScreen::new(theme, custom),
+                ))
             }
             ScreenType::MyIssues => {
                 let board_id = ctx.app_state.selected_board_id.ok_or_else(|| {
                     color_eyre::eyre::eyre!("No board selected: cannot open My Issues")
                 })?;
-                let screen = MyIssuesScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id)
-                    .await?;
+                let screen =
+                    MyIssuesScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id).await?;
                 Ok(ScreenEntry::MyIssues(screen))
             }
             ScreenType::SearchIssues => {
@@ -320,10 +373,7 @@ impl ScreenManager {
                     SearchIssuesScreen::new(ctx.repo.clone(), ctx.app_state.mode, board_id).await?;
                 Ok(ScreenEntry::SearchIssues(screen))
             }
-            _ => Err(color_eyre::eyre::eyre!(
-                "Screen {:?} not implemented yet",
-                screen_type
-            )),
+            ScreenType::NewIssue => Ok(ScreenEntry::IssueForm(IssueFormScreen::new())),
         }
     }
 }

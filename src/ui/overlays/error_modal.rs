@@ -34,7 +34,9 @@ impl Widget for ErrorModal<'_> {
         let inner = ModalFrame::new(
             self.error.title.as_str(),
             modal,
-            Style::default().fg(color).bg(self.context.colors().background),
+            Style::default()
+                .fg(color)
+                .bg(self.context.colors().background),
             self.context,
         )
         .render_to_buffer(buf);

@@ -12,7 +12,10 @@ use crate::{
         state::Mode,
     },
     config::ProfileConfig,
-    ui::{context::RenderContext, screens::{Screen, ScreenState}},
+    ui::{
+        context::RenderContext,
+        screens::{CommandLineCommand, Screen, ScreenState},
+    },
 };
 
 use controller::ProfilesController;
@@ -87,6 +90,14 @@ impl Screen for ProfilesScreen {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+    }
+
+    fn handle_command_line(&mut self, cmd: CommandLineCommand) -> ScreenState {
+        match cmd {
+            CommandLineCommand::Write => ScreenState::Stay,
+            CommandLineCommand::WriteQuit => ScreenState::Close,
+            CommandLineCommand::Quit => ScreenState::Close,
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::{
     app::error::AppErrorState,
     config::ProfileConfig,
-    ui::components::form::{FormField, FormState},
+    ui::components::form::{CursorState, FieldValue, FormField, FormState},
 };
 
 pub struct ProfileCreationState {
@@ -64,20 +64,28 @@ impl ProfileCreationState {
         state.profile_id = Some(profile.id);
         state.sync_mode = profile.sync_mode;
         if let Some(item) = state.form.fields_mut().get_mut(0) {
-            item.value = profile.name;
-            item.cursor_position = item.value.len();
+            item.value = FieldValue::Text(profile.name.clone());
+            if let CursorState::Text { position } = &mut item.cursor {
+                *position = profile.name.len();
+            }
         }
         if let Some(item) = state.form.fields_mut().get_mut(1) {
-            item.value = profile.jira.base_url;
-            item.cursor_position = item.value.len();
+            item.value = FieldValue::Text(profile.jira.base_url.clone());
+            if let CursorState::Text { position } = &mut item.cursor {
+                *position = profile.jira.base_url.len();
+            }
         }
         if let Some(item) = state.form.fields_mut().get_mut(2) {
-            item.value = profile.jira.username;
-            item.cursor_position = item.value.len();
+            item.value = FieldValue::Text(profile.jira.username.clone());
+            if let CursorState::Text { position } = &mut item.cursor {
+                *position = profile.jira.username.len();
+            }
         }
         if let Some(item) = state.form.fields_mut().get_mut(3) {
-            item.value = profile.jira.api_token;
-            item.cursor_position = item.value.len();
+            item.value = FieldValue::Text(profile.jira.api_token.clone());
+            if let CursorState::Text { position } = &mut item.cursor {
+                *position = profile.jira.api_token.len();
+            }
         }
         state
     }
@@ -86,10 +94,10 @@ impl ProfileCreationState {
 impl Default for ProfileCreationState {
     fn default() -> Self {
         let form = FormState::new(vec![
-            FormField::new("Profile Name", false),
-            FormField::new("Jira URL", false),
-            FormField::new("Email", false),
-            FormField::new("API Token", true),
+            FormField::text("Profile Name", false),
+            FormField::text("Jira URL", false),
+            FormField::text("Email", false),
+            FormField::text("API Token", true),
         ]);
         Self {
             form,

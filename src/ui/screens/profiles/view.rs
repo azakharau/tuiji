@@ -8,11 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{
-        input::overlay::modal_dialog_area,
-        key_handlers::ActionHint,
-        state::Mode,
-    },
+    app::{input::overlay::modal_dialog_area, key_handlers::ActionHint, state::Mode},
     ui::{
         components::{
             bottom_bar::BottomBar,

@@ -5,20 +5,23 @@ use ratatui::Frame;
 use crate::{
     app::{
         key_handlers::{ActionHint, KeyHandler},
-        state::ScreenType,
+        state::{Mode, ScreenType},
     },
     config::{CustomThemeConfig, ProfileConfig},
     ui::context::RenderContext,
 };
 
 pub mod board_selection;
+pub mod conflicts;
 pub mod current_sprint;
 pub mod home;
+pub mod issue_form;
 pub mod my_issues;
 pub mod profile_creation;
 pub mod profiles;
 pub mod search_issues;
 pub mod settings;
+pub mod sync_status;
 
 pub trait Screen: KeyHandler {
     fn draw(&mut self, frame: &mut Frame, context: &RenderContext);
@@ -49,11 +52,18 @@ pub enum ScreenState {
     Stay,
     Refresh,
     SwitchTo(ScreenType),
+    SwitchMode(Mode),
     Quit,
     SaveProfile(ProfileConfig),
     SaveProfileAndClose(ProfileConfig),
     ApplyTheme(String),
     SaveCustomTheme(CustomThemeConfig),
     SaveCustomThemeAndClose(CustomThemeConfig),
+    ResolveConflictLocal(String),
+    ResolveConflictRemote(String),
+    SyncNow,
+    SyncPause,
+    SyncRetry,
+    SyncResume,
     Close,
 }

@@ -8,16 +8,20 @@ use crate::{
     client::jira::BoardConfig,
     config::{ProfileConfig, SyncMode},
     data::{
-        BoardSummary, IssueSummary, SqliteRepository, SqliteRepositoryConfig, SyncState,
+        BoardSummary, CommentSnapshot, IssueSnapshot, IssueSummary, SqliteRepository,
+        SqliteRepositoryConfig, SyncLogEntry, SyncLogFilter, SyncState, diff_comment, diff_issue,
         repository::{AppRepository, CommandRepository, QueryRepository, jira::JiraRepository},
     },
 };
+
+const DEFAULT_PROFILE_ID: &str = "default";
 
 #[derive(Clone)]
 pub struct RepositoryHub {
     cache: Arc<SqliteRepository>,
     remote: Option<Arc<JiraRepository>>,
     sync_mode: SyncMode,
+    profile_id: String,
 }
 
 impl RepositoryHub {
@@ -25,7 +29,10 @@ impl RepositoryHub {
         cache_cfg: SqliteRepositoryConfig,
         profile: Option<&ProfileConfig>,
     ) -> Result<Self> {
-        let cache = SqliteRepository::connect(cache_cfg).await?;
+        let profile_id = profile
+            .map(|profile| profile.id.clone())
+            .unwrap_or_else(|| DEFAULT_PROFILE_ID.to_string());
+        let cache = SqliteRepository::connect(cache_cfg, profile_id.clone()).await?;
         let sync_mode = profile
             .map(|profile| profile.sync_mode())
             .unwrap_or(SyncMode::Cache);
@@ -40,6 +47,7 @@ impl RepositoryHub {
             cache: Arc::new(cache),
             remote,
             sync_mode,
+            profile_id,
         })
     }
 
@@ -47,6 +55,9 @@ impl RepositoryHub {
         let sync_mode = profile
             .map(|profile| profile.sync_mode())
             .unwrap_or(SyncMode::Cache);
+        let profile_id = profile
+            .map(|profile| profile.id.clone())
+            .unwrap_or_else(|| DEFAULT_PROFILE_ID.to_string());
         let remote = match profile {
             Some(profile) if sync_mode == SyncMode::Online => {
                 Some(Arc::new(JiraRepository::new(&profile.jira)?))
@@ -55,9 +66,10 @@ impl RepositoryHub {
             _ => None,
         };
         Ok(Self {
-            cache: Arc::clone(&self.cache),
+            cache: Arc::new(self.cache.with_profile(profile_id.clone())),
             remote,
             sync_mode,
+            profile_id,
         })
     }
 
@@ -72,7 +84,12 @@ impl RepositoryHub {
     pub async fn sync_pull(&self) -> Result<()> {
         let Some(remote) = &self.remote else {
             self.cache
-                .log_sync_event("pull", "error", Some("sync pull requires online mode"))
+                .log_sync_event(
+                    "pull",
+                    "error",
+                    Some("sync pull requires online mode"),
+                    Some(self.profile_id.as_str()),
+                )
                 .await?;
             return Err(eyre!("Sync pull requires online mode"));
         };
@@ -85,7 +102,90 @@ impl RepositoryHub {
                     .replace_board_columns(board_id, &config.columns)
                     .await?;
                 let issues = remote.current_sprint_issues(board_id).await?;
-                self.cache.upsert_issues(issues).await?;
+                for issue in &issues {
+                    let local = self.cache.fetch_issue(&issue.key).await?;
+                    let remote_snapshot = IssueSnapshot::from(issue);
+                    let mut has_conflict = false;
+
+                    if let Some(local_issue) = &local {
+                        if local_issue.dirty {
+                            let diffs = diff_issue(local_issue, &remote_snapshot);
+                            if !diffs.is_empty() {
+                                has_conflict = true;
+                            }
+                        }
+
+                        let mut comment_conflict = false;
+                        if local_issue.comments.iter().any(|c| c.dirty) {
+                            let mut remote_by_id = std::collections::HashMap::new();
+                            for comment in &remote_snapshot.comments {
+                                remote_by_id.insert(comment.id.as_str(), comment);
+                            }
+                            for local_comment in &local_issue.comments {
+                                if !local_comment.dirty {
+                                    continue;
+                                }
+                                match remote_by_id.get(local_comment.id.as_str()) {
+                                    Some(remote_comment) => {
+                                        if !diff_comment(local_comment, remote_comment).is_empty() {
+                                            comment_conflict = true;
+                                            let snapshot = serde_json::to_string(remote_comment)
+                                                .unwrap_or_default();
+                                            if !snapshot.is_empty() {
+                                                self.cache
+                                                    .mark_comment_conflict(
+                                                        &local_comment.id,
+                                                        &snapshot,
+                                                    )
+                                                    .await?;
+                                            }
+                                        } else {
+                                            self.cache
+                                                .clear_comment_dirty(&local_comment.id)
+                                                .await?;
+                                        }
+                                    }
+                                    None => {
+                                        comment_conflict = true;
+                                        let missing = CommentSnapshot {
+                                            id: local_comment.id.clone(),
+                                            author: String::new(),
+                                            body: String::new(),
+                                            created_at: None,
+                                            updated_at: None,
+                                        };
+                                        let snapshot =
+                                            serde_json::to_string(&missing).unwrap_or_default();
+                                        if !snapshot.is_empty() {
+                                            self.cache
+                                                .mark_comment_conflict(&local_comment.id, &snapshot)
+                                                .await?;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if has_conflict || comment_conflict {
+                            let snapshot =
+                                serde_json::to_string(&remote_snapshot).unwrap_or_default();
+                            if !snapshot.is_empty() {
+                                self.cache
+                                    .mark_issue_conflict(&issue.key, &snapshot)
+                                    .await?;
+                            }
+                            continue;
+                        }
+
+                        if local_issue.dirty {
+                            self.cache.clear_issue_dirty(&issue.key).await?;
+                        }
+                    }
+
+                    self.cache
+                        .upsert_issues(std::slice::from_ref(issue))
+                        .await?;
+                }
             }
             Ok(())
         }
@@ -93,12 +193,19 @@ impl RepositoryHub {
 
         match result {
             Ok(()) => {
-                self.cache.log_sync_event("pull", "success", None).await?;
+                self.cache
+                    .log_sync_event("pull", "success", None, Some(self.profile_id.as_str()))
+                    .await?;
                 Ok(())
             }
             Err(err) => {
                 self.cache
-                    .log_sync_event("pull", "error", Some(&err.to_string()))
+                    .log_sync_event(
+                        "pull",
+                        "error",
+                        Some(&err.to_string()),
+                        Some(self.profile_id.as_str()),
+                    )
                     .await?;
                 Err(err)
             }
@@ -108,19 +215,31 @@ impl RepositoryHub {
     pub async fn sync_push(&self) -> Result<()> {
         let Some(_remote) = &self.remote else {
             self.cache
-                .log_sync_event("push", "error", Some("sync push requires online mode"))
+                .log_sync_event(
+                    "push",
+                    "error",
+                    Some("sync push requires online mode"),
+                    Some(self.profile_id.as_str()),
+                )
                 .await?;
             return Err(eyre!("Sync push requires online mode"));
         };
         let result = self.cache.push_outbox().await;
         match result {
             Ok(()) => {
-                self.cache.log_sync_event("push", "success", None).await?;
+                self.cache
+                    .log_sync_event("push", "success", None, Some(self.profile_id.as_str()))
+                    .await?;
                 Ok(())
             }
             Err(err) => {
                 self.cache
-                    .log_sync_event("push", "error", Some(&err.to_string()))
+                    .log_sync_event(
+                        "push",
+                        "error",
+                        Some(&err.to_string()),
+                        Some(self.profile_id.as_str()),
+                    )
                     .await?;
                 Err(err)
             }
@@ -154,7 +273,7 @@ impl AppRepository for RepositoryHub {
             SyncMode::Online => match &self.remote {
                 Some(remote) => match remote.current_sprint_issues(board_id).await {
                     Ok(issues) => {
-                        self.cache.upsert_issues(issues.clone()).await?;
+                        self.cache.upsert_issues(&issues).await?;
                         Ok(issues)
                     }
                     Err(err) => self
@@ -217,6 +336,33 @@ impl AppRepository for RepositoryHub {
 
     async fn seed_mock_data_if_empty(&self) -> Result<Option<u64>> {
         self.cache.seed_mock_data_if_empty().await
+    }
+
+    async fn conflict_issues(&self) -> Result<Vec<IssueSummary>> {
+        self.cache.list_conflict_issues().await
+    }
+
+    async fn conflict_count(&self) -> Result<usize> {
+        self.cache.count_conflicts().await
+    }
+
+    async fn resolve_conflict_use_local(&self, key: &str) -> Result<()> {
+        self.cache.resolve_issue_use_local(key).await
+    }
+
+    async fn resolve_conflict_use_remote(&self, key: &str) -> Result<()> {
+        let Some(issue) = self.cache.fetch_issue(key).await? else {
+            return Err(eyre!("Issue {} not found", key));
+        };
+        let snapshot = issue
+            .remote_snapshot
+            .ok_or_else(|| eyre!("Remote snapshot missing for issue {}", key))?;
+        let remote: IssueSnapshot = serde_json::from_str(snapshot.as_str())?;
+        self.cache.resolve_issue_use_remote(key, &remote).await
+    }
+
+    async fn sync_log(&self, limit: usize, filter: SyncLogFilter) -> Result<Vec<SyncLogEntry>> {
+        self.cache.sync_log(limit, filter).await
     }
 }
 

@@ -1,10 +1,10 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Rect},
     style::{Modifier, Style},
     widgets::{
         Block, Padding, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
     },
-    Frame,
 };
 
 use crate::ui::context::RenderContext;
@@ -36,14 +36,18 @@ impl<'a> TableView<'a> {
             .style(base_style)
             .padding(Padding::horizontal(1));
 
-        let table = Table::new(self.rows.iter().cloned(), [
-            Constraint::Length(12),
-            Constraint::Fill(1),
-            Constraint::Length(14),
-        ])
-        .header(Row::new(["Key", "Summary", "Status"]).style(
-            Style::default().fg(self.context.colors().accent),
-        ))
+        let table = Table::new(
+            self.rows.iter().cloned(),
+            [
+                Constraint::Length(12),
+                Constraint::Fill(1),
+                Constraint::Length(14),
+            ],
+        )
+        .header(
+            Row::new(["Key", "Summary", "Status"])
+                .style(Style::default().fg(self.context.colors().accent)),
+        )
         .style(base_style)
         .block(block)
         .row_highlight_style(highlight_style);

@@ -1,0 +1,3 @@
+-- Rollback migration - not needed as database is in development
+-- SQLite doesn't support DROP COLUMN, so rollback would require table recreation
+-- For production use, keep this file empty or implement full table recreation

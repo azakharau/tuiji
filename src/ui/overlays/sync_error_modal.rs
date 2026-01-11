@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
-    style::{Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Paragraph, Widget, Wrap},
 };
@@ -36,11 +36,8 @@ impl Widget for SyncErrorModal<'_> {
         )
         .render_to_buffer(buf);
 
-        let sections = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)])
-            .split(inner);
-        let message = self
-            .error
-            .unwrap_or("Sync paused after repeated errors.");
+        let sections = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).split(inner);
+        let message = self.error.unwrap_or("Sync paused after repeated errors.");
         let text = Paragraph::new(message)
             .alignment(Alignment::Center)
             .wrap(Wrap::default());

@@ -135,7 +135,7 @@ fn field_value(state: &SettingsThemeFormState, idx: usize) -> &str {
         .form()
         .fields()
         .get(idx)
-        .map(|item| item.value.as_str())
+        .and_then(|item| item.value.as_text())
         .unwrap_or("")
 }
 

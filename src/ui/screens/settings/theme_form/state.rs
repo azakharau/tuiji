@@ -1,6 +1,6 @@
 use crate::{
     app::error::AppErrorState,
-    ui::components::form::{FormField, FormState},
+    ui::components::form::{CursorState, FieldValue, FormField, FormState},
     ui::theme::{ThemePalette, color_to_hex},
 };
 
@@ -13,16 +13,16 @@ pub struct SettingsThemeFormState {
 impl SettingsThemeFormState {
     pub fn new(palette: ThemePalette, existing_ids: Vec<String>) -> Self {
         let mut fields = vec![
-            FormField::new("Theme name", false),
-            FormField::new("Background", false),
-            FormField::new("Text", false),
-            FormField::new("Accent", false),
-            FormField::new("Selection", false),
-            FormField::new("Border", false),
-            FormField::new("Error", false),
-            FormField::new("Warning", false),
-            FormField::new("Info", false),
-            FormField::new("Success", false),
+            FormField::text("Theme name", false),
+            FormField::text("Background", false),
+            FormField::text("Text", false),
+            FormField::text("Accent", false),
+            FormField::text("Selection", false),
+            FormField::text("Border", false),
+            FormField::text("Error", false),
+            FormField::text("Warning", false),
+            FormField::text("Info", false),
+            FormField::text("Success", false),
         ];
         let defaults = vec![
             String::new(),
@@ -36,9 +36,11 @@ impl SettingsThemeFormState {
             color_to_hex(palette.info),
             color_to_hex(palette.success),
         ];
-        for (field, value) in fields.iter_mut().zip(defaults.into_iter()) {
-            field.value = value;
-            field.cursor_position = field.value.len();
+        for (field, value_str) in fields.iter_mut().zip(defaults.into_iter()) {
+            field.value = FieldValue::Text(value_str.clone());
+            if let CursorState::Text { position } = &mut field.cursor {
+                *position = value_str.len();
+            }
         }
         Self {
             form: FormState::new(fields),

@@ -34,7 +34,6 @@ pub fn is_board_required_screen(screen: ScreenType) -> bool {
             | ScreenType::CurrentSprint
             | ScreenType::MyIssues
             | ScreenType::SearchIssues
-            | ScreenType::NewIssue
     )
 }
 
@@ -161,14 +160,22 @@ impl<'a> NavigationController<'a> {
             }
             ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
             ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
+            ScreenState::SwitchMode(mode) => {
+                self.state.mode = mode;
+                Ok(ActionOutcome::Continue { render: true })
+            }
             ScreenState::Close => self.close_screen(),
             ScreenState::SaveProfile(_)
             | ScreenState::SaveProfileAndClose(_)
             | ScreenState::ApplyTheme(_)
             | ScreenState::SaveCustomTheme(_)
-            | ScreenState::SaveCustomThemeAndClose(_) => {
-                Ok(ActionOutcome::Continue { render: true })
-            }
+            | ScreenState::SaveCustomThemeAndClose(_)
+            | ScreenState::ResolveConflictLocal(_)
+            | ScreenState::ResolveConflictRemote(_)
+            | ScreenState::SyncNow
+            | ScreenState::SyncPause
+            | ScreenState::SyncRetry
+            | ScreenState::SyncResume => Ok(ActionOutcome::Continue { render: true }),
         }
     }
 

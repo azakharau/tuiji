@@ -116,51 +116,65 @@ impl Menu {
     pub fn height(&self) -> u16 {
         self.items.len() as u16
     }
+
+    pub fn render_with_style(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        style: Style,
+        highlight_style: Style,
+    ) {
+        render_menu(self, area, buf, style, highlight_style);
+    }
 }
 
 impl Widget for &Menu {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let max_hint_width = self
-            .items
-            .iter()
-            .filter_map(|item| item.hint.as_ref())
-            .map(|hint| hint.chars().count())
-            .max()
-            .unwrap_or(0) as u16;
-        let max_width = self
-            .items
-            .iter()
-            .map(|item| item_text_width(item, max_hint_width as usize))
-            .max()
-            .unwrap_or(0) as u16;
-        let padding = 2u16;
-        let button_width = max_width.saturating_add(padding * 2);
-
-        let columns = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min((area.width.saturating_sub(button_width)) / 2),
-                Constraint::Length(button_width.min(area.width)),
-                Constraint::Min(0),
-            ])
-            .split(area);
-
-        let list_items = self
-            .items
-            .iter()
-            .map(|item| ListItem::new(render_line(item, max_hint_width as usize)));
-
-        let mut state = ListState::default();
-        if !self.items.is_empty() {
-            state.select(Some(self.selected));
-        }
-
-        let list = List::new(list_items)
-            .style(self.style)
-            .highlight_style(self.highlight_style);
-
-        StatefulWidget::render(list, columns[1], buf, &mut state);
+        render_menu(self, area, buf, self.style, self.highlight_style);
     }
+}
+
+fn render_menu(menu: &Menu, area: Rect, buf: &mut Buffer, style: Style, highlight_style: Style) {
+    let max_hint_width = menu
+        .items
+        .iter()
+        .filter_map(|item| item.hint.as_ref())
+        .map(|hint| hint.chars().count())
+        .max()
+        .unwrap_or(0) as u16;
+    let max_width = menu
+        .items
+        .iter()
+        .map(|item| item_text_width(item, max_hint_width as usize))
+        .max()
+        .unwrap_or(0) as u16;
+    let padding = 2u16;
+    let button_width = max_width.saturating_add(padding * 2);
+
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min((area.width.saturating_sub(button_width)) / 2),
+            Constraint::Length(button_width.min(area.width)),
+            Constraint::Min(0),
+        ])
+        .split(area);
+
+    let list_items = menu
+        .items
+        .iter()
+        .map(|item| ListItem::new(render_line(item, max_hint_width as usize)));
+
+    let mut state = ListState::default();
+    if !menu.items.is_empty() {
+        state.select(Some(menu.selected));
+    }
+
+    let list = List::new(list_items)
+        .style(style)
+        .highlight_style(highlight_style);
+
+    StatefulWidget::render(list, columns[1], buf, &mut state);
 }
 
 fn render_line(item: &MenuItem, hint_width: usize) -> Line<'static> {

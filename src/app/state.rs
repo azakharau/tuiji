@@ -33,6 +33,8 @@ pub enum ScreenType {
     MyIssues,
     SearchIssues,
     NewIssue,
+    Conflicts,
+    SyncStatus,
     Settings,
     SettingsThemes,
     SettingsThemeForm,

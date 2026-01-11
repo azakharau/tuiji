@@ -8,11 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{
-        input::overlay::modal_dialog_area,
-        key_handlers::ActionHint,
-        state::Mode,
-    },
+    app::{input::overlay::modal_dialog_area, key_handlers::ActionHint, state::Mode},
     ui::{
         components::{
             bottom_bar::BottomBar,
@@ -54,9 +50,12 @@ impl SettingsView {
             Constraint::Length(1),
         ])
         .split(inner);
-        let list_area =
-            Layout::horizontal([Constraint::Length(15), Constraint::Fill(1), Constraint::Length(15)])
-                .split(layout[1])[1];
+        let list_area = Layout::horizontal([
+            Constraint::Length(15),
+            Constraint::Fill(1),
+            Constraint::Length(15),
+        ])
+        .split(layout[1])[1];
         let text = Paragraph::new(Text::from(state.message()))
             .alignment(Alignment::Center)
             .wrap(Wrap::default());

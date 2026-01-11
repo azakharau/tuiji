@@ -79,8 +79,7 @@ impl ThemeRegistry {
             "tokyonight"
         } else if theme_id.eq_ignore_ascii_case("solarized_dark") {
             "solarized_dark"
-        } else if theme_id.eq_ignore_ascii_case("default")
-            || theme_id.eq_ignore_ascii_case("dark")
+        } else if theme_id.eq_ignore_ascii_case("default") || theme_id.eq_ignore_ascii_case("dark")
         {
             "default"
         } else {

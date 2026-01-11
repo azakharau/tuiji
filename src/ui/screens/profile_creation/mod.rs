@@ -12,7 +12,10 @@ use crate::{
         state::Mode,
     },
     config::ProfileConfig,
-    ui::{context::RenderContext, screens::{CommandLineCommand, Screen, ScreenState}},
+    ui::{
+        context::RenderContext,
+        screens::{CommandLineCommand, Screen, ScreenState},
+    },
 };
 
 use controller::ProfileCreationController;

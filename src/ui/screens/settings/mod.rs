@@ -1,8 +1,8 @@
 mod controller;
 mod state;
-mod view;
 pub mod theme_form;
 pub mod themes;
+mod view;
 
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use crate::{
     },
     ui::{
         context::RenderContext,
-        screens::{Screen, ScreenState},
+        screens::{CommandLineCommand, Screen, ScreenState},
     },
 };
 
@@ -70,6 +70,14 @@ impl Screen for SettingsScreen {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+    }
+
+    fn handle_command_line(&mut self, cmd: CommandLineCommand) -> ScreenState {
+        match cmd {
+            CommandLineCommand::Write => ScreenState::Stay,
+            CommandLineCommand::WriteQuit => ScreenState::Close,
+            CommandLineCommand::Quit => ScreenState::Close,
+        }
     }
 }
 

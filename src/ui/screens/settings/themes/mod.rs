@@ -14,7 +14,7 @@ use crate::{
     config::CustomThemeConfig,
     ui::{
         context::RenderContext,
-        screens::{Screen, ScreenState},
+        screens::{CommandLineCommand, Screen, ScreenState},
     },
 };
 
@@ -57,6 +57,14 @@ impl Screen for SettingsThemesScreen {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+    }
+
+    fn handle_command_line(&mut self, cmd: CommandLineCommand) -> ScreenState {
+        match cmd {
+            CommandLineCommand::Write => ScreenState::Stay,
+            CommandLineCommand::WriteQuit => ScreenState::Close,
+            CommandLineCommand::Quit => ScreenState::Close,
+        }
     }
 }
 

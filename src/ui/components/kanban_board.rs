@@ -11,7 +11,10 @@ use ratatui::{
 use crate::{
     client::jira::BoardConfig,
     ui::{
-        components::{badges::{StatusBadge, StatusVariant}, issue_card::IssueCardComponent},
+        components::{
+            badges::{StatusBadge, StatusVariant},
+            issue_card::IssueCardComponent,
+        },
         context::RenderContext,
     },
 };
@@ -127,7 +130,9 @@ impl Widget for KanbanBoard<'_> {
                     issue.render_with_selection(area, buf, selected, self.context);
                 } else {
                     // Clear the area for empty rows to avoid ghost content.
-                    Paragraph::new(Text::raw("")).style(base_style).render(area, buf);
+                    Paragraph::new(Text::raw(""))
+                        .style(base_style)
+                        .render(area, buf);
                 }
             }
         }

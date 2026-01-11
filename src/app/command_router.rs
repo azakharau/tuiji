@@ -137,6 +137,33 @@ impl<'a> CommandRouter<'a> {
                 screen.handle_command(cmd)
             })
             .await?;
+        if let ScreenState::ResolveConflictLocal(key) = &state {
+            self.resolve_conflict(key.as_str(), false).await?;
+            return Ok(ScreenState::Refresh);
+        }
+        if let ScreenState::ResolveConflictRemote(key) = &state {
+            self.resolve_conflict(key.as_str(), true).await?;
+            return Ok(ScreenState::Refresh);
+        }
+        match state {
+            ScreenState::SyncNow => {
+                self.enqueue_sync_now();
+                return Ok(ScreenState::Refresh);
+            }
+            ScreenState::SyncPause => {
+                self.worker_controller.pause(None);
+                return Ok(ScreenState::Refresh);
+            }
+            ScreenState::SyncRetry => {
+                self.retry_last_sync();
+                return Ok(ScreenState::Refresh);
+            }
+            ScreenState::SyncResume => {
+                self.worker_controller.resume();
+                return Ok(ScreenState::Refresh);
+            }
+            _ => {}
+        }
         self.normalize_screen_state(state, true)
     }
 
@@ -207,9 +234,7 @@ impl<'a> CommandRouter<'a> {
                     .await?;
                 self.normalize_screen_state(state, true)
             }
-            CommandLineAction::QuitAll => {
-                Ok(ScreenState::Quit)
-            }
+            CommandLineAction::QuitAll => Ok(ScreenState::Quit),
             CommandLineAction::Sync(action) => {
                 self.handle_sync_action(action, SyncSource::Manual).await
             }
@@ -262,9 +287,23 @@ impl<'a> CommandRouter<'a> {
             SyncAction::Push => SyncJobKind::Push,
             SyncAction::SwitchOffline => return Ok(ScreenState::Refresh),
         };
-        self.worker_controller
-            .enqueue(SyncJob::new(kind, source));
+        self.worker_controller.enqueue(SyncJob::new(kind, source));
         Ok(ScreenState::Refresh)
+    }
+
+    fn enqueue_sync_now(&mut self) {
+        self.worker_controller
+            .enqueue(SyncJob::new(SyncJobKind::Pull, SyncSource::Manual));
+        self.worker_controller
+            .enqueue(SyncJob::new(SyncJobKind::Push, SyncSource::Manual));
+    }
+
+    fn retry_last_sync(&mut self) {
+        self.worker_controller.resume();
+        if let Some(mut job) = self.worker_controller.take_last_failed_job() {
+            job.next_attempt_at = None;
+            self.worker_controller.enqueue_front(job);
+        }
     }
 
     async fn forward_raw_input(&mut self, code: KeyCode) -> Result<ScreenState> {
@@ -641,14 +680,12 @@ impl<'a> CommandRouter<'a> {
             AppConfigState::Missing(_) => AppConfig::default(),
         };
         if crate::ui::theme::ThemeRegistry::is_builtin_id(theme.id.as_str()) {
-            return Err(eyre!("Theme id \"{}\" conflicts with built-in theme", theme.id));
+            return Err(eyre!(
+                "Theme id \"{}\" conflicts with built-in theme",
+                theme.id
+            ));
         }
-        if let Some(existing) = cfg
-            .ui
-            .custom_themes
-            .iter_mut()
-            .find(|t| t.id == theme.id)
-        {
+        if let Some(existing) = cfg.ui.custom_themes.iter_mut().find(|t| t.id == theme.id) {
             *existing = theme.clone();
         } else {
             cfg.ui.custom_themes.push(theme.clone());
@@ -664,6 +701,37 @@ impl<'a> CommandRouter<'a> {
             AppConfigState::Loaded(cfg) => cfg.ui.theme.as_str(),
             AppConfigState::Missing(_) => "default",
         }
+    }
+
+    async fn resolve_conflict(&mut self, key: &str, use_remote: bool) -> Result<()> {
+        let repo = self.repo.as_ref().ok_or_else(|| {
+            color_eyre::eyre::eyre!("Repository not initialized: cannot resolve conflicts")
+        })?;
+        if use_remote {
+            repo.resolve_conflict_use_remote(key).await?;
+        } else {
+            repo.resolve_conflict_use_local(key).await?;
+        }
+
+        let issues = repo.conflict_issues().await.unwrap_or_default();
+        let count = issues.len();
+        if self.screen_manager.conflicts_mut().is_none() {
+            let ctx = ScreenContext {
+                cfg_state: self.cfg_state,
+                app_state: self.state,
+                repo: repo.clone(),
+            };
+            let _ = self
+                .screen_manager
+                .active_screen_mut(ScreenType::Conflicts, ctx)
+                .await?;
+        }
+        if let Some(screen) = self.screen_manager.conflicts_mut() {
+            screen.set_issues(issues);
+        }
+        self.state.conflict_count = count;
+        self.screen_manager.invalidate(ScreenType::Home);
+        Ok(())
     }
 
     fn map_global_action(&mut self, cmd: &Command) -> Option<ScreenState> {
@@ -690,6 +758,7 @@ impl<'a> CommandRouter<'a> {
             ActionId::OpenNewIssue => Some(ScreenState::SwitchTo(ScreenType::NewIssue)),
             ActionId::OpenBoards => Some(ScreenState::SwitchTo(ScreenType::BoardSelection)),
             ActionId::OpenSettings => Some(ScreenState::SwitchTo(ScreenType::Settings)),
+            ActionId::OpenSyncStatus => Some(ScreenState::SwitchTo(ScreenType::SyncStatus)),
             _ => None,
         }
     }

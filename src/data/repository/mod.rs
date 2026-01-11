@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use color_eyre::Result;
 
 use crate::client::jira::BoardConfig;
-use crate::data::model::{IssueSummary, OutboxCommand, SyncState};
+use crate::data::model::{IssueSummary, OutboxCommand, SyncLogEntry, SyncLogFilter, SyncState};
 
 pub mod jira;
 pub mod local;
@@ -17,7 +17,7 @@ pub trait QueryRepository: Send + Sync {
 
 #[async_trait]
 pub trait CommandRepository: Send + Sync {
-    async fn upsert_issues(&self, _issues: Vec<IssueSummary>) -> Result<()> {
+    async fn upsert_issues(&self, _issues: &[IssueSummary]) -> Result<()> {
         Ok(())
     }
     async fn set_sync_state(&self, _state: SyncState) -> Result<()> {
@@ -42,4 +42,9 @@ pub trait AppRepository: Send + Sync {
     async fn set_selected_board(&self, board_id: u64, is_default: bool) -> Result<()>;
     async fn selected_board_ids(&self) -> Result<Vec<u64>>;
     async fn seed_mock_data_if_empty(&self) -> Result<Option<u64>>;
+    async fn conflict_issues(&self) -> Result<Vec<IssueSummary>>;
+    async fn conflict_count(&self) -> Result<usize>;
+    async fn resolve_conflict_use_local(&self, key: &str) -> Result<()>;
+    async fn resolve_conflict_use_remote(&self, key: &str) -> Result<()>;
+    async fn sync_log(&self, limit: usize, filter: SyncLogFilter) -> Result<Vec<SyncLogEntry>>;
 }

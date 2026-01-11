@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Style},
+    style::Style,
     widgets::{Paragraph, Widget, Wrap},
 };
 
@@ -28,9 +28,8 @@ impl Widget for BoardRequiredModal<'_> {
         let border_style = Style::default()
             .fg(self.context.colors().warning)
             .bg(self.context.colors().background);
-        let inner =
-            ModalFrame::new("Board Required", modal, border_style, self.context)
-                .render_to_buffer(buf);
+        let inner = ModalFrame::new("Board Required", modal, border_style, self.context)
+            .render_to_buffer(buf);
         let sections = Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(inner);
         let text = Paragraph::new("No board selected.\nConfigure a board to continue.")
             .alignment(Alignment::Center)

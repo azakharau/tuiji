@@ -5,6 +5,8 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEvent};
 use futures::StreamExt;
 use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle, time};
 
+use crate::app::screen_manager::ScreenContext;
+use crate::app::state::ScreenType;
 use crate::app::{
     ActionOutcome, App,
     event::{AppEvent, InputEvent, NotificationEvent, SystemEvent, UiEvent, WorkerEvent},
@@ -13,6 +15,7 @@ use crate::app::{
     notification::AppNotificationKind,
     worker_controller::{SyncJobEvent, SyncJobKind},
 };
+use crate::data::AppRepository;
 
 pub async fn run(app: &mut App) -> Result<()> {
     app.init_db().await?;
@@ -59,7 +62,7 @@ pub async fn run(app: &mut App) -> Result<()> {
                 render_requested |= app.notification_service.tick();
             }
             AppEvent::Worker(msg) => {
-                render_requested |= handle_worker_event(app, msg);
+                render_requested |= handle_worker_event(app, msg).await;
             }
             AppEvent::Ui(ui_event) => {
                 if let UiEvent::Error(err) = ui_event {
@@ -93,7 +96,7 @@ pub async fn run(app: &mut App) -> Result<()> {
     Ok(())
 }
 
-fn handle_worker_event(app: &mut App, msg: WorkerEvent) -> bool {
+async fn handle_worker_event(app: &mut App, msg: WorkerEvent) -> bool {
     match msg {
         WorkerEvent::JiraUpdated => true,
         WorkerEvent::Notification(message) => {
@@ -105,16 +108,53 @@ fn handle_worker_event(app: &mut App, msg: WorkerEvent) -> bool {
             true
         }
         WorkerEvent::SyncCompleted(job) => {
+            let kind = job.kind;
             app.worker_controller
                 .handle_worker_event(SyncJobEvent::Completed(job));
             app.screen_manager.invalidate(app.state.current_screen);
+            if kind == SyncJobKind::Pull {
+                if let Some(repo) = app.repo.clone() {
+                    if let Ok(count) = repo.conflict_count().await {
+                        let prev_count = app.state.conflict_count;
+                        if count > prev_count {
+                            app.notification_service.push_notification(
+                                format!("Conflicts detected ({count})"),
+                                crate::app::error::AppErrorLevel::Warning,
+                                AppNotificationKind::System,
+                            );
+                            if let Ok(issues) = repo.conflict_issues().await {
+                                let ctx = ScreenContext {
+                                    cfg_state: &app.cfg_state,
+                                    app_state: &app.state,
+                                    repo: repo.clone(),
+                                };
+                                if app
+                                    .screen_manager
+                                    .active_screen_mut(ScreenType::Conflicts, ctx)
+                                    .await
+                                    .is_ok()
+                                {
+                                    if let Some(screen) = app.screen_manager.conflicts_mut() {
+                                        screen.set_issues(issues);
+                                    }
+                                }
+                            }
+                            if app.state.current_screen != ScreenType::Conflicts {
+                                app.screen_stack.push(app.state.current_screen);
+                                app.state.current_screen = ScreenType::Conflicts;
+                            }
+                        }
+                        app.state.conflict_count = count;
+                        app.screen_manager
+                            .invalidate(crate::app::state::ScreenType::Home);
+                    }
+                }
+            }
             true
         }
         WorkerEvent::SyncFailed { job, error } => {
-            app.worker_controller.handle_worker_event(SyncJobEvent::Failed {
-                job,
-                error,
-            });
+            app.worker_controller
+                .handle_worker_event(SyncJobEvent::Failed { job, error });
             true
         }
     }
@@ -147,10 +187,11 @@ fn start_next_job(app: &mut App, tx: &UnboundedSender<AppEvent>) {
         return;
     };
     let Some(repo) = app.repo.clone() else {
-        app.worker_controller.handle_worker_event(SyncJobEvent::Failed {
-            job,
-            error: "Repository not initialized: cannot sync".to_string(),
-        });
+        app.worker_controller
+            .handle_worker_event(SyncJobEvent::Failed {
+                job,
+                error: "Repository not initialized: cannot sync".to_string(),
+            });
         return;
     };
 

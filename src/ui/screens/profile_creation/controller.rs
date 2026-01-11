@@ -147,7 +147,7 @@ fn field_value(state: &ProfileCreationState, idx: usize) -> &str {
         .form()
         .fields()
         .get(idx)
-        .map(|item| item.value.as_str())
+        .and_then(|item| item.value.as_text())
         .unwrap_or("")
 }
 

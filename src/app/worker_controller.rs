@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, time::Instant};
+use std::{
+    collections::VecDeque,
+    time::{Instant, SystemTime},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SyncJobKind {
@@ -18,7 +21,7 @@ pub enum SyncSource {
 pub struct SyncJob {
     pub kind: SyncJobKind,
     pub source: SyncSource,
-    pub created_at: Instant,
+    pub created_at: SystemTime,
     pub retries: u8,
     pub next_attempt_at: Option<Instant>,
 }
@@ -28,7 +31,7 @@ impl SyncJob {
         Self {
             kind,
             source,
-            created_at: Instant::now(),
+            created_at: SystemTime::now(),
             retries: 0,
             next_attempt_at: None,
         }
@@ -40,6 +43,18 @@ pub enum SyncJobEvent {
     Failed { job: SyncJob, error: String },
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct SyncStatusSnapshot {
+    pub queue_len: usize,
+    pub active: Option<SyncJob>,
+    pub queue_entries: Vec<SyncJob>,
+    pub last_pull: Option<SystemTime>,
+    pub last_push: Option<SystemTime>,
+    pub paused: bool,
+    pub error_count: u8,
+    pub last_error: Option<String>,
+}
+
 pub struct WorkerController {
     queue: VecDeque<SyncJob>,
     active: Option<SyncJob>,
@@ -47,6 +62,8 @@ pub struct WorkerController {
     paused: bool,
     last_error: Option<String>,
     last_failed_job: Option<SyncJob>,
+    last_pull: Option<SystemTime>,
+    last_push: Option<SystemTime>,
 }
 
 impl WorkerController {
@@ -58,6 +75,8 @@ impl WorkerController {
             paused: false,
             last_error: None,
             last_failed_job: None,
+            last_pull: None,
+            last_push: None,
         }
     }
 
@@ -93,11 +112,16 @@ impl WorkerController {
 
     pub fn handle_worker_event(&mut self, event: SyncJobEvent) {
         match event {
-            SyncJobEvent::Completed(_job) => {
+            SyncJobEvent::Completed(job) => {
                 self.active = None;
                 self.error_count = 0;
                 self.last_error = None;
                 self.last_failed_job = None;
+                let now = SystemTime::now();
+                match job.kind {
+                    SyncJobKind::Pull => self.last_pull = Some(now),
+                    SyncJobKind::Push => self.last_push = Some(now),
+                }
             }
             SyncJobEvent::Failed { mut job, error } => {
                 self.active = None;
@@ -145,6 +169,19 @@ impl WorkerController {
 
     pub fn last_error(&self) -> Option<&str> {
         self.last_error.as_deref()
+    }
+
+    pub fn snapshot(&self) -> SyncStatusSnapshot {
+        SyncStatusSnapshot {
+            queue_len: self.queue.len(),
+            active: self.active.clone(),
+            queue_entries: self.queue.iter().cloned().collect(),
+            last_pull: self.last_pull,
+            last_push: self.last_push,
+            paused: self.paused,
+            error_count: self.error_count,
+            last_error: self.last_error.clone(),
+        }
     }
 
     pub fn clear_last_error(&mut self) {

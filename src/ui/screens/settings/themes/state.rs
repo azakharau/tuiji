@@ -34,7 +34,9 @@ impl SettingsThemesState {
         entries.push(ThemeEntry::Create);
         let selected_index = entries
             .iter()
-            .position(|entry| matches!(entry, ThemeEntry::Theme { id, .. } if id == &active_theme_id))
+            .position(
+                |entry| matches!(entry, ThemeEntry::Theme { id, .. } if id == &active_theme_id),
+            )
             .unwrap_or(0);
         let mut state = Self {
             entries,

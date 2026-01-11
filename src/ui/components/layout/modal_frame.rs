@@ -1,10 +1,10 @@
 use ratatui::{
+    Frame,
     buffer::Buffer,
     layout::Rect,
     style::Style,
     text::Line,
     widgets::{Block, Borders, Clear, Widget},
-    Frame,
 };
 
 use crate::ui::context::RenderContext;

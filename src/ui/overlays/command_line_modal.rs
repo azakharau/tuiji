@@ -60,8 +60,8 @@ impl<'a> CommandLineInput<'a> {
 
 impl Widget for CommandLineInput<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let paragraph = Paragraph::new(self.buffer)
-            .style(Style::default().fg(self.color).bg(self.background));
+        let paragraph =
+            Paragraph::new(self.buffer).style(Style::default().fg(self.color).bg(self.background));
         paragraph.render(area, buf);
 
         if area.width == 0 || area.height == 0 {

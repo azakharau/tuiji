@@ -42,6 +42,7 @@ pub struct AppState {
     pub current_screen: state::ScreenType,
     pub selected_board_id: Option<u64>,
     pub profile_editor: Option<ProfileEditorIntent>,
+    pub conflict_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,6 +186,7 @@ impl App {
             mode: self.state.mode,
             sync_paused: self.worker_controller.is_paused(),
             sync_error: self.worker_controller.last_error(),
+            sync_status: self.worker_controller.snapshot(),
         };
         AppRenderer::prepare(&mut self.screen_manager, &render_state).await?;
         AppRenderer::draw(&mut self.screen_manager, &render_state, &mut self.terminal)?;
@@ -214,6 +216,7 @@ impl App {
             selected = repo.seed_mock_data_if_empty().await?;
         }
         self.state.selected_board_id = selected;
+        self.state.conflict_count = repo.conflict_count().await.unwrap_or(0);
         self.repo = Some(Arc::new(repo));
         Ok(())
     }
