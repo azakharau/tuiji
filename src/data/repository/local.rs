@@ -225,6 +225,11 @@ impl RepositoryHub {
             return Err(eyre!("Sync push requires online mode"));
         };
 
+        // Cleanup old completed outbox entries (older than 7 days)
+        if let Err(err) = self.cache.cleanup_old_outbox(7).await {
+            eprintln!("Failed to cleanup old outbox entries: {}", err);
+        }
+
         // Fetch pending outbox items
         let items = self
             .cache

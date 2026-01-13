@@ -1156,6 +1156,21 @@ impl SqliteRepository {
         Ok(())
     }
 
+    /// Cleanup old completed outbox entries older than specified days
+    pub async fn cleanup_old_outbox(&self, days: i64) -> Result<()> {
+        sqlx::query(
+            r#"
+            DELETE FROM outbox 
+            WHERE status = 'done' 
+            AND updated_at < strftime('%s','now') - ?
+            "#,
+        )
+        .bind(days * 86400)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn push_outbox(&self) -> Result<()> {
         let items = self.fetch_pending_outbox(OUTBOX_BATCH_SIZE).await?;
         for item in items {
