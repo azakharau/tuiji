@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
+use gouqi::issues::{CreateCustomIssue, CreateResponse, EditIssue};
 use gouqi::{Board, Credentials, Issue, Project, SearchOptions, Sprint, r#async::Jira};
 use serde::Deserialize;
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub type Issues = Vec<Issue>;
 
@@ -243,5 +245,25 @@ impl JiraClient {
                 .collect(),
             estimation: estim,
         })
+    }
+
+    pub async fn create_issue(
+        &self,
+        fields: BTreeMap<String, Value>,
+    ) -> gouqi::Result<CreateResponse> {
+        let custom_issue = CreateCustomIssue { fields };
+        self.client.post("api", "/issue", custom_issue).await
+    }
+
+    pub async fn update_issue<K>(
+        &self,
+        key: K,
+        fields: BTreeMap<String, Value>,
+    ) -> gouqi::Result<()>
+    where
+        K: Into<String>,
+    {
+        let edit = EditIssue { fields };
+        self.client.issues().update(key, edit).await
     }
 }

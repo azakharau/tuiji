@@ -16,8 +16,8 @@ use crate::{
     },
 };
 
-const OUTBOX_BATCH_SIZE: i64 = 20;
-const MAX_OUTBOX_ATTEMPTS: i64 = 5;
+pub const OUTBOX_BATCH_SIZE: i64 = 20;
+pub const MAX_OUTBOX_ATTEMPTS: i64 = 5;
 
 #[derive(Debug, Clone)]
 pub struct SqliteRepositoryConfig {
@@ -706,6 +706,102 @@ impl SqliteRepository {
         Ok(())
     }
 
+    /// Update an issue's key (e.g., from TEMP-xxx to PROJ-123)
+    /// This updates all related tables: issues, issue_comments, issue_history, and outbox
+    pub async fn update_issue_key(&self, old_key: &str, new_key: &str) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        let profile_id = self.profile_id();
+
+        // First, verify the issue exists (will fail if not found)
+        let _issue = sqlx::query(
+            r#"
+            SELECT * FROM issues 
+            WHERE key = ? AND profile_id = ?
+            "#,
+        )
+        .bind(old_key)
+        .bind(&profile_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // Insert the issue with the new key (all columns except key)
+        sqlx::query(
+            r#"
+            INSERT INTO issues (
+                key, profile_id, summary, status, issue_type, priority, assignee, epic,
+                story_points, sprint_id, project_key, updated_at, synced_at, raw_json,
+                dirty, conflict, remote_snapshot
+            )
+            SELECT ?, profile_id, summary, status, issue_type, priority, assignee, epic,
+                   story_points, sprint_id, project_key, updated_at, synced_at, raw_json,
+                   dirty, conflict, remote_snapshot
+            FROM issues
+            WHERE key = ? AND profile_id = ?
+            "#,
+        )
+        .bind(new_key)
+        .bind(old_key)
+        .bind(&profile_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Update issue_comments to reference new key
+        sqlx::query(
+            r#"
+            UPDATE issue_comments 
+            SET issue_key = ? 
+            WHERE issue_key = ? AND profile_id = ?
+            "#,
+        )
+        .bind(new_key)
+        .bind(old_key)
+        .bind(&profile_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Update issue_history to reference new key
+        sqlx::query(
+            r#"
+            UPDATE issue_history 
+            SET issue_key = ? 
+            WHERE issue_key = ? AND profile_id = ?
+            "#,
+        )
+        .bind(new_key)
+        .bind(old_key)
+        .bind(&profile_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Update outbox entity_id for this issue
+        sqlx::query(
+            r#"
+            UPDATE outbox 
+            SET entity_id = ? 
+            WHERE entity_type = 'issue' AND entity_id = ?
+            "#,
+        )
+        .bind(new_key)
+        .bind(old_key)
+        .execute(&mut *tx)
+        .await?;
+
+        // Delete the old issue entry (cascades to related tables via foreign keys)
+        sqlx::query(
+            r#"
+            DELETE FROM issues 
+            WHERE key = ? AND profile_id = ?
+            "#,
+        )
+        .bind(old_key)
+        .bind(&profile_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn upsert_board(
         &self,
         board_id: u64,
@@ -832,6 +928,22 @@ impl SqliteRepository {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn get_board_id_by_sprint(&self, sprint_id: i64) -> Result<Option<u64>> {
+        let result = sqlx::query(
+            r#"
+            SELECT board_id
+            FROM sprints
+            WHERE id = ? AND profile_id = ?
+            "#,
+        )
+        .bind(sprint_id)
+        .bind(self.profile_id())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.map(|row| row.get::<i64, _>("board_id") as u64))
     }
 
     pub async fn selected_board_ids(&self) -> Result<Vec<u64>> {

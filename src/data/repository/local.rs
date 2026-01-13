@@ -213,7 +213,7 @@ impl RepositoryHub {
     }
 
     pub async fn sync_push(&self) -> Result<()> {
-        let Some(_remote) = &self.remote else {
+        let Some(remote) = &self.remote else {
             self.cache
                 .log_sync_event(
                     "push",
@@ -224,26 +224,122 @@ impl RepositoryHub {
                 .await?;
             return Err(eyre!("Sync push requires online mode"));
         };
-        let result = self.cache.push_outbox().await;
-        match result {
-            Ok(()) => {
+
+        // Fetch pending outbox items
+        let items = self
+            .cache
+            .fetch_pending_outbox(super::sqlite::OUTBOX_BATCH_SIZE)
+            .await?;
+
+        for item in items {
+            // Check max attempts
+            if item.attempts >= super::sqlite::MAX_OUTBOX_ATTEMPTS {
                 self.cache
-                    .log_sync_event("push", "success", None, Some(self.profile_id.as_str()))
+                    .mark_outbox_failed(&item.id, "max attempts reached")
                     .await?;
-                Ok(())
+                continue;
             }
-            Err(err) => {
+
+            // Check for conflicts
+            let conflict = match item.entity_type.as_str() {
+                "issue" => self.cache.issue_conflict(&item.entity_id).await?,
+                "comment" => self.cache.comment_conflict(&item.entity_id).await?,
+                _ => false,
+            };
+            if conflict {
                 self.cache
-                    .log_sync_event(
-                        "push",
-                        "error",
-                        Some(&err.to_string()),
-                        Some(self.profile_id.as_str()),
-                    )
+                    .mark_outbox_conflict(&item.id, Some("conflict"))
                     .await?;
-                Err(err)
+                continue;
+            }
+
+            self.cache.mark_outbox_processing(&item.id).await?;
+
+            // Push to Jira based on entity type
+            let push_result = match item.entity_type.as_str() {
+                "issue" => {
+                    self.push_issue_to_jira(&item.entity_id, &item.change_set, remote)
+                        .await
+                }
+                "comment" => {
+                    // TODO: implement comment push
+                    self.cache.clear_comment_dirty(&item.entity_id).await
+                }
+                _ => Ok(()),
+            };
+
+            match push_result {
+                Ok(()) => {
+                    self.cache.mark_outbox_done(&item.id).await?;
+                }
+                Err(err) => {
+                    self.cache
+                        .mark_outbox_failed(&item.id, &err.to_string())
+                        .await?;
+                }
             }
         }
+
+        Ok(())
+    }
+
+    async fn push_issue_to_jira(
+        &self,
+        issue_key: &str,
+        change_set: &str,
+        remote: &JiraRepository,
+    ) -> Result<()> {
+        // Parse the change_set to determine action
+        let change: serde_json::Value = serde_json::from_str(change_set)?;
+        let action = change
+            .get("action")
+            .and_then(|a| a.as_str())
+            .unwrap_or("update");
+
+        // Fetch the issue from cache
+        let issue = self
+            .cache
+            .fetch_issue(issue_key)
+            .await?
+            .ok_or_else(|| eyre!("Issue {} not found in cache", issue_key))?;
+
+        // Get estimation field ID from board config if available
+        let estimation_field_id = if let Some(sprint_id) = issue.sprint_id {
+            if let Some(board_id) = self.cache.get_board_id_by_sprint(sprint_id).await? {
+                self.cache
+                    .board_config(board_id)
+                    .await
+                    .ok()
+                    .map(|config| config.estimation.field_id().to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if action == "create" && issue_key.starts_with("TEMP-") {
+            // Create new issue in Jira
+            let new_key = remote
+                .create_issue(&issue, estimation_field_id.as_deref())
+                .await?;
+
+            // Update key in database (TEMP-xxx -> PROJ-123)
+            self.cache.update_issue_key(issue_key, &new_key).await?;
+
+            // Clear dirty flag
+            self.cache.clear_issue_dirty(&new_key).await?;
+        } else {
+            // Update existing issue in Jira
+            remote
+                .update_issue(&issue, estimation_field_id.as_deref())
+                .await?;
+
+            // Clear dirty flag
+            self.cache.clear_issue_dirty(issue_key).await?;
+        }
+
+        Ok(())
     }
 }
 

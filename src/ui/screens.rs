@@ -47,7 +47,7 @@ pub enum CommandLineCommand {
     Quit,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum ScreenState {
     Stay,
     Refresh,
@@ -66,4 +66,32 @@ pub enum ScreenState {
     SyncRetry,
     SyncResume,
     Close,
+    CreateIssue(Box<crate::data::IssueSummary>),
+}
+
+impl PartialEq for ScreenState {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Stay, Self::Stay) => true,
+            (Self::Refresh, Self::Refresh) => true,
+            (Self::SwitchTo(a), Self::SwitchTo(b)) => a == b,
+            (Self::SwitchMode(a), Self::SwitchMode(b)) => a == b,
+            (Self::Quit, Self::Quit) => true,
+            (Self::SaveProfile(a), Self::SaveProfile(b)) => a == b,
+            (Self::SaveProfileAndClose(a), Self::SaveProfileAndClose(b)) => a == b,
+            (Self::ApplyTheme(a), Self::ApplyTheme(b)) => a == b,
+            (Self::SaveCustomTheme(a), Self::SaveCustomTheme(b)) => a == b,
+            (Self::SaveCustomThemeAndClose(a), Self::SaveCustomThemeAndClose(b)) => a == b,
+            (Self::ResolveConflictLocal(a), Self::ResolveConflictLocal(b)) => a == b,
+            (Self::ResolveConflictRemote(a), Self::ResolveConflictRemote(b)) => a == b,
+            (Self::SyncNow, Self::SyncNow) => true,
+            (Self::SyncPause, Self::SyncPause) => true,
+            (Self::SyncRetry, Self::SyncRetry) => true,
+            (Self::SyncResume, Self::SyncResume) => true,
+            (Self::Close, Self::Close) => true,
+            // CreateIssue variants are never equal (contains non-comparable data)
+            (Self::CreateIssue(_), Self::CreateIssue(_)) => false,
+            _ => false,
+        }
+    }
 }

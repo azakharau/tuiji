@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use color_eyre::Result;
+use serde_json::Value;
 
 use crate::{
     client::jira::{BoardConfig, JiraClient},
@@ -28,6 +30,28 @@ impl JiraRepository {
 
     pub async fn list_boards(&self) -> Result<Vec<gouqi::Board>> {
         Ok(self.client.get_boards().await?)
+    }
+
+    pub async fn create_issue(
+        &self,
+        issue: &IssueSummary,
+        estimation_field_id: Option<&str>,
+    ) -> Result<String> {
+        // Convert IssueSummary to BTreeMap of fields for Jira API
+        let fields = issue_summary_to_create_fields(issue, estimation_field_id)?;
+        let response = self.client.create_issue(fields).await?;
+        Ok(response.key)
+    }
+
+    pub async fn update_issue(
+        &self,
+        issue: &IssueSummary,
+        estimation_field_id: Option<&str>,
+    ) -> Result<()> {
+        // Convert IssueSummary to gouqi EditIssue format (BTreeMap of fields)
+        let fields = issue_summary_to_fields(issue, estimation_field_id)?;
+        self.client.update_issue(issue.key.as_str(), fields).await?;
+        Ok(())
     }
 }
 
@@ -209,4 +233,141 @@ fn extract_custom_fields(issue: &gouqi::Issue) -> Option<String> {
     } else {
         serde_json::to_string(&custom).ok()
     }
+}
+
+// Convert IssueSummary to BTreeMap of fields for create
+fn issue_summary_to_create_fields(
+    issue: &IssueSummary,
+    estimation_field_id: Option<&str>,
+) -> Result<BTreeMap<String, Value>> {
+    let mut fields = BTreeMap::new();
+
+    // Extract project key from issue key or use provided project_key
+    let project_key = issue
+        .project_key
+        .clone()
+        .unwrap_or_else(|| issue.key.split('-').next().unwrap_or("UNKNOWN").to_string());
+
+    // Required fields for issue creation
+    fields.insert(
+        "project".to_string(),
+        serde_json::json!({ "key": project_key }),
+    );
+    fields.insert("summary".to_string(), Value::String(issue.summary.clone()));
+    fields.insert(
+        "issuetype".to_string(),
+        serde_json::json!({ "name": issue.issue_type }),
+    );
+
+    // Priority
+    fields.insert(
+        "priority".to_string(),
+        serde_json::json!({ "name": issue.priority }),
+    );
+
+    // Assignee (skip if Unassigned)
+    if issue.assignee != "Unassigned" {
+        fields.insert(
+            "assignee".to_string(),
+            serde_json::json!({ "name": issue.assignee }),
+        );
+    }
+
+    // Optional fields
+    if let Some(ref desc) = issue.description {
+        fields.insert("description".to_string(), Value::String(desc.clone()));
+    }
+
+    if let Some(ref reporter) = issue.reporter {
+        fields.insert(
+            "reporter".to_string(),
+            serde_json::json!({ "name": reporter }),
+        );
+    }
+
+    if !issue.labels.is_empty() {
+        fields.insert("labels".to_string(), serde_json::json!(issue.labels));
+    }
+
+    if let Some(ref env) = issue.environment {
+        fields.insert("environment".to_string(), Value::String(env.clone()));
+    }
+
+    // Story points (custom field - use provided field_id or default)
+    if let Some(story_points) = issue.story_points {
+        let field_id = estimation_field_id.unwrap_or("customfield_10002");
+        fields.insert(
+            field_id.to_string(),
+            Value::Number(serde_json::Number::from_f64(story_points).unwrap()),
+        );
+    }
+
+    // Parent issue (for subtasks)
+    if let Some(ref parent) = issue.parent_key {
+        fields.insert("parent".to_string(), serde_json::json!({ "key": parent }));
+    }
+
+    // Merge any additional custom fields from the issue
+    if let Some(ref custom_json) = issue.custom_fields {
+        if let Ok(custom_map) = serde_json::from_str::<BTreeMap<String, Value>>(custom_json) {
+            for (key, value) in custom_map {
+                if !fields.contains_key(&key) {
+                    fields.insert(key, value);
+                }
+            }
+        }
+    }
+
+    Ok(fields)
+}
+
+// Convert IssueSummary to BTreeMap of fields for update
+fn issue_summary_to_fields(
+    issue: &IssueSummary,
+    estimation_field_id: Option<&str>,
+) -> Result<BTreeMap<String, Value>> {
+    let mut fields = BTreeMap::new();
+
+    // Basic fields
+    fields.insert("summary".to_string(), Value::String(issue.summary.clone()));
+
+    if let Some(ref desc) = issue.description {
+        fields.insert("description".to_string(), Value::String(desc.clone()));
+    }
+
+    fields.insert(
+        "issuetype".to_string(),
+        serde_json::json!({ "name": issue.issue_type }),
+    );
+    fields.insert(
+        "priority".to_string(),
+        serde_json::json!({ "name": issue.priority }),
+    );
+
+    // Assignee
+    if issue.assignee != "Unassigned" {
+        fields.insert(
+            "assignee".to_string(),
+            serde_json::json!({ "name": issue.assignee }),
+        );
+    }
+
+    // Optional fields
+    if let Some(ref env) = issue.environment {
+        fields.insert("environment".to_string(), Value::String(env.clone()));
+    }
+
+    if let Some(story_points) = issue.story_points {
+        let field_id = estimation_field_id.unwrap_or("customfield_10002");
+        fields.insert(
+            field_id.to_string(),
+            Value::Number(serde_json::Number::from_f64(story_points).unwrap()),
+        );
+    }
+
+    if !issue.labels.is_empty() {
+        fields.insert("labels".to_string(), serde_json::json!(issue.labels));
+    }
+
+    Ok(fields)
 }

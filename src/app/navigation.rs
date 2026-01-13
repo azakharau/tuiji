@@ -172,6 +172,7 @@ impl<'a> NavigationController<'a> {
             | ScreenState::SaveCustomThemeAndClose(_)
             | ScreenState::ResolveConflictLocal(_)
             | ScreenState::ResolveConflictRemote(_)
+            | ScreenState::CreateIssue(_)
             | ScreenState::SyncNow
             | ScreenState::SyncPause
             | ScreenState::SyncRetry

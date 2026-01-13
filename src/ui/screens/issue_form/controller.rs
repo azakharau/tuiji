@@ -4,6 +4,7 @@ use crate::{
         key_handlers::{ActionId, Command, InsertMode},
         state::Mode,
     },
+    data::IssueSummary,
     ui::components::form::{CursorState, FieldType, FieldValue, FormState},
     ui::screens::{CommandLineCommand, ScreenState},
 };
@@ -176,9 +177,9 @@ impl IssueFormController {
         match cmd {
             CommandLineCommand::Write => match validate_form(state) {
                 Ok(_) => {
-                    // TODO: Save issue to database
-                    // For now, just show success and close
-                    ScreenState::Close
+                    // Create issue from form data
+                    let issue = form_to_issue(state);
+                    ScreenState::CreateIssue(Box::new(issue))
                 }
                 Err(err) => {
                     state.set_error(AppErrorState::new("Validation Error", err));
@@ -187,8 +188,9 @@ impl IssueFormController {
             },
             CommandLineCommand::WriteQuit => match validate_form(state) {
                 Ok(_) => {
-                    // TODO: Save issue to database
-                    ScreenState::Close
+                    // Create issue from form data
+                    let issue = form_to_issue(state);
+                    ScreenState::CreateIssue(Box::new(issue))
                 }
                 Err(err) => {
                     state.set_error(AppErrorState::new("Validation Error", err));
@@ -325,5 +327,93 @@ fn handle_date_input(form: &mut FormState, digit: char) {
                 *position = formatted.len();
             }
         }
+    }
+}
+
+/// Convert form data to IssueSummary for saving
+fn form_to_issue(state: &IssueFormState) -> IssueSummary {
+    let form = state.form();
+    let fields = form.fields();
+
+    // Generate temporary key for offline-created issues
+    // Format: TEMP-{timestamp}-{random}
+    let temp_key = format!(
+        "TEMP-{}-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        uuid::Uuid::new_v4().to_string()[..8].to_string()
+    );
+
+    // Extract values from form fields (indices match state.rs field order)
+    let summary = fields[0].value.as_text().unwrap_or("").to_string();
+    let description = fields[1].value.as_text().map(|s| s.to_string());
+    let issue_type = fields[2].value.as_single().unwrap_or("story").to_string();
+    let status = fields[3].value.as_single().unwrap_or("todo").to_string();
+    let priority = fields[4].value.as_single().unwrap_or("medium").to_string();
+    let assignee_raw = fields[5].value.as_single().unwrap_or("unassigned");
+    let assignee = if assignee_raw == "unassigned" {
+        "Unassigned".to_string()
+    } else {
+        assignee_raw.to_string()
+    };
+    let reporter = fields[6].value.as_single().map(|s| s.to_string());
+    let labels = fields[7].value.as_multiple().unwrap_or(&[]).to_vec();
+    // Components are at index 8 but we don't have a field for them in IssueSummary
+    let story_points_str = fields[9].value.as_text().unwrap_or("");
+    let story_points = story_points_str.parse::<f64>().ok();
+    let sprint_str = fields[10].value.as_single().unwrap_or("none");
+    let sprint_id = if sprint_str != "none" {
+        // Extract sprint number from "sprint-23" format
+        sprint_str
+            .strip_prefix("sprint-")
+            .and_then(|s| s.parse::<i64>().ok())
+    } else {
+        None
+    };
+    let epic = fields[11].value.as_single().and_then(|e| {
+        if e != "none" {
+            Some(e.to_string())
+        } else {
+            None
+        }
+    });
+    let environment = fields[12].value.as_text().map(|s| s.to_string());
+    let _due_date_str = fields[13].value.as_text().unwrap_or("");
+    // TODO: Parse due date from YYYY-MM-DD format
+
+    let now = std::time::SystemTime::now();
+
+    IssueSummary {
+        key: temp_key,
+        summary,
+        epic,
+        status,
+        issue_type,
+        assignee,
+        priority,
+        story_points,
+        project_key: None, // Will be set based on selected board
+        sprint_id,
+        updated_at: Some(now),
+        comments: Vec::new(),
+        dirty: true, // Mark as dirty since it's locally created
+        conflict: false,
+        remote_snapshot: None,
+        description,
+        reporter,
+        creator: None,
+        created_at: Some(now),
+        resolution_date: None,
+        resolution: None,
+        labels,
+        fix_versions: Vec::new(),
+        parent_key: None,
+        environment,
+        time_estimate: None,
+        time_spent: None,
+        time_remaining: None,
+        custom_fields: None,
     }
 }

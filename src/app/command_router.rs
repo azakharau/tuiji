@@ -23,7 +23,7 @@ use crate::{
         worker_controller::{SyncJob, SyncJobKind, SyncSource, WorkerController},
     },
     config::{AppConfig, AppConfigState, ProfileConfig, SyncMode},
-    data::{AppRepository, RepositoryHub},
+    data::{AppRepository, RepositoryHub, repository::CommandRepository},
     ui::screens::{CommandLineCommand, ScreenState},
 };
 
@@ -602,6 +602,18 @@ impl<'a> CommandRouter<'a> {
                     Ok(ScreenState::Refresh)
                 }
             }
+            ScreenState::CreateIssue(issue) => {
+                if let Err(err) = self.save_issue(*issue) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                    return Ok(ScreenState::Refresh);
+                }
+                if close_on_save {
+                    Ok(ScreenState::Close)
+                } else {
+                    Ok(ScreenState::Refresh)
+                }
+            }
             other => Ok(other),
         }
     }
@@ -701,6 +713,52 @@ impl<'a> CommandRouter<'a> {
             AppConfigState::Loaded(cfg) => cfg.ui.theme.as_str(),
             AppConfigState::Missing(_) => "default",
         }
+    }
+
+    fn save_issue(&mut self, issue: crate::data::IssueSummary) -> Result<()> {
+        let repo = self.repo.as_ref().ok_or_else(|| {
+            color_eyre::eyre::eyre!("Repository not initialized: cannot save issue")
+        })?;
+
+        // Save to database using async block
+        let issue_key = issue.key.clone();
+        let is_temp_key = issue_key.starts_with("TEMP-");
+
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                // First, save the issue to the cache
+                repo.cache().upsert_issues(&[issue]).await?;
+
+                // Then, enqueue an outbox command to sync to Jira
+                let change_set = serde_json::json!({
+                    "action": if is_temp_key { "create" } else { "update" },
+                    "key": issue_key
+                })
+                .to_string();
+
+                repo.cache()
+                    .enqueue_outbox(crate::data::model::OutboxCommand::issue(
+                        issue_key.clone(),
+                        change_set,
+                    ))
+                    .await
+            })
+        })?;
+
+        self.notification_service.push_notification(
+            format!("Issue {} created successfully", issue_key),
+            AppErrorLevel::Info,
+            AppNotificationKind::System,
+        );
+
+        // Invalidate relevant screens to show the new issue
+        self.screen_manager.invalidate_many(&[
+            ScreenType::MyIssues,
+            ScreenType::SearchIssues,
+            ScreenType::CurrentSprint,
+        ]);
+
+        Ok(())
     }
 
     async fn resolve_conflict(&mut self, key: &str, use_remote: bool) -> Result<()> {
