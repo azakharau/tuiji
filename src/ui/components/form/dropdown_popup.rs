@@ -32,7 +32,7 @@ impl<'a> DropdownPopup<'a> {
     /// Calculate popup position directly below the field
     pub fn calculate_area(field_rect: Rect, frame_area: Rect, options_count: usize) -> Rect {
         let popup_height = (options_count as u16 + 2).min(15); // Max 15 lines (with borders)
-        let popup_width = field_rect.width.max(40).min(60);
+        let popup_width = field_rect.width.clamp(40, 60);
 
         // Align with field horizontally
         let popup_x = field_rect.x;

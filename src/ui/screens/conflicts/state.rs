@@ -128,7 +128,7 @@ impl ConflictsState {
             .as_ref()
             .and_then(|raw| serde_json::from_str::<IssueSnapshot>(raw).ok())
         {
-            self.issue_diffs = diff_issue(&issue, &snapshot);
+            self.issue_diffs = diff_issue(issue, &snapshot);
         }
 
         for comment in &issue.comments {

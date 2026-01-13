@@ -76,15 +76,12 @@ impl FormField {
 
     /// Set initial value for text fields
     pub fn with_value(mut self, value: impl Into<String>) -> Self {
-        match &mut self.value {
-            FieldValue::Text(s) => {
-                *s = value.into();
-                // Update cursor position to end of value
-                if let CursorState::Text { position } = &mut self.cursor {
-                    *position = s.len();
-                }
+        if let FieldValue::Text(s) = &mut self.value {
+            *s = value.into();
+            // Update cursor position to end of value
+            if let CursorState::Text { position } = &mut self.cursor {
+                *position = s.len();
             }
-            _ => {}
         }
         self
     }
@@ -92,9 +89,8 @@ impl FormField {
     /// Set initial selected value for select fields
     pub fn with_selected(mut self, value: impl Into<String>) -> Self {
         let value_str = value.into();
-        match &mut self.value {
-            FieldValue::Single(opt) => *opt = Some(value_str),
-            _ => {}
+        if let FieldValue::Single(opt) = &mut self.value {
+            *opt = Some(value_str);
         }
         self
     }

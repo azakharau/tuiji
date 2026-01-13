@@ -134,44 +134,42 @@ impl FormState {
     }
 
     pub fn move_cursor_up(&mut self, repeat: usize) {
-        if let Some(field) = self.selected_field_mut() {
-            if let (
+        if let Some(field) = self.selected_field_mut()
+            && let (
                 FieldType::TextArea { .. },
                 CursorState::TextArea { row, col },
                 FieldValue::Text(s),
             ) = (&field.field_type, &mut field.cursor, &field.value)
-            {
-                let lines: Vec<&str> = s.lines().collect();
-                if lines.is_empty() {
-                    return;
-                }
-
-                *row = row.saturating_sub(repeat);
-                // Clamp column to line length
-                let current_line = lines.get(*row).unwrap_or(&"");
-                *col = (*col).min(current_line.len());
+        {
+            let lines: Vec<&str> = s.lines().collect();
+            if lines.is_empty() {
+                return;
             }
+
+            *row = row.saturating_sub(repeat);
+            // Clamp column to line length
+            let current_line = lines.get(*row).unwrap_or(&"");
+            *col = (*col).min(current_line.len());
         }
     }
 
     pub fn move_cursor_down(&mut self, repeat: usize) {
-        if let Some(field) = self.selected_field_mut() {
-            if let (
+        if let Some(field) = self.selected_field_mut()
+            && let (
                 FieldType::TextArea { .. },
                 CursorState::TextArea { row, col },
                 FieldValue::Text(s),
             ) = (&field.field_type, &mut field.cursor, &field.value)
-            {
-                let lines: Vec<&str> = s.lines().collect();
-                if lines.is_empty() {
-                    return;
-                }
-
-                *row = (*row + repeat).min(lines.len().saturating_sub(1));
-                // Clamp column to line length
-                let current_line = lines.get(*row).unwrap_or(&"");
-                *col = (*col).min(current_line.len());
+        {
+            let lines: Vec<&str> = s.lines().collect();
+            if lines.is_empty() {
+                return;
             }
+
+            *row = (*row + repeat).min(lines.len().saturating_sub(1));
+            // Clamp column to line length
+            let current_line = lines.get(*row).unwrap_or(&"");
+            *col = (*col).min(current_line.len());
         }
     }
 
@@ -205,37 +203,34 @@ impl FormState {
     }
 
     pub fn move_word_right(&mut self, repeat: usize) {
-        if let Some(field) = self.selected_field_mut() {
-            if let (CursorState::Text { position }, FieldValue::Text(value)) =
+        if let Some(field) = self.selected_field_mut()
+            && let (CursorState::Text { position }, FieldValue::Text(value)) =
                 (&mut field.cursor, &field.value)
-            {
-                for _ in 0..repeat {
-                    *position = word_forward(value, *position);
-                }
+        {
+            for _ in 0..repeat {
+                *position = word_forward(value, *position);
             }
         }
     }
 
     pub fn move_word_end(&mut self, repeat: usize) {
-        if let Some(field) = self.selected_field_mut() {
-            if let (CursorState::Text { position }, FieldValue::Text(value)) =
+        if let Some(field) = self.selected_field_mut()
+            && let (CursorState::Text { position }, FieldValue::Text(value)) =
                 (&mut field.cursor, &field.value)
-            {
-                for _ in 0..repeat {
-                    *position = word_end(value, *position);
-                }
+        {
+            for _ in 0..repeat {
+                *position = word_end(value, *position);
             }
         }
     }
 
     pub fn move_word_left(&mut self, repeat: usize) {
-        if let Some(field) = self.selected_field_mut() {
-            if let (CursorState::Text { position }, FieldValue::Text(value)) =
+        if let Some(field) = self.selected_field_mut()
+            && let (CursorState::Text { position }, FieldValue::Text(value)) =
                 (&mut field.cursor, &field.value)
-            {
-                for _ in 0..repeat {
-                    *position = word_backward(value, *position);
-                }
+        {
+            for _ in 0..repeat {
+                *position = word_backward(value, *position);
             }
         }
     }
@@ -323,17 +318,16 @@ impl FormState {
     }
 
     pub fn enter_insert_after(&mut self) {
-        if let Some(field) = self.selected_field_mut() {
-            if let (CursorState::Text { position }, FieldValue::Text(s)) =
+        if let Some(field) = self.selected_field_mut()
+            && let (CursorState::Text { position }, FieldValue::Text(s)) =
                 (&field.cursor, &field.value)
+        {
+            let pos = *position;
+            let len = s.len();
+            if pos < len
+                && let CursorState::Text { position } = &mut field.cursor
             {
-                let pos = *position;
-                let len = s.len();
-                if pos < len {
-                    if let CursorState::Text { position } = &mut field.cursor {
-                        *position = pos + 1;
-                    }
-                }
+                *position = pos + 1;
             }
         }
     }
@@ -392,16 +386,16 @@ impl FormState {
                     CursorState::MultiSelect { index },
                     FieldValue::Multiple(selected),
                 ) => {
-                    if let Some(options_mut) = field.field_type.options_mut() {
-                        if let Some(option) = options_mut.get_mut(*index) {
-                            option.selected = !option.selected;
-                            if option.selected {
-                                if !selected.contains(&option.value) {
-                                    selected.push(option.value.clone());
-                                }
-                            } else {
-                                selected.retain(|v| v != &option.value);
+                    if let Some(options_mut) = field.field_type.options_mut()
+                        && let Some(option) = options_mut.get_mut(*index)
+                    {
+                        option.selected = !option.selected;
+                        if option.selected {
+                            if !selected.contains(&option.value) {
+                                selected.push(option.value.clone());
                             }
+                        } else {
+                            selected.retain(|v| v != &option.value);
                         }
                     }
                 }
