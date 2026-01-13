@@ -45,12 +45,12 @@ impl IssueFormController {
         match command.action {
             ActionId::MoveDown => {
                 // Check if dropdown is expanded
-                if let Some(field) = state.form().selected_field() {
-                    if field.field_type.is_expanded() {
-                        // Navigate dropdown with j/k
-                        state.form_mut().move_selection_down();
-                        return ScreenState::Refresh;
-                    }
+                if let Some(field) = state.form().selected_field()
+                    && field.field_type.is_expanded()
+                {
+                    // Navigate dropdown with j/k
+                    state.form_mut().move_selection_down();
+                    return ScreenState::Refresh;
                 }
                 // Otherwise move to next field
                 for _ in 0..command.repeat {
@@ -60,12 +60,12 @@ impl IssueFormController {
             }
             ActionId::MoveUp => {
                 // Check if dropdown is expanded
-                if let Some(field) = state.form().selected_field() {
-                    if field.field_type.is_expanded() {
-                        // Navigate dropdown with j/k
-                        state.form_mut().move_selection_up();
-                        return ScreenState::Refresh;
-                    }
+                if let Some(field) = state.form().selected_field()
+                    && field.field_type.is_expanded()
+                {
+                    // Navigate dropdown with j/k
+                    state.form_mut().move_selection_up();
+                    return ScreenState::Refresh;
                 }
                 // Otherwise move to previous field
                 for _ in 0..command.repeat {
@@ -158,13 +158,12 @@ impl IssueFormController {
             }
             ActionId::Quit => {
                 // In Normal mode with dropdown open, 'q' closes dropdown instead of quitting
-                if mode == Mode::Normal {
-                    if let Some(field) = state.form().selected_field() {
-                        if field.field_type.is_expanded() {
-                            state.form_mut().toggle_dropdown();
-                            return ScreenState::Refresh;
-                        }
-                    }
+                if mode == Mode::Normal
+                    && let Some(field) = state.form().selected_field()
+                    && field.field_type.is_expanded()
+                {
+                    state.form_mut().toggle_dropdown();
+                    return ScreenState::Refresh;
                 }
                 // Otherwise, let the default handler deal with it (stays or closes)
                 ScreenState::Stay
@@ -220,7 +219,7 @@ fn validate_form(state: &IssueFormState) -> Result<(), String> {
     let summary = state
         .form()
         .fields()
-        .get(0)
+        .first()
         .and_then(|f| f.value.as_text())
         .unwrap_or("");
 
@@ -233,26 +232,26 @@ fn validate_form(state: &IssueFormState) -> Result<(), String> {
 
 fn handle_raw_input(form: &mut FormState, code: crossterm::event::KeyCode) {
     // Check if we're in a dropdown
-    if let Some(field) = form.selected_field() {
-        if field.field_type.is_expanded() {
-            match code {
-                // Esc closes dropdown
-                crossterm::event::KeyCode::Esc => {
-                    form.toggle_dropdown();
+    if let Some(field) = form.selected_field()
+        && field.field_type.is_expanded()
+    {
+        match code {
+            // Esc closes dropdown
+            crossterm::event::KeyCode::Esc => {
+                form.toggle_dropdown();
+                return;
+            }
+            // Space in MultiSelect toggles checkbox
+            crossterm::event::KeyCode::Char(' ') => {
+                if matches!(field.field_type, FieldType::MultiSelect { .. }) {
+                    form.select_option();
                     return;
                 }
-                // Space in MultiSelect toggles checkbox
-                crossterm::event::KeyCode::Char(' ') => {
-                    if matches!(field.field_type, FieldType::MultiSelect { .. }) {
-                        form.select_option();
-                        return;
-                    }
-                }
-                _ => {}
             }
-            // Other keys are ignored when dropdown is open
-            return;
+            _ => {}
         }
+        // Other keys are ignored when dropdown is open
+        return;
     }
 
     // Check if we're editing the Due Date field
@@ -319,13 +318,13 @@ fn handle_date_input(form: &mut FormState, digit: char) {
     };
 
     // Update field value and cursor position
-    if let Some(field) = form.selected_field_mut() {
-        if let FieldValue::Text(value) = &mut field.value {
-            *value = formatted.clone();
-            // Set cursor to end
-            if let CursorState::Text { position } = &mut field.cursor {
-                *position = formatted.len();
-            }
+    if let Some(field) = form.selected_field_mut()
+        && let FieldValue::Text(value) = &mut field.value
+    {
+        *value = formatted.clone();
+        // Set cursor to end
+        if let CursorState::Text { position } = &mut field.cursor {
+            *position = formatted.len();
         }
     }
 }
@@ -343,7 +342,7 @@ fn form_to_issue(state: &IssueFormState) -> IssueSummary {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs(),
-        uuid::Uuid::new_v4().to_string()[..8].to_string()
+        &uuid::Uuid::new_v4().to_string()[..8]
     );
 
     // Extract values from form fields (indices match state.rs field order)
