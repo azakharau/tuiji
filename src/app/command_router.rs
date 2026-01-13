@@ -457,11 +457,10 @@ impl<'a> CommandRouter<'a> {
                 }
                 if let (AppConfigState::Loaded(cfg), Some(id)) =
                     (&*self.cfg_state, selected_profile.as_deref())
+                    && cfg.profiles.iter().any(|p| p.id == id)
                 {
-                    if cfg.profiles.iter().any(|p| p.id == id) {
-                        self.start_profile_creation(ProfileEditorIntent::Edit(id.to_string()));
-                        return Ok(ScreenState::SwitchTo(ScreenType::ProfileCreation));
-                    }
+                    self.start_profile_creation(ProfileEditorIntent::Edit(id.to_string()));
+                    return Ok(ScreenState::SwitchTo(ScreenType::ProfileCreation));
                 }
                 Ok(ScreenState::Stay)
             }
@@ -541,103 +540,101 @@ impl<'a> CommandRouter<'a> {
         }
     }
 
-    fn normalize_screen_state(
+    async fn normalize_screen_state(
         &mut self,
         state: ScreenState,
         close_on_save: bool,
-    ) -> impl std::future::Future<Output = Result<ScreenState>> + '_ {
-        async move {
-            match state {
-                ScreenState::SaveProfile(profile) => {
-                    if let Err(err) = self.save_profile(profile) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(err.to_string()));
-                    }
-                    Ok(ScreenState::Refresh)
+    ) -> Result<ScreenState> {
+        match state {
+            ScreenState::SaveProfile(profile) => {
+                if let Err(err) = self.save_profile(profile) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
                 }
-                ScreenState::SaveProfileAndClose(profile) => {
-                    if let Err(err) = self.save_profile(profile) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(err.to_string()));
-                        return Ok(ScreenState::Refresh);
-                    }
-                    if close_on_save {
-                        Ok(ScreenState::Close)
-                    } else {
-                        Ok(ScreenState::Refresh)
-                    }
-                }
-                ScreenState::ApplyTheme(theme_id) => {
-                    if let Err(err) = self.save_theme(theme_id.as_str()) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(err.to_string()));
-                    }
-                    if let Some(screen) = self.screen_manager.settings_themes_mut() {
-                        screen.set_active_theme(theme_id.as_str());
-                    }
-                    Ok(ScreenState::Refresh)
-                }
-                ScreenState::SaveCustomTheme(theme) => {
-                    if let Err(err) = self.save_custom_theme(theme) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(err.to_string()));
-                        return Ok(ScreenState::Refresh);
-                    }
-                    let theme_id = self.current_theme_id().to_string();
-                    if let Some(screen) = self.screen_manager.settings_themes_mut() {
-                        screen.set_active_theme(theme_id.as_str());
-                    }
-                    self.screen_manager.invalidate(ScreenType::SettingsThemes);
-                    Ok(ScreenState::Refresh)
-                }
-                ScreenState::SaveCustomThemeAndClose(theme) => {
-                    if let Err(err) = self.save_custom_theme(theme) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(err.to_string()));
-                        return Ok(ScreenState::Refresh);
-                    }
-                    self.screen_manager.invalidate(ScreenType::SettingsThemes);
-                    if close_on_save {
-                        Ok(ScreenState::Close)
-                    } else {
-                        Ok(ScreenState::Refresh)
-                    }
-                }
-                ScreenState::CreateIssue(issue) => {
-                    if let Err(err) = self.save_issue(*issue) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(err.to_string()));
-                        return Ok(ScreenState::Refresh);
-                    }
-                    if close_on_save {
-                        Ok(ScreenState::Close)
-                    } else {
-                        Ok(ScreenState::Refresh)
-                    }
-                }
-                ScreenState::ViewIssue(key) => match self.fetch_issue_and_open(&key).await {
-                    Ok(()) => Ok(ScreenState::SwitchTo(ScreenType::IssueDetail)),
-                    Err(err) => {
-                        self.notification_service
-                            .set_error(AppErrorState::error(format!(
-                                "Failed to load issue: {}",
-                                err
-                            )));
-                        Ok(ScreenState::Refresh)
-                    }
-                },
-                ScreenState::OpenInBrowser(key) => {
-                    if let Err(err) = self.open_issue_in_browser(&key) {
-                        self.notification_service
-                            .set_error(AppErrorState::error(format!(
-                                "Failed to open browser: {}",
-                                err
-                            )));
-                    }
-                    Ok(ScreenState::Refresh)
-                }
-                other => Ok(other),
+                Ok(ScreenState::Refresh)
             }
+            ScreenState::SaveProfileAndClose(profile) => {
+                if let Err(err) = self.save_profile(profile) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                    return Ok(ScreenState::Refresh);
+                }
+                if close_on_save {
+                    Ok(ScreenState::Close)
+                } else {
+                    Ok(ScreenState::Refresh)
+                }
+            }
+            ScreenState::ApplyTheme(theme_id) => {
+                if let Err(err) = self.save_theme(theme_id.as_str()) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                }
+                if let Some(screen) = self.screen_manager.settings_themes_mut() {
+                    screen.set_active_theme(theme_id.as_str());
+                }
+                Ok(ScreenState::Refresh)
+            }
+            ScreenState::SaveCustomTheme(theme) => {
+                if let Err(err) = self.save_custom_theme(theme) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                    return Ok(ScreenState::Refresh);
+                }
+                let theme_id = self.current_theme_id().to_string();
+                if let Some(screen) = self.screen_manager.settings_themes_mut() {
+                    screen.set_active_theme(theme_id.as_str());
+                }
+                self.screen_manager.invalidate(ScreenType::SettingsThemes);
+                Ok(ScreenState::Refresh)
+            }
+            ScreenState::SaveCustomThemeAndClose(theme) => {
+                if let Err(err) = self.save_custom_theme(theme) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                    return Ok(ScreenState::Refresh);
+                }
+                self.screen_manager.invalidate(ScreenType::SettingsThemes);
+                if close_on_save {
+                    Ok(ScreenState::Close)
+                } else {
+                    Ok(ScreenState::Refresh)
+                }
+            }
+            ScreenState::CreateIssue(issue) => {
+                if let Err(err) = self.save_issue(*issue) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                    return Ok(ScreenState::Refresh);
+                }
+                if close_on_save {
+                    Ok(ScreenState::Close)
+                } else {
+                    Ok(ScreenState::Refresh)
+                }
+            }
+            ScreenState::ViewIssue(key) => match self.fetch_issue_and_open(&key).await {
+                Ok(()) => Ok(ScreenState::SwitchTo(ScreenType::IssueDetail)),
+                Err(err) => {
+                    self.notification_service
+                        .set_error(AppErrorState::error(format!(
+                            "Failed to load issue: {}",
+                            err
+                        )));
+                    Ok(ScreenState::Refresh)
+                }
+            },
+            ScreenState::OpenInBrowser(key) => {
+                if let Err(err) = self.open_issue_in_browser(&key) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(format!(
+                            "Failed to open browser: {}",
+                            err
+                        )));
+                }
+                Ok(ScreenState::Refresh)
+            }
+            other => Ok(other),
         }
     }
 
@@ -683,14 +680,14 @@ impl<'a> CommandRouter<'a> {
             .screen_manager
             .profiles_mut()
             .and_then(|screen| screen.selected_profile_id().map(|id| id.to_string()));
-        if let Some(screen) = self.screen_manager.profiles_mut() {
-            if let AppConfigState::Loaded(cfg) = &self.cfg_state {
-                screen.refresh(
-                    &cfg.profiles,
-                    cfg.active_profile_id.as_deref(),
-                    selected_profile_id.as_deref(),
-                );
-            }
+        if let Some(screen) = self.screen_manager.profiles_mut()
+            && let AppConfigState::Loaded(cfg) = &self.cfg_state
+        {
+            screen.refresh(
+                &cfg.profiles,
+                cfg.active_profile_id.as_deref(),
+                selected_profile_id.as_deref(),
+            );
         }
         self.screen_manager
             .invalidate_many(&[ScreenType::Home, ScreenType::CurrentSprint]);
