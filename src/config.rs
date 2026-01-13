@@ -190,20 +190,20 @@ impl UiConfig {
         if let Ok(theme) = std::env::var(format!("{}UI_THEME", ENV_PREFIX)) {
             self.theme = theme;
         }
-        if let Ok(ttl) = std::env::var(format!("{}UI_NOTIFICATION_TTL_SECONDS", ENV_PREFIX)) {
-            if let Ok(value) = ttl.parse::<u64>() {
-                self.notification_ttl_seconds = value;
-            }
+        if let Ok(ttl) = std::env::var(format!("{}UI_NOTIFICATION_TTL_SECONDS", ENV_PREFIX))
+            && let Ok(value) = ttl.parse::<u64>()
+        {
+            self.notification_ttl_seconds = value;
         }
-        if let Ok(limit) = std::env::var(format!("{}UI_NOTIFICATION_STACK_LIMIT", ENV_PREFIX)) {
-            if let Ok(value) = limit.parse::<usize>() {
-                self.notification_stack_limit = value;
-            }
+        if let Ok(limit) = std::env::var(format!("{}UI_NOTIFICATION_STACK_LIMIT", ENV_PREFIX))
+            && let Ok(value) = limit.parse::<usize>()
+        {
+            self.notification_stack_limit = value;
         }
-        if let Ok(ttl) = std::env::var(format!("{}UI_ERROR_TTL_SECONDS", ENV_PREFIX)) {
-            if let Ok(value) = ttl.parse::<u64>() {
-                self.error_ttl_seconds = value;
-            }
+        if let Ok(ttl) = std::env::var(format!("{}UI_ERROR_TTL_SECONDS", ENV_PREFIX))
+            && let Ok(value) = ttl.parse::<u64>()
+        {
+            self.error_ttl_seconds = value;
         }
     }
 }
@@ -310,19 +310,19 @@ struct LegacyAppConfig {
 
 impl AppConfig {
     pub fn active_profile(&self) -> Option<&ProfileConfig> {
-        if let Some(id) = &self.active_profile_id {
-            if let Some(profile) = self.profiles.iter().find(|p| &p.id == id) {
-                return Some(profile);
-            }
+        if let Some(id) = &self.active_profile_id
+            && let Some(profile) = self.profiles.iter().find(|p| &p.id == id)
+        {
+            return Some(profile);
         }
         self.profiles.first()
     }
 
     pub fn active_profile_mut(&mut self) -> Option<&mut ProfileConfig> {
-        if let Some(id) = &self.active_profile_id {
-            if let Some(pos) = self.profiles.iter().position(|p| &p.id == id) {
-                return self.profiles.get_mut(pos);
-            }
+        if let Some(id) = &self.active_profile_id
+            && let Some(pos) = self.profiles.iter().position(|p| &p.id == id)
+        {
+            return self.profiles.get_mut(pos);
         }
         self.profiles.first_mut()
     }
@@ -651,18 +651,19 @@ mod tests {
 
     #[test]
     fn test_default_keybindings_section_not_serialized() {
-        let mut config = AppConfig::default();
-        // Set profiles to avoid empty config
-        config.profiles = vec![ProfileConfig {
-            id: "test".to_string(),
-            name: "Test".to_string(),
-            jira: JiraConfig {
-                base_url: "http://test.com".to_string(),
-                username: "test".to_string(),
-                api_token: "token".to_string(),
-            },
-            sync_mode: None,
-        }];
+        let config = AppConfig {
+            profiles: vec![ProfileConfig {
+                id: "test".to_string(),
+                name: "Test".to_string(),
+                jira: JiraConfig {
+                    base_url: "http://test.com".to_string(),
+                    username: "test".to_string(),
+                    api_token: "token".to_string(),
+                },
+                sync_mode: None,
+            }],
+            ..Default::default()
+        };
 
         let serialized = toml::to_string_pretty(&config).unwrap();
 
