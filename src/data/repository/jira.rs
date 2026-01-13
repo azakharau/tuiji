@@ -371,3 +371,24 @@ fn issue_summary_to_fields(
 
     Ok(fields)
 }
+
+impl JiraRepository {
+    /// Create a comment in Jira
+    pub async fn create_comment(&self, issue_key: &str, body: &str) -> Result<String> {
+        let comment_id = self.client.create_comment(issue_key, body).await?;
+        Ok(comment_id)
+    }
+
+    /// Update a comment in Jira
+    pub async fn update_comment(
+        &self,
+        issue_key: &str,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<()> {
+        self.client
+            .update_comment(issue_key, comment_id, body)
+            .await?;
+        Ok(())
+    }
+}

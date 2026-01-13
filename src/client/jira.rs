@@ -266,4 +266,51 @@ impl JiraClient {
         let edit = EditIssue { fields };
         self.client.issues().update(key, edit).await
     }
+
+    /// Create a comment on an issue
+    pub async fn create_comment(&self, issue_key: &str, body: &str) -> gouqi::Result<String> {
+        use serde_json::json;
+
+        let comment_body = json!({
+            "body": body
+        });
+
+        let response: serde_json::Value = self
+            .client
+            .post("api", &format!("issue/{}/comment", issue_key), comment_body)
+            .await?;
+
+        let comment_id = response
+            .get("id")
+            .and_then(|v| v.as_str())
+            .ok_or(gouqi::Error::NotFound)?
+            .to_string();
+
+        Ok(comment_id)
+    }
+
+    /// Update an existing comment
+    pub async fn update_comment(
+        &self,
+        issue_key: &str,
+        comment_id: &str,
+        body: &str,
+    ) -> gouqi::Result<()> {
+        use serde_json::json;
+
+        let comment_body = json!({
+            "body": body
+        });
+
+        let _: serde_json::Value = self
+            .client
+            .put(
+                "api",
+                &format!("issue/{}/comment/{}", issue_key, comment_id),
+                comment_body,
+            )
+            .await?;
+
+        Ok(())
+    }
 }

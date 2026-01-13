@@ -1270,6 +1270,105 @@ impl SqliteRepository {
         .await?;
         Ok(())
     }
+
+    /// Fetch a comment by ID
+    pub async fn fetch_comment(&self, comment_id: &str) -> Result<Option<IssueComment>> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, issue_key, author, body, created_at, updated_at, dirty, conflict, remote_snapshot
+            FROM issue_comments
+            WHERE id = ? AND profile_id = ?
+            "#,
+        )
+        .bind(comment_id)
+        .bind(self.profile_id())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some(row) = row else {
+            return Ok(None);
+        };
+
+        let dirty: i64 = row.get("dirty");
+        let conflict: i64 = row.get("conflict");
+
+        Ok(Some(IssueComment {
+            id: row.get("id"),
+            issue_key: row.get("issue_key"),
+            author: row.get("author"),
+            body: row.get("body"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+            dirty: dirty != 0,
+            conflict: conflict != 0,
+            remote_snapshot: row.get("remote_snapshot"),
+        }))
+    }
+
+    /// Update comment ID (for TEMP IDs after creation in Jira)
+    pub async fn update_comment_id(&self, old_id: &str, new_id: &str) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        let profile_id = self.profile_id();
+
+        // Verify the comment exists
+        let _comment = sqlx::query(
+            r#"
+            SELECT * FROM issue_comments 
+            WHERE id = ? AND profile_id = ?
+            "#,
+        )
+        .bind(old_id)
+        .bind(&profile_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // Insert with new ID
+        sqlx::query(
+            r#"
+            INSERT INTO issue_comments (
+                id, profile_id, issue_key, author, body, created_at, updated_at,
+                dirty, conflict, remote_snapshot
+            )
+            SELECT ?, profile_id, issue_key, author, body, created_at, updated_at,
+                   dirty, conflict, remote_snapshot
+            FROM issue_comments
+            WHERE id = ? AND profile_id = ?
+            "#,
+        )
+        .bind(new_id)
+        .bind(old_id)
+        .bind(&profile_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Update outbox entity_id for this comment
+        sqlx::query(
+            r#"
+            UPDATE outbox 
+            SET entity_id = ? 
+            WHERE entity_type = 'comment' AND entity_id = ?
+            "#,
+        )
+        .bind(new_id)
+        .bind(old_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Delete old comment
+        sqlx::query(
+            r#"
+            DELETE FROM issue_comments 
+            WHERE id = ? AND profile_id = ?
+            "#,
+        )
+        .bind(old_id)
+        .bind(&profile_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
 }
 
 #[async_trait]

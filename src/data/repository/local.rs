@@ -267,8 +267,8 @@ impl RepositoryHub {
                         .await
                 }
                 "comment" => {
-                    // TODO: implement comment push
-                    self.cache.clear_comment_dirty(&item.entity_id).await
+                    self.push_comment_to_jira(&item.entity_id, &item.change_set, remote)
+                        .await
                 }
                 _ => Ok(()),
             };
@@ -343,6 +343,51 @@ impl RepositoryHub {
 
             // Clear dirty flag
             self.cache.clear_issue_dirty(issue_key).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn push_comment_to_jira(
+        &self,
+        comment_id: &str,
+        change_set: &str,
+        remote: &JiraRepository,
+    ) -> Result<()> {
+        // Parse the change_set to determine action
+        let change: serde_json::Value = serde_json::from_str(change_set)?;
+        let action = change
+            .get("action")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| eyre!("Missing action in change_set"))?;
+
+        // Fetch the comment from cache
+        let Some(comment) = self.cache.fetch_comment(comment_id).await? else {
+            return Err(eyre!(
+                "Comment {} not found in cache (may have been deleted)",
+                comment_id
+            ));
+        };
+
+        if action == "create" && comment_id.starts_with("TEMP-") {
+            // Create new comment in Jira
+            let new_id = remote
+                .create_comment(&comment.issue_key, &comment.body)
+                .await?;
+
+            // Update comment ID in database (TEMP-xxx -> real ID)
+            self.cache.update_comment_id(comment_id, &new_id).await?;
+
+            // Clear dirty flag
+            self.cache.clear_comment_dirty(&new_id).await?;
+        } else {
+            // Update existing comment in Jira
+            remote
+                .update_comment(&comment.issue_key, comment_id, &comment.body)
+                .await?;
+
+            // Clear dirty flag
+            self.cache.clear_comment_dirty(comment_id).await?;
         }
 
         Ok(())
