@@ -17,6 +17,25 @@ use super::state::IssueDetailState;
 pub struct IssueDetailView;
 
 impl IssueDetailView {
+    /// Generate a consistent color for an author name
+    fn author_color(author: &str) -> Color {
+        // Use a simple hash to generate a consistent color per author
+        let hash: u32 = author.bytes().map(|b| b as u32).sum();
+        let colors = [
+            Color::Yellow,
+            Color::Cyan,
+            Color::Magenta,
+            Color::Blue,
+            Color::Green,
+            Color::LightYellow,
+            Color::LightCyan,
+            Color::LightMagenta,
+            Color::LightBlue,
+            Color::LightGreen,
+        ];
+        colors[(hash as usize) % colors.len()]
+    }
+
     /// Build content lines from issue data
     fn build_content_lines(issue: &IssueSummary) -> Vec<Line<'static>> {
         let mut content_lines = vec![];
@@ -149,8 +168,9 @@ impl IssueDetailView {
             content_lines.push(Line::from(""));
 
             for comment in &issue.comments {
+                let author_color = Self::author_color(&comment.author);
                 content_lines.push(Line::from(vec![
-                    Span::styled(comment.author.clone(), Style::default().fg(Color::Yellow)),
+                    Span::styled(comment.author.clone(), Style::default().fg(author_color)),
                     Span::raw(" - "),
                     Span::raw(
                         comment
@@ -160,9 +180,30 @@ impl IssueDetailView {
                             .to_string(),
                     ),
                 ]));
-                // Add indentation for comment body
+                // Add indentation and formatting for comment body
+                let mut in_code_block = false;
                 for line in comment.body.lines() {
-                    content_lines.push(Line::from(format!("  {}", line)));
+                    // Detect code blocks
+                    if line.trim().starts_with("```") {
+                        in_code_block = !in_code_block;
+                        content_lines.push(Line::from(Span::styled(
+                            format!("  {}", line),
+                            Style::default().fg(Color::DarkGray),
+                        )));
+                        continue;
+                    }
+
+                    // Format based on context
+                    if in_code_block {
+                        // Code block line
+                        content_lines.push(Line::from(Span::styled(
+                            format!("    {}", line),
+                            Style::default().fg(Color::Green),
+                        )));
+                    } else {
+                        // Normal comment line with indentation
+                        content_lines.push(Line::from(format!("  {}", line)));
+                    }
                 }
                 content_lines.push(Line::from(""));
             }
@@ -239,9 +280,12 @@ impl IssueDetailView {
 
         // Apply scroll offset (get it after update_bounds to get clamped value)
         let scroll_offset = state.scroll_offset();
+        let horizontal_offset = state.horizontal_offset();
         let visible_lines: Vec<_> = content_lines.into_iter().skip(scroll_offset).collect();
 
-        let content = Paragraph::new(visible_lines).wrap(Wrap { trim: false });
+        let content = Paragraph::new(visible_lines)
+            .wrap(Wrap { trim: false })
+            .scroll((0, horizontal_offset as u16));
 
         frame.render_widget(content, inner_area.inner(Margin::new(1, 0)));
     }

@@ -6,6 +6,7 @@ pub struct IssueDetailState {
     scroll_offset: usize,
     max_scroll: usize,
     viewport_height: usize,
+    horizontal_offset: usize,
     cached_content: Option<Vec<Line<'static>>>,
 }
 
@@ -16,6 +17,7 @@ impl IssueDetailState {
             scroll_offset: 0,
             max_scroll: 0,
             viewport_height: 1,
+            horizontal_offset: 0,
             cached_content: None,
         }
     }
@@ -84,5 +86,25 @@ impl IssueDetailState {
     /// Invalidate cache (e.g., when issue is updated)
     pub fn invalidate_cache(&mut self) {
         self.cached_content = None;
+    }
+
+    /// Get horizontal scroll offset
+    pub fn horizontal_offset(&self) -> usize {
+        self.horizontal_offset
+    }
+
+    /// Scroll right (increase horizontal offset)
+    pub fn scroll_right(&mut self) {
+        self.horizontal_offset += 4; // Scroll by 4 characters
+    }
+
+    /// Scroll left (decrease horizontal offset)
+    pub fn scroll_left(&mut self) {
+        self.horizontal_offset = self.horizontal_offset.saturating_sub(4);
+    }
+
+    /// Reset horizontal scroll to start
+    pub fn reset_horizontal_scroll(&mut self) {
+        self.horizontal_offset = 0;
     }
 }

@@ -312,7 +312,11 @@ pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<Actio
             push(ActionId::MoveDown, "Down");
             push(ActionId::MoveTop, "Top");
             push(ActionId::MoveBottom, "Bottom");
+            push(ActionId::MoveLeft, "Left");
+            push(ActionId::MoveRight, "Right");
+            push(ActionId::MoveLineStart, "Line start");
             push(ActionId::OpenInBrowser, "Open in browser");
+            push(ActionId::Refresh, "Refresh");
             push(ActionId::GoHome, "Home");
         }
         _ => {}

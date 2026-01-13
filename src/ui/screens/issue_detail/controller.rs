@@ -40,6 +40,18 @@ impl IssueDetailController {
                 state.invalidate_cache();
                 ScreenState::ViewIssue(state.issue().key.clone())
             }
+            ActionId::MoveRight => {
+                state.scroll_right();
+                ScreenState::Refresh
+            }
+            ActionId::MoveLeft => {
+                state.scroll_left();
+                ScreenState::Refresh
+            }
+            ActionId::MoveLineStart => {
+                state.reset_horizontal_scroll();
+                ScreenState::Refresh
+            }
             _ => ScreenState::Stay,
         }
     }
