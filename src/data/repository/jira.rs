@@ -318,13 +318,11 @@ fn issue_summary_to_create_fields(
     }
 
     // Merge any additional custom fields from the issue
-    if let Some(ref custom_json) = issue.custom_fields {
-        if let Ok(custom_map) = serde_json::from_str::<BTreeMap<String, Value>>(custom_json) {
-            for (key, value) in custom_map {
-                if !fields.contains_key(&key) {
-                    fields.insert(key, value);
-                }
-            }
+    if let Some(ref custom_json) = issue.custom_fields
+        && let Ok(custom_map) = serde_json::from_str::<BTreeMap<String, Value>>(custom_json)
+    {
+        for (key, value) in custom_map {
+            fields.entry(key).or_insert(value);
         }
     }
 

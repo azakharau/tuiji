@@ -720,7 +720,7 @@ impl SqliteRepository {
             "#,
         )
         .bind(old_key)
-        .bind(&profile_id)
+        .bind(profile_id)
         .fetch_one(&mut *tx)
         .await?;
 
@@ -741,7 +741,7 @@ impl SqliteRepository {
         )
         .bind(new_key)
         .bind(old_key)
-        .bind(&profile_id)
+        .bind(profile_id)
         .execute(&mut *tx)
         .await?;
 
@@ -755,7 +755,7 @@ impl SqliteRepository {
         )
         .bind(new_key)
         .bind(old_key)
-        .bind(&profile_id)
+        .bind(profile_id)
         .execute(&mut *tx)
         .await?;
 
@@ -769,7 +769,7 @@ impl SqliteRepository {
         )
         .bind(new_key)
         .bind(old_key)
-        .bind(&profile_id)
+        .bind(profile_id)
         .execute(&mut *tx)
         .await?;
 
@@ -794,7 +794,7 @@ impl SqliteRepository {
             "#,
         )
         .bind(old_key)
-        .bind(&profile_id)
+        .bind(profile_id)
         .execute(&mut *tx)
         .await?;
 
@@ -1318,7 +1318,7 @@ impl SqliteRepository {
             "#,
         )
         .bind(old_id)
-        .bind(&profile_id)
+        .bind(profile_id)
         .fetch_one(&mut *tx)
         .await?;
 
@@ -1337,7 +1337,7 @@ impl SqliteRepository {
         )
         .bind(new_id)
         .bind(old_id)
-        .bind(&profile_id)
+        .bind(profile_id)
         .execute(&mut *tx)
         .await?;
 
@@ -1362,7 +1362,7 @@ impl SqliteRepository {
             "#,
         )
         .bind(old_id)
-        .bind(&profile_id)
+        .bind(profile_id)
         .execute(&mut *tx)
         .await?;
 
