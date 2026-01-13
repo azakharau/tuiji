@@ -84,7 +84,7 @@ impl App {
             AppConfigState::Loaded(cfg) => {
                 ScreenManager::new(Duration::from_secs(cfg.ui.screen_cache_ttl_seconds))
             }
-            AppConfigState::Missing(_) => ScreenManager::default(),
+            AppConfigState::Missing(_) => ScreenManager::with_default_ttl(),
         };
         let ui_cfg = match &config {
             AppConfigState::Loaded(cfg) => cfg.ui.clone(),

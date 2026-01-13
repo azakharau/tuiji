@@ -94,14 +94,13 @@ impl ProfilesState {
         self.refresh_items(&labels);
         self.profile_count = profile_count;
         self.message = message;
-        if let Some(selected_id) = selected_id {
-            if let Some(idx) = self
+        if let Some(selected_id) = selected_id
+            && let Some(idx) = self
                 .entries
                 .iter()
                 .position(|entry| entry.profile_id.as_deref() == Some(selected_id))
-            {
-                self.selected_index = idx;
-            }
+        {
+            self.selected_index = idx;
         }
     }
 

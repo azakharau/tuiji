@@ -60,9 +60,11 @@ impl ProfileCreationState {
     }
 
     fn from_profile(profile: ProfileConfig) -> Self {
-        let mut state = Self::default();
-        state.profile_id = Some(profile.id);
-        state.sync_mode = profile.sync_mode;
+        let mut state = Self {
+            profile_id: Some(profile.id),
+            sync_mode: profile.sync_mode,
+            ..Default::default()
+        };
         if let Some(item) = state.form.fields_mut().get_mut(0) {
             item.value = FieldValue::Text(profile.name.clone());
             if let CursorState::Text { position } = &mut item.cursor {

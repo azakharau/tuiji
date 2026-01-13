@@ -65,7 +65,7 @@ impl ProfilesView {
         let items = state.list_items();
         if items.is_empty() {
             frame.render_widget(
-                EmptyState::new("Profiles", state.message(), &context),
+                EmptyState::new("Profiles", state.message(), context),
                 layout[1],
             );
         } else {

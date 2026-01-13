@@ -71,37 +71,30 @@ impl IssueFormView {
             None
         };
 
-        let mut buffer = frame.buffer_mut();
-        FormView::render(
-            state.form(),
-            form_area,
-            &mut buffer,
-            context,
-            hide_content_for,
-        );
+        let buffer = frame.buffer_mut();
+        FormView::render(state.form(), form_area, buffer, context, hide_content_for);
 
         // Bottom bar
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, layout[2]);
 
         // Render text popup overlay if open
-        if state.is_text_popup_open() {
-            if let Some(field) = state.form().selected_field() {
-                if matches!(
-                    field.field_type,
-                    FieldType::Text { .. } | FieldType::TextArea { .. }
-                ) {
-                    let min_height = if matches!(field.field_type, FieldType::TextArea { .. }) {
-                        10
-                    } else {
-                        5
-                    };
-                    let popup_area = TextAreaPopup::calculate_area(frame.area(), min_height);
-                    // Show cursor in popup for editing
-                    let popup = TextAreaPopup::new(field, context, true);
-                    frame.render_widget(popup, popup_area);
-                }
-            }
+        if state.is_text_popup_open()
+            && let Some(field) = state.form().selected_field()
+            && matches!(
+                field.field_type,
+                FieldType::Text { .. } | FieldType::TextArea { .. }
+            )
+        {
+            let min_height = if matches!(field.field_type, FieldType::TextArea { .. }) {
+                10
+            } else {
+                5
+            };
+            let popup_area = TextAreaPopup::calculate_area(frame.area(), min_height);
+            // Show cursor in popup for editing
+            let popup = TextAreaPopup::new(field, context, true);
+            frame.render_widget(popup, popup_area);
         }
 
         // Render dropdown popup overlay if a select/multiselect field is expanded

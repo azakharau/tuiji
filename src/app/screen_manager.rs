@@ -99,7 +99,7 @@ impl ScreenManager {
         }
     }
 
-    pub fn default() -> Self {
+    pub fn with_default_ttl() -> Self {
         Self::new(DEFAULT_SCREEN_TTL)
     }
 

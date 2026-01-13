@@ -45,8 +45,8 @@ impl SettingsThemeFormView {
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(inner);
         frame.render_widget(Clear, area);
         frame.render_widget(block, area);
-        let mut buffer = frame.buffer_mut();
-        FormView::render(state.form(), form_area, &mut buffer, context, None);
+        let buffer = frame.buffer_mut();
+        FormView::render(state.form(), form_area, buffer, context, None);
 
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, bar_area);

@@ -30,6 +30,12 @@ pub struct IssueFormScreen {
     mode: Mode,
 }
 
+impl Default for IssueFormScreen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IssueFormScreen {
     pub fn new() -> Self {
         Self {

@@ -29,6 +29,12 @@ pub struct SettingsScreen {
     actions: Arc<Vec<ActionHint>>,
 }
 
+impl Default for SettingsScreen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SettingsScreen {
     pub fn new() -> Self {
         Self {
