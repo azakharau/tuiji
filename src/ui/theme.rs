@@ -79,9 +79,6 @@ impl ThemeRegistry {
             "tokyonight"
         } else if theme_id.eq_ignore_ascii_case("solarized_dark") {
             "solarized_dark"
-        } else if theme_id.eq_ignore_ascii_case("default") || theme_id.eq_ignore_ascii_case("dark")
-        {
-            "default"
         } else {
             "default"
         }
@@ -125,10 +122,10 @@ impl ThemeRegistry {
     }
 
     pub fn palette_from_config(cfg: &AppConfig, theme_id: &str) -> ThemePalette {
-        if let Some(custom) = cfg.ui.custom_themes.iter().find(|t| t.id == theme_id) {
-            if let Some(palette) = Self::custom_palette(custom) {
-                return palette;
-            }
+        if let Some(custom) = cfg.ui.custom_themes.iter().find(|t| t.id == theme_id)
+            && let Some(palette) = Self::custom_palette(custom)
+        {
+            return palette;
         }
         Self::get(theme_id)
     }
