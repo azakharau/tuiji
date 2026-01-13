@@ -113,43 +113,41 @@ async fn handle_worker_event(app: &mut App, msg: WorkerEvent) -> bool {
             app.worker_controller
                 .handle_worker_event(SyncJobEvent::Completed(job));
             app.screen_manager.invalidate(app.state.current_screen);
-            if kind == SyncJobKind::Pull {
-                if let Some(repo) = app.repo.clone() {
-                    if let Ok(count) = repo.conflict_count().await {
-                        let prev_count = app.state.conflict_count;
-                        if count > prev_count {
-                            app.notification_service.push_notification(
-                                format!("Conflicts detected ({count})"),
-                                crate::app::error::AppErrorLevel::Warning,
-                                AppNotificationKind::System,
-                            );
-                            if let Ok(issues) = repo.conflict_issues().await {
-                                let ctx = ScreenContext {
-                                    cfg_state: &app.cfg_state,
-                                    app_state: &app.state,
-                                    repo: repo.clone(),
-                                };
-                                if app
-                                    .screen_manager
-                                    .active_screen_mut(ScreenType::Conflicts, ctx)
-                                    .await
-                                    .is_ok()
-                                {
-                                    if let Some(screen) = app.screen_manager.conflicts_mut() {
-                                        screen.set_issues(issues);
-                                    }
-                                }
-                            }
-                            if app.state.current_screen != ScreenType::Conflicts {
-                                app.screen_stack.push(app.state.current_screen);
-                                app.state.current_screen = ScreenType::Conflicts;
-                            }
+            if kind == SyncJobKind::Pull
+                && let Some(repo) = app.repo.clone()
+                && let Ok(count) = repo.conflict_count().await
+            {
+                let prev_count = app.state.conflict_count;
+                if count > prev_count {
+                    app.notification_service.push_notification(
+                        format!("Conflicts detected ({count})"),
+                        crate::app::error::AppErrorLevel::Warning,
+                        AppNotificationKind::System,
+                    );
+                    if let Ok(issues) = repo.conflict_issues().await {
+                        let ctx = ScreenContext {
+                            cfg_state: &app.cfg_state,
+                            app_state: &app.state,
+                            repo: repo.clone(),
+                        };
+                        if app
+                            .screen_manager
+                            .active_screen_mut(ScreenType::Conflicts, ctx)
+                            .await
+                            .is_ok()
+                            && let Some(screen) = app.screen_manager.conflicts_mut()
+                        {
+                            screen.set_issues(issues);
                         }
-                        app.state.conflict_count = count;
-                        app.screen_manager
-                            .invalidate(crate::app::state::ScreenType::Home);
+                    }
+                    if app.state.current_screen != ScreenType::Conflicts {
+                        app.screen_stack.push(app.state.current_screen);
+                        app.state.current_screen = ScreenType::Conflicts;
                     }
                 }
+                app.state.conflict_count = count;
+                app.screen_manager
+                    .invalidate(crate::app::state::ScreenType::Home);
             }
             true
         }
