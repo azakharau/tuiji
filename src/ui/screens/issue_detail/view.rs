@@ -8,6 +8,7 @@ use ratatui::{
 
 use crate::{
     app::{key_handlers::ActionHint, state::Mode},
+    data::IssueSummary,
     ui::context::RenderContext,
 };
 
@@ -16,51 +17,20 @@ use super::state::IssueDetailState;
 pub struct IssueDetailView;
 
 impl IssueDetailView {
-    pub fn draw(
-        frame: &mut Frame,
-        state: &mut IssueDetailState,
-        _mode: Mode,
-        _actions: &[ActionHint],
-        _context: &RenderContext,
-    ) {
-        let area = frame.area();
-
-        // Clone issue data to avoid borrow conflicts
-        let issue = state.issue().clone();
-
-        // Layout: title + content
-        let layout = Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(area);
-
-        // Title block
-        let title_text = vec![Line::from(vec![
-            Span::styled(
-                &issue.key,
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" - "),
-            Span::raw(&issue.summary),
-        ])];
-        let title_block = Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default());
-        let title = Paragraph::new(title_text).block(title_block);
-        frame.render_widget(title, layout[0]);
-
-        // Content area
+    /// Build content lines from issue data
+    fn build_content_lines(issue: &IssueSummary) -> Vec<Line<'static>> {
         let mut content_lines = vec![];
 
         // Status, Type, Priority
         content_lines.push(Line::from(vec![
             Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(&issue.status),
+            Span::raw(issue.status.clone()),
             Span::raw("  "),
             Span::styled("Type: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(&issue.issue_type),
+            Span::raw(issue.issue_type.clone()),
             Span::raw("  "),
             Span::styled("Priority: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(&issue.priority),
+            Span::raw(issue.priority.clone()),
         ]));
         content_lines.push(Line::from(""));
 
@@ -68,7 +38,7 @@ impl IssueDetailView {
         if !issue.assignee.is_empty() {
             content_lines.push(Line::from(vec![
                 Span::styled("Assignee: ", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(&issue.assignee),
+                Span::raw(issue.assignee.clone()),
             ]));
         }
 
@@ -87,7 +57,7 @@ impl IssueDetailView {
         if let Some(ref epic) = issue.epic {
             content_lines.push(Line::from(vec![
                 Span::styled("Epic: ", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(epic),
+                Span::raw(epic.clone()),
             ]));
         }
 
@@ -95,7 +65,7 @@ impl IssueDetailView {
         if let Some(ref parent) = issue.parent_key {
             content_lines.push(Line::from(vec![
                 Span::styled("Parent: ", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(parent),
+                Span::raw(parent.clone()),
             ]));
         }
 
@@ -111,9 +81,50 @@ impl IssueDetailView {
             )));
             content_lines.push(Line::from(""));
 
-            // Split description by lines
+            // Split description by lines with basic formatting
+            let mut in_code_block = false;
             for line in description.lines() {
-                content_lines.push(Line::from(line.to_string()));
+                // Detect code blocks
+                if line.trim().starts_with("```") {
+                    in_code_block = !in_code_block;
+                    content_lines.push(Line::from(Span::styled(
+                        line.to_string(),
+                        Style::default().fg(Color::DarkGray),
+                    )));
+                    continue;
+                }
+
+                // Format based on context
+                if in_code_block {
+                    // Code block line - use monospace-style color
+                    content_lines.push(Line::from(Span::styled(
+                        format!("  {}", line),
+                        Style::default().fg(Color::Green),
+                    )));
+                } else if line.trim().starts_with("# ") {
+                    // Heading level 1
+                    content_lines.push(Line::from(Span::styled(
+                        line.to_string(),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )));
+                } else if line.trim().starts_with("## ") {
+                    // Heading level 2
+                    content_lines.push(Line::from(Span::styled(
+                        line.to_string(),
+                        Style::default().fg(Color::Cyan),
+                    )));
+                } else if line.trim().starts_with("* ") || line.trim().starts_with("- ") {
+                    // List item
+                    content_lines.push(Line::from(Span::styled(
+                        line.to_string(),
+                        Style::default().fg(Color::White),
+                    )));
+                } else {
+                    // Normal line
+                    content_lines.push(Line::from(line.to_string()));
+                }
             }
             content_lines.push(Line::from(""));
         }
@@ -139,14 +150,67 @@ impl IssueDetailView {
 
             for comment in &issue.comments {
                 content_lines.push(Line::from(vec![
-                    Span::styled(&comment.author, Style::default().fg(Color::Yellow)),
+                    Span::styled(comment.author.clone(), Style::default().fg(Color::Yellow)),
                     Span::raw(" - "),
-                    Span::raw(comment.created_at.as_deref().unwrap_or("Unknown")),
+                    Span::raw(
+                        comment
+                            .created_at
+                            .as_deref()
+                            .unwrap_or("Unknown")
+                            .to_string(),
+                    ),
                 ]));
-                content_lines.push(Line::from(comment.body.as_str()));
+                // Add indentation for comment body
+                for line in comment.body.lines() {
+                    content_lines.push(Line::from(format!("  {}", line)));
+                }
                 content_lines.push(Line::from(""));
             }
         }
+
+        content_lines
+    }
+
+    pub fn draw(
+        frame: &mut Frame,
+        state: &mut IssueDetailState,
+        _mode: Mode,
+        _actions: &[ActionHint],
+        _context: &RenderContext,
+    ) {
+        let area = frame.area();
+
+        // Clone issue data to avoid borrow conflicts
+        let issue = state.issue().clone();
+
+        // Layout: title + content
+        let layout = Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(area);
+
+        // Title block
+        let title_text = vec![Line::from(vec![
+            Span::styled(
+                issue.key.clone(),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" - "),
+            Span::raw(issue.summary.clone()),
+        ])];
+        let title_block = Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default());
+        let title = Paragraph::new(title_text).block(title_block);
+        frame.render_widget(title, layout[0]);
+
+        // Get or build content lines (with caching)
+        let content_lines = if let Some(cached) = state.cached_content() {
+            cached.clone()
+        } else {
+            let lines = Self::build_content_lines(&issue);
+            state.cache_content(lines.clone());
+            lines
+        };
 
         // Create initial block to calculate inner area
         let temp_block = Block::default().borders(Borders::ALL);

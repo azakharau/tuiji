@@ -35,6 +35,11 @@ impl IssueDetailController {
                 ScreenState::Refresh
             }
             ActionId::OpenInBrowser => ScreenState::OpenInBrowser(state.issue().key.clone()),
+            ActionId::Refresh => {
+                // Invalidate cache and reload issue
+                state.invalidate_cache();
+                ScreenState::ViewIssue(state.issue().key.clone())
+            }
             _ => ScreenState::Stay,
         }
     }

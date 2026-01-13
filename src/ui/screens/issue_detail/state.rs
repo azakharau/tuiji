@@ -1,10 +1,12 @@
 use crate::data::IssueSummary;
+use ratatui::text::Line;
 
 pub struct IssueDetailState {
     issue: IssueSummary,
     scroll_offset: usize,
     max_scroll: usize,
     viewport_height: usize,
+    cached_content: Option<Vec<Line<'static>>>,
 }
 
 impl IssueDetailState {
@@ -14,6 +16,7 @@ impl IssueDetailState {
             scroll_offset: 0,
             max_scroll: 0,
             viewport_height: 1,
+            cached_content: None,
         }
     }
 
@@ -66,5 +69,20 @@ impl IssueDetailState {
         } else {
             (self.scroll_offset * 100) / self.max_scroll
         }
+    }
+
+    /// Get cached content lines, or None if not cached
+    pub fn cached_content(&self) -> Option<&Vec<Line<'static>>> {
+        self.cached_content.as_ref()
+    }
+
+    /// Cache content lines for rendering optimization
+    pub fn cache_content(&mut self, lines: Vec<Line<'static>>) {
+        self.cached_content = Some(lines);
+    }
+
+    /// Invalidate cache (e.g., when issue is updated)
+    pub fn invalidate_cache(&mut self) {
+        self.cached_content = None;
     }
 }
