@@ -165,6 +165,8 @@ impl<'a> NavigationController<'a> {
                 Ok(ActionOutcome::Continue { render: true })
             }
             ScreenState::Close => self.close_screen(),
+            ScreenState::ViewIssue(_) => Ok(ActionOutcome::Continue { render: true }),
+            ScreenState::OpenInBrowser(_) => Ok(ActionOutcome::Continue { render: true }),
             ScreenState::SaveProfile(_)
             | ScreenState::SaveProfileAndClose(_)
             | ScreenState::ApplyTheme(_)

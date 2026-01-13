@@ -10,6 +10,13 @@ pub struct SearchIssuesController;
 impl SearchIssuesController {
     pub fn handle_command(state: &mut SearchIssuesState, command: Command) -> ScreenState {
         match command.action {
+            ActionId::Confirm => {
+                if let Some(key) = state.selected_issue_key() {
+                    ScreenState::ViewIssue(key.to_string())
+                } else {
+                    ScreenState::Stay
+                }
+            }
             ActionId::MoveUp => {
                 state.move_up(command.repeat);
                 ScreenState::Refresh

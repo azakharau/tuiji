@@ -75,4 +75,22 @@ impl CurrentSprintState {
     pub fn set_scroll_offset(&mut self, value: usize) {
         self.scroll_offset = value;
     }
+
+    /// Get the key of the currently selected issue, if any.
+    pub fn selected_issue_key(&self) -> Option<&str> {
+        let col_issues: Vec<_> = self
+            .issues
+            .iter()
+            .filter(|issue| {
+                self.board_cfg
+                    .columns
+                    .get(self.selected_col)
+                    .map(|col| col.name.eq_ignore_ascii_case(&issue.status))
+                    .unwrap_or(false)
+            })
+            .collect();
+        col_issues
+            .get(self.selected_row)
+            .map(|issue| issue.key.as_str())
+    }
 }

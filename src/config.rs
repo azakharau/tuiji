@@ -391,6 +391,8 @@ pub struct KeyBindingsConfig {
     pub conflicts: Vec<KeyBindingConfig>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sync_status: Vec<KeyBindingConfig>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub issue_detail: Vec<KeyBindingConfig>,
 }
 
 impl Default for KeyBindingsConfig {
@@ -508,6 +510,18 @@ impl Default for KeyBindingsConfig {
                 KeyBindingConfig::new(BindingAction::FilterPull, "P"),
                 KeyBindingConfig::new(BindingAction::FilterPush, "U"),
             ],
+            issue_detail: vec![
+                KeyBindingConfig::new(BindingAction::MoveUp, "k"),
+                KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "j"),
+                KeyBindingConfig::new(BindingAction::MoveDown, "<down>"),
+                KeyBindingConfig::new(BindingAction::MoveTop, "gg"),
+                KeyBindingConfig::new(BindingAction::MoveBottom, "G"),
+                KeyBindingConfig::new(BindingAction::PageUp, "<pageup>"),
+                KeyBindingConfig::new(BindingAction::PageDown, "<pagedown>"),
+                KeyBindingConfig::new(BindingAction::Refresh, "r"),
+                KeyBindingConfig::new(BindingAction::OpenInBrowser, "o"),
+            ],
             new_issue: vec![
                 KeyBindingConfig::new(BindingAction::MoveUp, "k"),
                 KeyBindingConfig::new(BindingAction::MoveUp, "<up>"),
@@ -592,6 +606,8 @@ pub enum BindingAction {
     MoveWordForward,
     MoveWordBackward,
     MoveWordEnd,
+    PageUp,
+    PageDown,
     EnterInsertBefore,
     EnterInsertAfter,
     EnterInsertLineStart,

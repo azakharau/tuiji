@@ -10,6 +10,13 @@ pub struct CurrentSprintController;
 impl CurrentSprintController {
     pub fn handle_command(state: &mut CurrentSprintState, command: Command) -> ScreenState {
         match command.action {
+            ActionId::Confirm => {
+                if let Some(key) = state.selected_issue_key() {
+                    ScreenState::ViewIssue(key.to_string())
+                } else {
+                    ScreenState::Stay
+                }
+            }
             ActionId::Refresh => ScreenState::Refresh,
             ActionId::MoveDown => {
                 Self::move_down(state, command.repeat);

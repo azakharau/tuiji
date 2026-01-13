@@ -15,6 +15,7 @@ pub mod board_selection;
 pub mod conflicts;
 pub mod current_sprint;
 pub mod home;
+pub mod issue_detail;
 pub mod issue_form;
 pub mod my_issues;
 pub mod profile_creation;
@@ -67,6 +68,8 @@ pub enum ScreenState {
     SyncResume,
     Close,
     CreateIssue(Box<crate::data::IssueSummary>),
+    ViewIssue(String),
+    OpenInBrowser(String), // issue key
 }
 
 impl PartialEq for ScreenState {
@@ -91,6 +94,8 @@ impl PartialEq for ScreenState {
             (Self::Close, Self::Close) => true,
             // CreateIssue variants are never equal (contains non-comparable data)
             (Self::CreateIssue(_), Self::CreateIssue(_)) => false,
+            (Self::ViewIssue(a), Self::ViewIssue(b)) => a == b,
+            (Self::OpenInBrowser(a), Self::OpenInBrowser(b)) => a == b,
             _ => false,
         }
     }

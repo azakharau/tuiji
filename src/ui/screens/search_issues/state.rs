@@ -5,13 +5,16 @@ use crate::ui::components::list::TableRow;
 
 pub struct SearchIssuesState {
     rows: Vec<TableRow<'static>>,
+    issue_keys: Vec<String>,
     selected_index: usize,
 }
 
 impl SearchIssuesState {
     pub fn new(issues: Vec<IssueSummary>) -> Self {
+        let (rows, keys) = build_rows_and_keys(issues);
         Self {
-            rows: build_rows(issues),
+            rows,
+            issue_keys: keys,
             selected_index: 0,
         }
     }
@@ -55,10 +58,16 @@ impl SearchIssuesState {
             self.selected_index = self.rows.len() - 1;
         }
     }
+
+    /// Get the key of the currently selected issue, if any.
+    pub fn selected_issue_key(&self) -> Option<&str> {
+        self.issue_keys.get(self.selected_index).map(|s| s.as_str())
+    }
 }
 
-fn build_rows(issues: Vec<IssueSummary>) -> Vec<TableRow<'static>> {
+fn build_rows_and_keys(issues: Vec<IssueSummary>) -> (Vec<TableRow<'static>>, Vec<String>) {
     let mut rows = Vec::with_capacity(issues.len());
+    let mut keys = Vec::with_capacity(issues.len());
     for issue in issues {
         let IssueSummary {
             key,
@@ -66,7 +75,8 @@ fn build_rows(issues: Vec<IssueSummary>) -> Vec<TableRow<'static>> {
             status,
             ..
         } = issue;
+        keys.push(key.clone());
         rows.push(Row::new(vec![key, summary, status]));
     }
-    rows
+    (rows, keys)
 }

@@ -47,6 +47,8 @@ pub enum ActionId {
     MoveWordForward,
     MoveWordBackward,
     MoveWordEnd,
+    PageUp,
+    PageDown,
     EnterInsert(InsertMode),
     RawInput(KeyCode),
 }
@@ -168,6 +170,10 @@ impl KeyBindings {
                 &global,
                 &map_bindings(&cfg.profile_creation),
             )),
+        );
+        by_screen.insert(
+            ScreenType::IssueDetail,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.issue_detail))),
         );
         Self { by_screen }
     }
@@ -301,6 +307,14 @@ pub fn action_hints(screen: ScreenType, bindings: &KeyBindings) -> Arc<Vec<Actio
             push(ActionId::MoveDown, "Down");
             push(ActionId::GoHome, "Home");
         }
+        ScreenType::IssueDetail => {
+            push(ActionId::MoveUp, "Up");
+            push(ActionId::MoveDown, "Down");
+            push(ActionId::MoveTop, "Top");
+            push(ActionId::MoveBottom, "Bottom");
+            push(ActionId::OpenInBrowser, "Open in browser");
+            push(ActionId::GoHome, "Home");
+        }
         _ => {}
     }
 
@@ -345,6 +359,8 @@ fn action_description(action: ActionId) -> Option<&'static str> {
         ActionId::MoveWordForward => Some("Word forward"),
         ActionId::MoveWordBackward => Some("Word back"),
         ActionId::MoveWordEnd => Some("Word end"),
+        ActionId::PageUp => Some("Page up"),
+        ActionId::PageDown => Some("Page down"),
         ActionId::EnterInsert(_) => Some("Insert"),
         ActionId::RawInput(_) => None,
     }
@@ -457,6 +473,8 @@ fn binding_action_to_action_id(action: BindingAction) -> ActionId {
         BindingAction::MoveWordForward => ActionId::MoveWordForward,
         BindingAction::MoveWordBackward => ActionId::MoveWordBackward,
         BindingAction::MoveWordEnd => ActionId::MoveWordEnd,
+        BindingAction::PageUp => ActionId::PageUp,
+        BindingAction::PageDown => ActionId::PageDown,
         BindingAction::EnterInsertBefore => ActionId::EnterInsert(InsertMode::Before),
         BindingAction::EnterInsertAfter => ActionId::EnterInsert(InsertMode::After),
         BindingAction::EnterInsertLineStart => ActionId::EnterInsert(InsertMode::LineStart),

@@ -164,7 +164,7 @@ impl<'a> CommandRouter<'a> {
             }
             _ => {}
         }
-        self.normalize_screen_state(state, true)
+        self.normalize_screen_state(state, true).await
     }
 
     async fn handle_command_line_event(&mut self, event: TextInput) -> Result<ScreenState> {
@@ -200,26 +200,26 @@ impl<'a> CommandRouter<'a> {
                 let state = self
                     .handle_screen_command_line(CommandLineCommand::Write)
                     .await?;
-                self.normalize_screen_state(state, false)
+                self.normalize_screen_state(state, false).await
             }
             CommandLineAction::WriteQuit => {
                 let state = self
                     .handle_screen_command_line(CommandLineCommand::WriteQuit)
                     .await?;
-                self.normalize_screen_state(state, true)
+                self.normalize_screen_state(state, true).await
             }
             CommandLineAction::WriteQuitAll => {
                 if has_modal_stack(self.state.current_screen, self.screen_stack) {
                     let state = self
                         .handle_screen_command_line(CommandLineCommand::Write)
                         .await?;
-                    let _ = self.normalize_screen_state(state, false)?;
+                    let _ = self.normalize_screen_state(state, false).await?;
                     close_all_modals_impl(self.state, self.screen_stack, self.terminal)
                 } else {
                     let state = self
                         .handle_screen_command_line(CommandLineCommand::WriteQuit)
                         .await?;
-                    self.normalize_screen_state(state, true)
+                    self.normalize_screen_state(state, true).await
                 }
             }
             CommandLineAction::Quit => {
@@ -232,7 +232,7 @@ impl<'a> CommandRouter<'a> {
                 let state = self
                     .handle_screen_command_line(CommandLineCommand::Quit)
                     .await?;
-                self.normalize_screen_state(state, true)
+                self.normalize_screen_state(state, true).await
             }
             CommandLineAction::QuitAll => Ok(ScreenState::Quit),
             CommandLineAction::Sync(action) => {
@@ -315,7 +315,7 @@ impl<'a> CommandRouter<'a> {
                 })
             })
             .await?;
-        self.normalize_screen_state(state, true)
+        self.normalize_screen_state(state, true).await
     }
 
     async fn handle_board_required_action(&mut self, cmd: Command) -> Result<ScreenState> {
@@ -545,76 +545,99 @@ impl<'a> CommandRouter<'a> {
         &mut self,
         state: ScreenState,
         close_on_save: bool,
-    ) -> Result<ScreenState> {
-        match state {
-            ScreenState::SaveProfile(profile) => {
-                if let Err(err) = self.save_profile(profile) {
-                    self.notification_service
-                        .set_error(AppErrorState::error(err.to_string()));
-                }
-                Ok(ScreenState::Refresh)
-            }
-            ScreenState::SaveProfileAndClose(profile) => {
-                if let Err(err) = self.save_profile(profile) {
-                    self.notification_service
-                        .set_error(AppErrorState::error(err.to_string()));
-                    return Ok(ScreenState::Refresh);
-                }
-                if close_on_save {
-                    Ok(ScreenState::Close)
-                } else {
+    ) -> impl std::future::Future<Output = Result<ScreenState>> + '_ {
+        async move {
+            match state {
+                ScreenState::SaveProfile(profile) => {
+                    if let Err(err) = self.save_profile(profile) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err.to_string()));
+                    }
                     Ok(ScreenState::Refresh)
                 }
-            }
-            ScreenState::ApplyTheme(theme_id) => {
-                if let Err(err) = self.save_theme(theme_id.as_str()) {
-                    self.notification_service
-                        .set_error(AppErrorState::error(err.to_string()));
+                ScreenState::SaveProfileAndClose(profile) => {
+                    if let Err(err) = self.save_profile(profile) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err.to_string()));
+                        return Ok(ScreenState::Refresh);
+                    }
+                    if close_on_save {
+                        Ok(ScreenState::Close)
+                    } else {
+                        Ok(ScreenState::Refresh)
+                    }
                 }
-                if let Some(screen) = self.screen_manager.settings_themes_mut() {
-                    screen.set_active_theme(theme_id.as_str());
-                }
-                Ok(ScreenState::Refresh)
-            }
-            ScreenState::SaveCustomTheme(theme) => {
-                if let Err(err) = self.save_custom_theme(theme) {
-                    self.notification_service
-                        .set_error(AppErrorState::error(err.to_string()));
-                    return Ok(ScreenState::Refresh);
-                }
-                let theme_id = self.current_theme_id().to_string();
-                if let Some(screen) = self.screen_manager.settings_themes_mut() {
-                    screen.set_active_theme(theme_id.as_str());
-                }
-                self.screen_manager.invalidate(ScreenType::SettingsThemes);
-                Ok(ScreenState::Refresh)
-            }
-            ScreenState::SaveCustomThemeAndClose(theme) => {
-                if let Err(err) = self.save_custom_theme(theme) {
-                    self.notification_service
-                        .set_error(AppErrorState::error(err.to_string()));
-                    return Ok(ScreenState::Refresh);
-                }
-                self.screen_manager.invalidate(ScreenType::SettingsThemes);
-                if close_on_save {
-                    Ok(ScreenState::Close)
-                } else {
+                ScreenState::ApplyTheme(theme_id) => {
+                    if let Err(err) = self.save_theme(theme_id.as_str()) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err.to_string()));
+                    }
+                    if let Some(screen) = self.screen_manager.settings_themes_mut() {
+                        screen.set_active_theme(theme_id.as_str());
+                    }
                     Ok(ScreenState::Refresh)
                 }
-            }
-            ScreenState::CreateIssue(issue) => {
-                if let Err(err) = self.save_issue(*issue) {
-                    self.notification_service
-                        .set_error(AppErrorState::error(err.to_string()));
-                    return Ok(ScreenState::Refresh);
-                }
-                if close_on_save {
-                    Ok(ScreenState::Close)
-                } else {
+                ScreenState::SaveCustomTheme(theme) => {
+                    if let Err(err) = self.save_custom_theme(theme) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err.to_string()));
+                        return Ok(ScreenState::Refresh);
+                    }
+                    let theme_id = self.current_theme_id().to_string();
+                    if let Some(screen) = self.screen_manager.settings_themes_mut() {
+                        screen.set_active_theme(theme_id.as_str());
+                    }
+                    self.screen_manager.invalidate(ScreenType::SettingsThemes);
                     Ok(ScreenState::Refresh)
                 }
+                ScreenState::SaveCustomThemeAndClose(theme) => {
+                    if let Err(err) = self.save_custom_theme(theme) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err.to_string()));
+                        return Ok(ScreenState::Refresh);
+                    }
+                    self.screen_manager.invalidate(ScreenType::SettingsThemes);
+                    if close_on_save {
+                        Ok(ScreenState::Close)
+                    } else {
+                        Ok(ScreenState::Refresh)
+                    }
+                }
+                ScreenState::CreateIssue(issue) => {
+                    if let Err(err) = self.save_issue(*issue) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(err.to_string()));
+                        return Ok(ScreenState::Refresh);
+                    }
+                    if close_on_save {
+                        Ok(ScreenState::Close)
+                    } else {
+                        Ok(ScreenState::Refresh)
+                    }
+                }
+                ScreenState::ViewIssue(key) => match self.fetch_issue_and_open(&key).await {
+                    Ok(()) => Ok(ScreenState::SwitchTo(ScreenType::IssueDetail)),
+                    Err(err) => {
+                        self.notification_service
+                            .set_error(AppErrorState::error(format!(
+                                "Failed to load issue: {}",
+                                err
+                            )));
+                        Ok(ScreenState::Refresh)
+                    }
+                },
+                ScreenState::OpenInBrowser(key) => {
+                    if let Err(err) = self.open_issue_in_browser(&key) {
+                        self.notification_service
+                            .set_error(AppErrorState::error(format!(
+                                "Failed to open browser: {}",
+                                err
+                            )));
+                    }
+                    Ok(ScreenState::Refresh)
+                }
+                other => Ok(other),
             }
-            other => Ok(other),
         }
     }
 
@@ -713,6 +736,25 @@ impl<'a> CommandRouter<'a> {
             AppConfigState::Loaded(cfg) => cfg.ui.theme.as_str(),
             AppConfigState::Missing(_) => "default",
         }
+    }
+
+    async fn fetch_issue_and_open(&mut self, key: &str) -> Result<()> {
+        let repo = self.repo.as_ref().ok_or_else(|| {
+            color_eyre::eyre::eyre!("Repository not initialized: cannot fetch issue")
+        })?;
+
+        // Fetch the issue from the repository
+        let issue = repo
+            .cache()
+            .fetch_issue(key)
+            .await?
+            .ok_or_else(|| color_eyre::eyre::eyre!("Issue {} not found", key))?;
+
+        // Create the IssueDetail screen with the fetched issue
+        self.screen_manager
+            .create_issue_detail(issue, self.state.mode);
+
+        Ok(())
     }
 
     fn save_issue(&mut self, issue: crate::data::IssueSummary) -> Result<()> {
@@ -851,5 +893,45 @@ impl<'a> CommandRouter<'a> {
                 | ScreenType::SearchIssues
                 | ScreenType::NewIssue
         )
+    }
+
+    fn open_issue_in_browser(&self, issue_key: &str) -> Result<()> {
+        // Get the base URL from the active profile
+        let base_url = match &*self.cfg_state {
+            AppConfigState::Loaded(cfg) => cfg
+                .active_profile()
+                .map(|p| p.jira.base_url.clone())
+                .ok_or_else(|| eyre!("No active profile"))?,
+            AppConfigState::Missing(_) => {
+                return Err(eyre!("Configuration not loaded"));
+            }
+        };
+
+        // Construct the issue URL
+        let url = format!("{}/browse/{}", base_url, issue_key);
+
+        // Open the URL in the default browser (cross-platform)
+        #[cfg(target_os = "macos")]
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| eyre!("Failed to open browser: {}", e))?;
+
+        #[cfg(target_os = "linux")]
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| eyre!("Failed to open browser: {}", e))?;
+
+        #[cfg(target_os = "windows")]
+        std::process::Command::new("cmd")
+            .args(&["/C", "start", "", &url])
+            .spawn()
+            .map_err(|e| eyre!("Failed to open browser: {}", e))?;
+
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        return Err(eyre!("Opening browser is not supported on this platform"));
+
+        Ok(())
     }
 }

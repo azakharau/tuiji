@@ -7,7 +7,10 @@ use std::{
 use color_eyre::Result;
 
 use crate::{
-    app::{AppState, state::ScreenType},
+    app::{
+        AppState,
+        state::{Mode, ScreenType},
+    },
     config::AppConfigState,
     data::AppRepository,
     ui::{
@@ -18,6 +21,7 @@ use crate::{
             conflicts::ConflictsScreen,
             current_sprint::CurrentSprintScreen,
             home::HomeScreen,
+            issue_detail::IssueDetailScreen,
             issue_form::IssueFormScreen,
             my_issues::MyIssuesScreen,
             profile_creation::ProfileCreationScreen,
@@ -58,6 +62,7 @@ enum ScreenEntry {
     MyIssues(MyIssuesScreen),
     SearchIssues(SearchIssuesScreen),
     IssueForm(IssueFormScreen),
+    IssueDetail(IssueDetailScreen),
     Settings(SettingsScreen),
     SettingsThemes(SettingsThemesScreen),
     SettingsThemeForm(SettingsThemeFormScreen),
@@ -76,6 +81,7 @@ impl ScreenEntry {
             ScreenEntry::MyIssues(screen) => screen,
             ScreenEntry::SearchIssues(screen) => screen,
             ScreenEntry::IssueForm(screen) => screen,
+            ScreenEntry::IssueDetail(screen) => screen,
             ScreenEntry::Settings(screen) => screen,
             ScreenEntry::SettingsThemes(screen) => screen,
             ScreenEntry::SettingsThemeForm(screen) => screen,
@@ -248,6 +254,26 @@ impl ScreenManager {
         }
     }
 
+    /// Create an IssueDetail screen with the given issue data.
+    /// This screen is not cached and must be created on-demand.
+    pub fn create_issue_detail(
+        &mut self,
+        issue: crate::data::IssueSummary,
+        mode: Mode,
+    ) -> &mut IssueDetailScreen {
+        let screen = IssueDetailScreen::new(issue, mode);
+        self.insert(ScreenType::IssueDetail, ScreenEntry::IssueDetail(screen));
+        match self
+            .screens
+            .get_mut(&ScreenType::IssueDetail)
+            .expect("IssueDetail screen missing")
+            .screen
+        {
+            ScreenEntry::IssueDetail(ref mut screen) => screen,
+            _ => panic!("IssueDetail screen mismatch"),
+        }
+    }
+
     fn insert(&mut self, screen_type: ScreenType, entry: ScreenEntry) {
         self.screens.insert(
             screen_type,
@@ -374,6 +400,9 @@ impl ScreenManager {
                 Ok(ScreenEntry::SearchIssues(screen))
             }
             ScreenType::NewIssue => Ok(ScreenEntry::IssueForm(IssueFormScreen::new())),
+            ScreenType::IssueDetail => Err(color_eyre::eyre::eyre!(
+                "IssueDetail screen must be created with push_issue_detail() - it requires issue data"
+            )),
         }
     }
 }
