@@ -298,15 +298,16 @@ impl RepositoryHub {
         let change: serde_json::Value = serde_json::from_str(change_set)?;
         let action = change
             .get("action")
-            .and_then(|a| a.as_str())
-            .unwrap_or("update");
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| eyre!("Missing action in change_set"))?;
 
-        // Fetch the issue from cache
-        let issue = self
-            .cache
-            .fetch_issue(issue_key)
-            .await?
-            .ok_or_else(|| eyre!("Issue {} not found in cache", issue_key))?;
+        // Fetch the issue from the cache - if not found, issue was deleted locally
+        let Some(issue) = self.cache.fetch_issue(issue_key).await? else {
+            return Err(eyre!(
+                "Issue {} not found in cache (may have been deleted)",
+                issue_key
+            ));
+        };
 
         // Get estimation field ID from board config if available
         let estimation_field_id = if let Some(sprint_id) = issue.sprint_id {
