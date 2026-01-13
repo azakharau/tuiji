@@ -162,88 +162,68 @@ impl JiraClient {
             .client
             .get("agile", &format!("/board/{}/configuration", board_id))
             .await?;
-        let columns_cfg = resp.get("columnConfig");
-        if columns_cfg.is_none() {
-            return gouqi::Result::Err(gouqi::Error::ConfigError {
-                message: "No columnConfig found".to_string(),
-            });
-        }
-        let columns_cfg: Vec<BoardColumn> = serde_json::from_value(
-            columns_cfg
-                .unwrap()
+
+        let column_config = resp.get("columnConfig").ok_or(gouqi::Error::ConfigError {
+            message: "No columnConfig found".to_string(),
+        })?;
+
+        let columns: Vec<BoardColumn> = serde_json::from_value(
+            column_config
                 .get("columns")
                 .ok_or(gouqi::Error::ConfigError {
                     message: "No columns found".to_string(),
                 })?
                 .clone(),
         )?;
-        let estim: Estimation = {
-            let est_cfg = resp.get("estimation");
-            if est_cfg.is_none() {
-                return gouqi::Result::Err(gouqi::Error::ConfigError {
-                    message: "No estimation config found".to_string(),
+
+        let est_cfg = resp.get("estimation").ok_or(gouqi::Error::ConfigError {
+            message: "No estimation config found".to_string(),
+        })?;
+
+        let est_field = est_cfg.get("field").ok_or(gouqi::Error::ConfigError {
+            message: "No estimation field found".to_string(),
+        })?;
+
+        let display_name = est_field
+            .get("displayName")
+            .ok_or(gouqi::Error::ConfigError {
+                message: "No estimation displayName found".to_string(),
+            })?
+            .as_str()
+            .ok_or(gouqi::Error::ConfigError {
+                message: "Estimation displayName is not a string".to_string(),
+            })?;
+
+        let field_id = est_field
+            .get("fieldId")
+            .ok_or(gouqi::Error::ConfigError {
+                message: "No fieldId found".to_string(),
+            })?
+            .as_str()
+            .ok_or(gouqi::Error::ConfigError {
+                message: "fieldId is not a string".to_string(),
+            })?
+            .to_string();
+
+        let estimation = match display_name {
+            "Story Points" => Estimation::StoryPoints(field_id),
+            "Days" => Estimation::DateBased(field_id),
+            _ => {
+                return Err(gouqi::Error::ConfigError {
+                    message: "Unknown estimation type".to_string(),
                 });
             }
-            match est_cfg
-                .unwrap()
-                .get("field")
-                .ok_or(gouqi::Error::ConfigError {
-                    message: "No estimation field found".to_string(),
-                })?
-                .get("displayName")
-                .ok_or(gouqi::Error::ConfigError {
-                    message: "No estimation displayName found".to_string(),
-                })?
-                .as_str()
-                .ok_or(gouqi::Error::ConfigError {
-                    message: "Estimation displayName is not a string".to_string(),
-                })? {
-                "Story Points" => Estimation::StoryPoints(
-                    est_cfg
-                        .unwrap()
-                        .get("field")
-                        .unwrap()
-                        .get("fieldId")
-                        .ok_or(gouqi::Error::ConfigError {
-                            message: "No fieldId found for Story Points".to_string(),
-                        })?
-                        .as_str()
-                        .ok_or(gouqi::Error::ConfigError {
-                            message: "fieldId for Story Points is not a string".to_string(),
-                        })?
-                        .to_string(),
-                ),
-                "Days" => Estimation::DateBased(
-                    est_cfg
-                        .unwrap()
-                        .get("field")
-                        .unwrap()
-                        .get("fieldId")
-                        .ok_or(gouqi::Error::ConfigError {
-                            message: "No fieldId found for Days".to_string(),
-                        })?
-                        .as_str()
-                        .ok_or(gouqi::Error::ConfigError {
-                            message: "fieldId for Days is not a string".to_string(),
-                        })?
-                        .to_string(),
-                ),
-                _ => {
-                    return gouqi::Result::Err(gouqi::Error::ConfigError {
-                        message: "Unknown estimation type".to_string(),
-                    });
-                }
-            }
         };
+
         Ok(BoardConfig {
-            columns: columns_cfg
+            columns: columns
                 .into_iter()
                 .map(|mut col| {
                     col.post_process();
                     col
                 })
                 .collect(),
-            estimation: estim,
+            estimation,
         })
     }
 

@@ -113,37 +113,36 @@ impl ScreenManager {
             let entry = self.create_entry(screen_type, ctx).await?;
             self.insert(screen_type, entry);
         }
-        let slot = self
-            .screens
-            .get_mut(&screen_type)
-            .expect("Screen not available");
+        // SAFETY: We just inserted the screen if it wasn't present
+        let slot = self.screens.get_mut(&screen_type).ok_or_else(|| {
+            color_eyre::eyre::eyre!("Screen {:?} not available after creation", screen_type)
+        })?;
         slot.last_used = Instant::now();
         Ok(slot.screen.as_screen_mut())
     }
 
     pub fn ensure_profiles(&mut self, cfg_state: &AppConfigState) -> &mut ProfilesScreen {
         self.evict_expired();
-        if !self.screens.contains_key(&ScreenType::Profiles) {
-            let (profiles, active_id) = match cfg_state {
-                AppConfigState::Loaded(cfg) => {
-                    (cfg.profiles.clone(), cfg.active_profile_id.as_deref())
-                }
-                AppConfigState::Missing(_) => (Vec::new(), None),
-            };
-            self.insert(
-                ScreenType::Profiles,
-                ScreenEntry::Profiles(ProfilesScreen::new(&profiles, active_id)),
-            );
-        }
         let slot = self
             .screens
-            .get_mut(&ScreenType::Profiles)
-            .expect("Profiles screen missing");
+            .entry(ScreenType::Profiles)
+            .or_insert_with(|| {
+                let (profiles, active_id) = match cfg_state {
+                    AppConfigState::Loaded(cfg) => {
+                        (cfg.profiles.clone(), cfg.active_profile_id.as_deref())
+                    }
+                    AppConfigState::Missing(_) => (Vec::new(), None),
+                };
+                ScreenSlot {
+                    screen: ScreenEntry::Profiles(ProfilesScreen::new(&profiles, active_id)),
+                    last_used: Instant::now(),
+                }
+            });
         slot.last_used = Instant::now();
-        match &mut slot.screen {
-            ScreenEntry::Profiles(screen) => screen,
-            _ => panic!("Profiles screen mismatch"),
-        }
+        let ScreenEntry::Profiles(screen) = &mut slot.screen else {
+            unreachable!("ScreenType::Profiles always maps to ScreenEntry::Profiles")
+        };
+        screen
     }
 
     pub fn profiles_mut(&mut self) -> Option<&mut ProfilesScreen> {
@@ -220,21 +219,18 @@ impl ScreenManager {
 
     pub fn ensure_settings(&mut self, _cfg_state: &AppConfigState) -> &mut SettingsScreen {
         self.evict_expired();
-        if !self.screens.contains_key(&ScreenType::Settings) {
-            self.insert(
-                ScreenType::Settings,
-                ScreenEntry::Settings(SettingsScreen::new()),
-            );
-        }
         let slot = self
             .screens
-            .get_mut(&ScreenType::Settings)
-            .expect("Settings screen missing");
+            .entry(ScreenType::Settings)
+            .or_insert_with(|| ScreenSlot {
+                screen: ScreenEntry::Settings(SettingsScreen::new()),
+                last_used: Instant::now(),
+            });
         slot.last_used = Instant::now();
-        match &mut slot.screen {
-            ScreenEntry::Settings(screen) => screen,
-            _ => panic!("Settings screen mismatch"),
-        }
+        let ScreenEntry::Settings(screen) = &mut slot.screen else {
+            unreachable!("ScreenType::Settings always maps to ScreenEntry::Settings")
+        };
+        screen
     }
 
     pub fn screen_mut_existing(&mut self, screen_type: ScreenType) -> Option<&mut dyn Screen> {
@@ -262,19 +258,22 @@ impl ScreenManager {
         mode: Mode,
     ) -> &mut IssueDetailScreen {
         let screen = IssueDetailScreen::new(issue, mode);
-        self.insert(
+        self.screens.insert(
             ScreenType::IssueDetail,
-            ScreenEntry::IssueDetail(Box::new(screen)),
+            ScreenSlot {
+                screen: ScreenEntry::IssueDetail(Box::new(screen)),
+                last_used: Instant::now(),
+            },
         );
-        match self
+        // SAFETY: We just inserted this entry
+        let slot = self
             .screens
             .get_mut(&ScreenType::IssueDetail)
-            .expect("IssueDetail screen missing")
-            .screen
-        {
-            ScreenEntry::IssueDetail(ref mut screen) => screen.as_mut(),
-            _ => panic!("IssueDetail screen mismatch"),
-        }
+            .unwrap_or_else(|| unreachable!("IssueDetail was just inserted"));
+        let ScreenEntry::IssueDetail(ref mut screen) = slot.screen else {
+            unreachable!("ScreenType::IssueDetail always maps to ScreenEntry::IssueDetail")
+        };
+        screen.as_mut()
     }
 
     fn insert(&mut self, screen_type: ScreenType, entry: ScreenEntry) {
