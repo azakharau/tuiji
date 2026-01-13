@@ -628,7 +628,8 @@ mod tests {
         config.keybindings.search_issues = vec![];
         config.keybindings.new_issue = vec![];
 
-        let serialized = toml::to_string_pretty(&config).unwrap();
+        let serialized =
+            toml::to_string_pretty(&config).expect("Config serialization should succeed in tests");
 
         // Check that empty arrays are not present
         assert!(
@@ -665,7 +666,8 @@ mod tests {
             ..Default::default()
         };
 
-        let serialized = toml::to_string_pretty(&config).unwrap();
+        let serialized =
+            toml::to_string_pretty(&config).expect("Config serialization should succeed in tests");
 
         // If keybindings are default, the entire [keybindings] section should not be present
         assert!(
@@ -684,7 +686,8 @@ mod tests {
             binding: "custom".to_string(),
         });
 
-        let serialized = toml::to_string_pretty(&config).unwrap();
+        let serialized =
+            toml::to_string_pretty(&config).expect("Config serialization should succeed in tests");
 
         // Custom keybindings should be present
         assert!(

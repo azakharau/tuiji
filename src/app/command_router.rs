@@ -7,6 +7,7 @@ use ratatui::DefaultTerminal;
 use crate::{
     app::{
         AppState, ProfileEditorIntent,
+        context::{AppContext, InputContext, ServiceContext},
         error::{AppErrorLevel, AppErrorState},
         input::{
             CommandLineAction, CommandLineOutcome, CommandLineState, InputCommand, InputParser,
@@ -43,33 +44,20 @@ pub struct CommandRouter<'a> {
 }
 
 impl<'a> CommandRouter<'a> {
-    pub fn new(
-        state: &'a mut AppState,
-        screen_stack: &'a mut Vec<ScreenType>,
-        screen_manager: &'a mut ScreenManager,
-        terminal: &'a mut DefaultTerminal,
-        cfg_state: &'a mut AppConfigState,
-        key_bindings: &'a mut Arc<KeyBindings>,
-        repo: &'a mut Option<Arc<RepositoryHub>>,
-        notification_service: &'a mut NotificationService,
-        worker_controller: &'a mut WorkerController,
-        command_line: &'a mut CommandLineState,
-        input: &'a mut InputParser,
-        show_hints: &'a mut bool,
-    ) -> Self {
+    pub fn new(app: AppContext<'a>, services: ServiceContext<'a>, input: InputContext<'a>) -> Self {
         Self {
-            state,
-            screen_stack,
-            screen_manager,
-            terminal,
-            cfg_state,
-            key_bindings,
-            repo,
-            notification_service,
-            worker_controller,
-            command_line,
-            input,
-            show_hints,
+            state: app.state,
+            screen_stack: app.screen_stack,
+            screen_manager: app.screen_manager,
+            terminal: app.terminal,
+            cfg_state: app.cfg_state,
+            key_bindings: app.key_bindings,
+            repo: app.repo,
+            notification_service: services.notification,
+            worker_controller: services.worker,
+            command_line: input.command_line,
+            input: input.input,
+            show_hints: input.show_hints,
         }
     }
 

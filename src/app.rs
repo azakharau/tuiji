@@ -7,6 +7,7 @@ use ratatui::DefaultTerminal;
 use crate::{
     app::{
         command_router::CommandRouter,
+        context::{AppContext, InputContext, ServiceContext},
         input::{CommandLineState, CommandResolver, InputParser, is_question_mark},
         key_handlers::KeyBindings,
         notification_service::NotificationService,
@@ -21,6 +22,7 @@ use crate::{
 };
 
 pub mod command_router;
+pub mod context;
 pub mod error;
 pub mod event;
 pub mod event_loop;
@@ -139,18 +141,24 @@ impl App {
             return Ok(ScreenState::Stay);
         };
         let mut router = CommandRouter::new(
-            &mut self.state,
-            &mut self.screen_stack,
-            &mut self.screen_manager,
-            &mut self.terminal,
-            &mut self.cfg_state,
-            &mut self.key_bindings,
-            &mut self.repo,
-            &mut self.notification_service,
-            &mut self.worker_controller,
-            &mut self.command_line,
-            &mut self.input,
-            &mut self.show_hints,
+            AppContext {
+                state: &mut self.state,
+                screen_stack: &mut self.screen_stack,
+                screen_manager: &mut self.screen_manager,
+                terminal: &mut self.terminal,
+                cfg_state: &mut self.cfg_state,
+                key_bindings: &mut self.key_bindings,
+                repo: &mut self.repo,
+            },
+            ServiceContext {
+                notification: &mut self.notification_service,
+                worker: &mut self.worker_controller,
+            },
+            InputContext {
+                command_line: &mut self.command_line,
+                input: &mut self.input,
+                show_hints: &mut self.show_hints,
+            },
         );
         router.handle_input_command(cmd).await
     }

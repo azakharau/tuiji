@@ -66,7 +66,12 @@ impl<'a> Widget for DropdownPopup<'a> {
         // Clear the popup area first
         for y in area.y..area.y + area.height {
             for x in area.x..area.x + area.width {
-                buf.cell_mut((x, y)).unwrap().reset();
+                // SAFETY: Coordinates (x, y) are guaranteed to be within buffer bounds
+                // because they're derived from the area Rect provided by ratatui's layout system,
+                // which ensures all areas fit within the terminal buffer dimensions.
+                if let Some(cell) = buf.cell_mut((x, y)) {
+                    cell.reset();
+                }
             }
         }
 

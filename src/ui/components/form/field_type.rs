@@ -92,7 +92,7 @@ impl FieldValue {
     pub fn is_empty(&self) -> bool {
         match self {
             FieldValue::Text(s) => s.is_empty(),
-            FieldValue::Single(opt) => opt.is_none() || opt.as_ref().unwrap().is_empty(),
+            FieldValue::Single(opt) => opt.as_ref().is_none_or(|s| s.is_empty()),
             FieldValue::Multiple(v) => v.is_empty(),
         }
     }

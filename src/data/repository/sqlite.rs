@@ -19,6 +19,18 @@ use crate::{
 pub const OUTBOX_BATCH_SIZE: i64 = 20;
 pub const MAX_OUTBOX_ATTEMPTS: i64 = 5;
 
+/// Data for inserting or updating a sprint
+#[derive(Debug)]
+pub struct SprintData<'a> {
+    pub board_id: u64,
+    pub sprint_id: u64,
+    pub name: &'a str,
+    pub state: Option<String>,
+    pub start_date: Option<i64>,
+    pub end_date: Option<i64>,
+    pub complete_date: Option<i64>,
+}
+
 #[derive(Debug, Clone)]
 pub struct SqliteRepositoryConfig {
     pub db_path: PathBuf,
@@ -892,16 +904,7 @@ impl SqliteRepository {
         Ok(())
     }
 
-    pub async fn upsert_sprint(
-        &self,
-        board_id: u64,
-        sprint_id: u64,
-        name: &str,
-        state: Option<String>,
-        start_date: Option<i64>,
-        end_date: Option<i64>,
-        complete_date: Option<i64>,
-    ) -> Result<()> {
+    pub async fn upsert_sprint(&self, data: SprintData<'_>) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO sprints (id, board_id, name, state, start_date, end_date, complete_date, updated_at, profile_id)
@@ -917,13 +920,13 @@ impl SqliteRepository {
                 profile_id = excluded.profile_id
             "#,
         )
-        .bind(sprint_id as i64)
-        .bind(board_id as i64)
-        .bind(name)
-        .bind(state)
-        .bind(start_date)
-        .bind(end_date)
-        .bind(complete_date)
+        .bind(data.sprint_id as i64)
+        .bind(data.board_id as i64)
+        .bind(data.name)
+        .bind(data.state)
+        .bind(data.start_date)
+        .bind(data.end_date)
+        .bind(data.complete_date)
         .bind(self.profile_id())
         .execute(&self.pool)
         .await?;

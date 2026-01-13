@@ -123,21 +123,18 @@ impl ScreenManager {
 
     pub fn ensure_profiles(&mut self, cfg_state: &AppConfigState) -> &mut ProfilesScreen {
         self.evict_expired();
-        let slot = self
-            .screens
-            .entry(ScreenType::Profiles)
-            .or_insert_with(|| {
-                let (profiles, active_id) = match cfg_state {
-                    AppConfigState::Loaded(cfg) => {
-                        (cfg.profiles.clone(), cfg.active_profile_id.as_deref())
-                    }
-                    AppConfigState::Missing(_) => (Vec::new(), None),
-                };
-                ScreenSlot {
-                    screen: ScreenEntry::Profiles(ProfilesScreen::new(&profiles, active_id)),
-                    last_used: Instant::now(),
+        let slot = self.screens.entry(ScreenType::Profiles).or_insert_with(|| {
+            let (profiles, active_id) = match cfg_state {
+                AppConfigState::Loaded(cfg) => {
+                    (cfg.profiles.clone(), cfg.active_profile_id.as_deref())
                 }
-            });
+                AppConfigState::Missing(_) => (Vec::new(), None),
+            };
+            ScreenSlot {
+                screen: ScreenEntry::Profiles(ProfilesScreen::new(&profiles, active_id)),
+                last_used: Instant::now(),
+            }
+        });
         slot.last_used = Instant::now();
         let ScreenEntry::Profiles(screen) = &mut slot.screen else {
             unreachable!("ScreenType::Profiles always maps to ScreenEntry::Profiles")
