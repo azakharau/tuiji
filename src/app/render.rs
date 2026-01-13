@@ -84,13 +84,12 @@ impl AppRenderer {
             .render_stack
             .iter()
             .any(|screen| screen == ScreenType::SyncStatus)
+            && let Some(screen) = screen_manager.sync_status_mut()
         {
-            if let Some(screen) = screen_manager.sync_status_mut() {
-                screen.set_snapshot(state.sync_status.clone());
-                let filter = screen.filter();
-                if let Ok(entries) = state.repo.sync_log(10, filter).await {
-                    screen.set_log(entries);
-                }
+            screen.set_snapshot(state.sync_status.clone());
+            let filter = screen.filter();
+            if let Ok(entries) = state.repo.sync_log(10, filter).await {
+                screen.set_log(entries);
             }
         }
         Ok(())
@@ -164,15 +163,11 @@ impl AppRenderer {
                 None => {}
             }
 
-            if !command_drawn {
-                if let Some(buffer) = command_buffer {
-                    if matches!(overlay, Some(OverlayItem::Notification(_)) | None) {
-                        frame.render_widget(
-                            CommandLineModal::new(buffer, &render_ctx),
-                            frame.area(),
-                        );
-                    }
-                }
+            if !command_drawn
+                && let Some(buffer) = command_buffer
+                && matches!(overlay, Some(OverlayItem::Notification(_)) | None)
+            {
+                frame.render_widget(CommandLineModal::new(buffer, &render_ctx), frame.area());
             }
         })?;
 

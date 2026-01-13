@@ -93,12 +93,12 @@ impl NotificationService {
 
     pub fn tick(&mut self) -> bool {
         let mut changed = false;
-        if let Some(expires_at) = self.error_expires_at {
-            if std::time::Instant::now() >= expires_at {
-                self.error_state = None;
-                self.error_expires_at = None;
-                changed = true;
-            }
+        if let Some(expires_at) = self.error_expires_at
+            && std::time::Instant::now() >= expires_at
+        {
+            self.error_state = None;
+            self.error_expires_at = None;
+            changed = true;
         }
         if !self.notifications.is_empty() {
             let now = std::time::Instant::now();

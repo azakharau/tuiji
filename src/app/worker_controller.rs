@@ -66,6 +66,12 @@ pub struct WorkerController {
     last_push: Option<SystemTime>,
 }
 
+impl Default for WorkerController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WorkerController {
     pub fn new() -> Self {
         Self {
@@ -100,7 +106,7 @@ impl WorkerController {
         let pos = self
             .queue
             .iter()
-            .position(|job| job.next_attempt_at.map_or(true, |at| at <= now))?;
+            .position(|job| job.next_attempt_at.is_none_or(|at| at <= now))?;
         let job = if pos == 0 {
             self.queue.pop_front()?
         } else {
