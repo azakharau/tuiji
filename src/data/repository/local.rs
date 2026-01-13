@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use color_eyre::{Result, eyre::eyre};
 use gouqi::Board;
+use log::error;
 
 use crate::{
     client::jira::BoardConfig,
@@ -227,7 +228,7 @@ impl RepositoryHub {
 
         // Cleanup old completed outbox entries (older than 7 days)
         if let Err(err) = self.cache.cleanup_old_outbox(7).await {
-            eprintln!("Failed to cleanup old outbox entries: {}", err);
+            error!("Failed to cleanup old outbox entries: {}", err);
         }
 
         // Fetch pending outbox items

@@ -3,6 +3,7 @@ use std::time::Duration;
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent};
 use futures::StreamExt;
+use log::error;
 use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle, time};
 
 use crate::app::screen_manager::ScreenContext;
@@ -229,7 +230,7 @@ fn spawn_input_listener(tx: UnboundedSender<AppEvent>) -> JoinHandle<()> {
                 }
                 Ok(_) => {}
                 Err(err) => {
-                    eprintln!("event stream error: {err}");
+                    error!("Event stream error: {}", err);
                     break;
                 }
             }
