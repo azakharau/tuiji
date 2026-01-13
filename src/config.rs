@@ -8,7 +8,7 @@ const CFG_DIR: &str = "tuiji";
 
 #[derive(Debug)]
 pub enum AppConfigState {
-    Loaded(AppConfig),
+    Loaded(Box<AppConfig>),
     Missing(ConfigError),
 }
 
@@ -76,7 +76,7 @@ impl AppConfig {
 
     pub fn load_state() -> AppConfigState {
         match Self::load() {
-            Ok(cfg) => AppConfigState::Loaded(cfg),
+            Ok(cfg) => AppConfigState::Loaded(Box::new(cfg)),
             Err(err) => AppConfigState::Missing(err),
         }
     }

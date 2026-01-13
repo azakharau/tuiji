@@ -442,11 +442,11 @@ impl<'a> CommandRouter<'a> {
                 };
                 let mut cfg = match &*self.cfg_state {
                     AppConfigState::Loaded(cfg) => cfg.clone(),
-                    AppConfigState::Missing(_) => AppConfig::default(),
+                    AppConfigState::Missing(_) => Box::new(AppConfig::default()),
                 };
                 if cfg.profiles.iter().any(|p| p.id == profile_id) {
                     cfg.set_active_profile(profile_id.as_str());
-                    self.save_config(cfg)?;
+                    self.save_config(*cfg)?;
                 }
                 Ok(ScreenState::Refresh)
             }
@@ -473,10 +473,10 @@ impl<'a> CommandRouter<'a> {
                 };
                 let mut cfg = match &*self.cfg_state {
                     AppConfigState::Loaded(cfg) => cfg.clone(),
-                    AppConfigState::Missing(_) => AppConfig::default(),
+                    AppConfigState::Missing(_) => Box::new(AppConfig::default()),
                 };
                 if cfg.remove_profile(profile_id.as_str()) {
-                    self.save_config(cfg)?;
+                    self.save_config(*cfg)?;
                     return Ok(ScreenState::Refresh);
                 }
                 Ok(ScreenState::Stay)
@@ -641,7 +641,7 @@ impl<'a> CommandRouter<'a> {
     fn save_profile(&mut self, profile: ProfileConfig) -> Result<()> {
         let mut cfg = match &*self.cfg_state {
             AppConfigState::Loaded(cfg) => cfg.clone(),
-            AppConfigState::Missing(_) => AppConfig::default(),
+            AppConfigState::Missing(_) => Box::new(AppConfig::default()),
         };
         let profile_id = profile.id.clone();
         let name_lower = profile.name.to_lowercase();
@@ -657,7 +657,7 @@ impl<'a> CommandRouter<'a> {
         }
         cfg.upsert_profile(profile);
         cfg.set_active_profile(&profile_id);
-        self.save_config(cfg)?;
+        self.save_config(*cfg)?;
         self.state.profile_editor = Some(ProfileEditorIntent::Edit(profile_id.clone()));
         if let Some(screen) = self.screen_manager.profile_creation_mut() {
             screen.set_profile_id(profile_id);
@@ -675,7 +675,7 @@ impl<'a> CommandRouter<'a> {
                 "Repository not initialized: cannot refresh active profile"
             ));
         }
-        *self.cfg_state = AppConfigState::Loaded(cfg);
+        *self.cfg_state = AppConfigState::Loaded(Box::new(cfg));
         let selected_profile_id = self
             .screen_manager
             .profiles_mut()
@@ -697,7 +697,7 @@ impl<'a> CommandRouter<'a> {
     fn save_theme(&mut self, theme_id: &str) -> Result<()> {
         let mut cfg = match &*self.cfg_state {
             AppConfigState::Loaded(cfg) => cfg.clone(),
-            AppConfigState::Missing(_) => AppConfig::default(),
+            AppConfigState::Missing(_) => Box::new(AppConfig::default()),
         };
         cfg.ui.set_theme(theme_id);
         cfg.save()?;
@@ -709,7 +709,7 @@ impl<'a> CommandRouter<'a> {
         theme.id = theme.id.to_lowercase();
         let mut cfg = match &*self.cfg_state {
             AppConfigState::Loaded(cfg) => cfg.clone(),
-            AppConfigState::Missing(_) => AppConfig::default(),
+            AppConfigState::Missing(_) => Box::new(AppConfig::default()),
         };
         if crate::ui::theme::ThemeRegistry::is_builtin_id(theme.id.as_str()) {
             return Err(eyre!(
@@ -867,12 +867,12 @@ impl<'a> CommandRouter<'a> {
     fn switch_to_offline(&mut self) -> Result<()> {
         let mut cfg = match &*self.cfg_state {
             AppConfigState::Loaded(cfg) => cfg.clone(),
-            AppConfigState::Missing(_) => AppConfig::default(),
+            AppConfigState::Missing(_) => Box::new(AppConfig::default()),
         };
         if let Some(profile) = cfg.active_profile_mut() {
             profile.set_sync_mode(SyncMode::Cache);
             let name = profile.name.clone();
-            self.save_config(cfg)?;
+            self.save_config(*cfg)?;
             self.notification_service.push_notification(
                 format!("Profile \"{name}\" switched to offline mode"),
                 AppErrorLevel::Info,

@@ -62,7 +62,7 @@ enum ScreenEntry {
     MyIssues(MyIssuesScreen),
     SearchIssues(SearchIssuesScreen),
     IssueForm(IssueFormScreen),
-    IssueDetail(IssueDetailScreen),
+    IssueDetail(Box<IssueDetailScreen>),
     Settings(SettingsScreen),
     SettingsThemes(SettingsThemesScreen),
     SettingsThemeForm(SettingsThemeFormScreen),
@@ -81,7 +81,7 @@ impl ScreenEntry {
             ScreenEntry::MyIssues(screen) => screen,
             ScreenEntry::SearchIssues(screen) => screen,
             ScreenEntry::IssueForm(screen) => screen,
-            ScreenEntry::IssueDetail(screen) => screen,
+            ScreenEntry::IssueDetail(screen) => screen.as_mut(),
             ScreenEntry::Settings(screen) => screen,
             ScreenEntry::SettingsThemes(screen) => screen,
             ScreenEntry::SettingsThemeForm(screen) => screen,
@@ -262,14 +262,17 @@ impl ScreenManager {
         mode: Mode,
     ) -> &mut IssueDetailScreen {
         let screen = IssueDetailScreen::new(issue, mode);
-        self.insert(ScreenType::IssueDetail, ScreenEntry::IssueDetail(screen));
+        self.insert(
+            ScreenType::IssueDetail,
+            ScreenEntry::IssueDetail(Box::new(screen)),
+        );
         match self
             .screens
             .get_mut(&ScreenType::IssueDetail)
             .expect("IssueDetail screen missing")
             .screen
         {
-            ScreenEntry::IssueDetail(ref mut screen) => screen,
+            ScreenEntry::IssueDetail(ref mut screen) => screen.as_mut(),
             _ => panic!("IssueDetail screen mismatch"),
         }
     }
