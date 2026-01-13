@@ -746,10 +746,14 @@ impl<'a> CommandRouter<'a> {
         })?;
 
         self.notification_service.push_notification(
-            format!("Issue {} created successfully", issue_key),
+            format!("Issue {} saved successfully", issue_key),
             AppErrorLevel::Info,
             AppNotificationKind::System,
         );
+
+        // Automatically enqueue push sync after save
+        self.worker_controller
+            .enqueue(SyncJob::new(SyncJobKind::Push, SyncSource::Manual));
 
         // Invalidate relevant screens to show the new issue
         self.screen_manager.invalidate_many(&[
