@@ -1,5 +1,10 @@
 # Repository Guidelines
 
+## Language / Язык
+- **All responses to user must be in Russian / Все ответы пользователю должны быть на русском языке**
+- Code, comments, commit messages, and documentation remain in English
+- Technical discussions and explanations should be in Russian
+
 ## Project Structure & Modules
 - Core app logic: `src/app.rs` (event loop, screen manager) plus submodules `src/app/{event,input,key_handlers,screen_manager,state}.rs`.
 - UI: `src/ui` (screens, components). Screens live in `src/ui/screens/*`, shared widgets in `src/ui/components/*`.

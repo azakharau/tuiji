@@ -17,10 +17,11 @@ impl AppConfigState {
         matches!(self, AppConfigState::Loaded(_))
     }
 
-    pub fn as_loaded(&self) -> &AppConfig {
+    /// Returns the loaded config if available, or an error if not loaded
+    pub fn as_loaded(&self) -> Result<&AppConfig, &ConfigError> {
         match self {
-            AppConfigState::Loaded(cfg) => cfg,
-            _ => panic!("App config is not loaded"),
+            AppConfigState::Loaded(cfg) => Ok(cfg),
+            AppConfigState::Missing(err) => Err(err),
         }
     }
 }

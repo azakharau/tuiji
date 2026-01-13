@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use color_eyre::Result;
+use color_eyre::{Result, eyre::eyre};
 use serde_json::Value;
 
 use crate::{
@@ -295,10 +295,20 @@ fn issue_summary_to_create_fields(
 
     // Story points (custom field - use provided field_id or default)
     if let Some(story_points) = issue.story_points {
+        // Validate that story_points is a valid number
+        if !story_points.is_finite() {
+            return Err(eyre!(
+                "Invalid story points value: {} (must be a finite number)",
+                story_points
+            ));
+        }
         let field_id = estimation_field_id.unwrap_or("customfield_10002");
         fields.insert(
             field_id.to_string(),
-            Value::Number(serde_json::Number::from_f64(story_points).unwrap()),
+            Value::Number(
+                serde_json::Number::from_f64(story_points)
+                    .ok_or_else(|| eyre!("Failed to convert story points to JSON number"))?,
+            ),
         );
     }
 
@@ -358,10 +368,20 @@ fn issue_summary_to_fields(
     }
 
     if let Some(story_points) = issue.story_points {
+        // Validate that story_points is a valid number
+        if !story_points.is_finite() {
+            return Err(eyre!(
+                "Invalid story points value: {} (must be a finite number)",
+                story_points
+            ));
+        }
         let field_id = estimation_field_id.unwrap_or("customfield_10002");
         fields.insert(
             field_id.to_string(),
-            Value::Number(serde_json::Number::from_f64(story_points).unwrap()),
+            Value::Number(
+                serde_json::Number::from_f64(story_points)
+                    .ok_or_else(|| eyre!("Failed to convert story points to JSON number"))?,
+            ),
         );
     }
 
