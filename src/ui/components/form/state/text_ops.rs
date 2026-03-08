@@ -110,3 +110,7 @@ pub(super) fn row_col_to_position(text: &str, row: usize, col: usize) -> usize {
     // If row is beyond available lines, return end of text.
     text.len()
 }
+
+pub(super) fn line_len_at_row(text: &str, row: usize) -> usize {
+    text.lines().nth(row).map(|line| line.len()).unwrap_or(0)
+}

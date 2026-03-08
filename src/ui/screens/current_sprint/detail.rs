@@ -10,6 +10,8 @@ use crate::{
     ui::{components::layout::ModalFrame, context::RenderContext},
 };
 
+use super::formatting::format_story_points;
+
 pub(super) fn render_issue_detail_modal(
     frame: &mut Frame,
     issue: &IssueSummary,
@@ -92,12 +94,4 @@ fn kv_line<'a>(label: &'a str, value: &'a str, context: &RenderContext) -> Line<
             Style::default().fg(context.colors().text),
         ),
     ])
-}
-
-fn format_story_points(value: f64) -> String {
-    if value.fract() == 0.0 {
-        format!("{value:.0}")
-    } else {
-        format!("{value:.1}")
-    }
 }

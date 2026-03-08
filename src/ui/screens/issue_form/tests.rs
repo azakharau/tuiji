@@ -318,6 +318,35 @@ fn test_command_line_write_with_validation_error() {
 }
 
 #[test]
+fn test_command_line_write_quit_with_validation_error() {
+    use crate::ui::screens::CommandLineCommand;
+    let mut state = IssueFormState::new();
+
+    let result =
+        IssueFormController::handle_command_line(&mut state, CommandLineCommand::WriteQuit);
+
+    assert_eq!(result, ScreenState::Refresh);
+    assert!(state.error().is_some());
+}
+
+#[test]
+fn test_command_line_write_quit_should_close_when_summary_present() {
+    use crate::ui::components::form::FieldValue;
+    use crate::ui::screens::CommandLineCommand;
+
+    let mut state = IssueFormState::new();
+    if let FieldValue::Text(summary) = &mut state.form_mut().fields_mut()[0].value {
+        *summary = "Valid summary".to_string();
+    }
+
+    let result =
+        IssueFormController::handle_command_line(&mut state, CommandLineCommand::WriteQuit);
+
+    assert_eq!(result, ScreenState::Close);
+    assert!(state.error().is_none());
+}
+
+#[test]
 fn test_repeat_count() {
     let mut state = IssueFormState::new();
     assert_eq!(state.form().selected_index(), 0);

@@ -1,5 +1,5 @@
 use super::super::field_type::{CursorState, FieldValue};
-use super::text_ops::row_col_to_position;
+use super::text_ops::{line_len_at_row, row_col_to_position};
 use super::*;
 
 impl FormState {
@@ -114,8 +114,13 @@ impl FormState {
                     }
                 }
                 (CursorState::TextArea { .. }, FieldValue::Text(s)) => {
+                    let line_len = if let CursorState::TextArea { row, .. } = &field.cursor {
+                        line_len_at_row(s, *row)
+                    } else {
+                        0
+                    };
                     if let CursorState::TextArea { col, .. } = &mut field.cursor {
-                        *col = s.len();
+                        *col = line_len;
                     }
                 }
                 _ => {}

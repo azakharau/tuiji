@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::ui::context::RenderContext;
 
-use super::state::CurrentSprintState;
+use super::{formatting::format_story_points, state::CurrentSprintState};
 
 pub struct TableView;
 
@@ -121,13 +121,5 @@ impl TableView {
                 .style(Style::default().fg(context.colors().accent));
             frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
         }
-    }
-}
-
-fn format_story_points(value: f64) -> String {
-    if value.fract() == 0.0 {
-        format!("{value:.0}")
-    } else {
-        format!("{value:.1}")
     }
 }
