@@ -1,6 +1,6 @@
 use crate::{
-    app::key_handlers::{ActionId, Command},
-    app::state::ScreenType,
+    ui::interaction::ScreenType,
+    ui::interaction::{ActionId, Command},
     ui::screens::ScreenState,
 };
 

@@ -1,11 +1,11 @@
 use crate::{
-    app::{
-        error::AppErrorState,
-        key_handlers::{ActionId, Command, InsertMode},
-    },
     config::{JiraConfig, ProfileConfig},
+    contracts::error::AppErrorState,
     ui::components::form::FormState,
-    ui::screens::{CommandLineCommand, ScreenState},
+    ui::{
+        interaction::{ActionId, Command, InsertMode},
+        screens::{CommandLineCommand, ScreenState},
+    },
 };
 
 use super::state::ProfileCreationState;

@@ -1,0 +1,65 @@
+use super::*;
+
+impl<'a> NavigationController<'a> {
+    pub(crate) fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
+        match action {
+            ScreenState::Quit => {
+                self.terminal.clear()?;
+                Ok(ActionOutcome::Quit)
+            }
+            ScreenState::SwitchTo(new_screen) => {
+                if self.state.current_screen == ScreenType::ProfileCreation
+                    && new_screen != ScreenType::ProfileCreation
+                {
+                    self.screen_manager.invalidate(ScreenType::ProfileCreation);
+                    self.state.profile_editor = None;
+                }
+                if new_screen == ScreenType::Home {
+                    self.screen_stack.clear();
+                } else if new_screen != self.state.current_screen {
+                    self.screen_stack.push(self.state.current_screen);
+                }
+                self.state.current_screen = new_screen;
+                if new_screen == ScreenType::ProfileCreation && self.state.profile_editor.is_none()
+                {
+                    self.state.profile_editor = Some(ProfileEditorIntent::New);
+                }
+                Ok(ActionOutcome::Continue { render: true })
+            }
+            ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
+            ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
+            ScreenState::SwitchMode(mode) => {
+                self.state.mode = mode;
+                Ok(ActionOutcome::Continue { render: true })
+            }
+            ScreenState::Close => self.close_screen(),
+            ScreenState::SaveProfile(_)
+            | ScreenState::SaveProfileAndClose(_)
+            | ScreenState::ApplyTheme(_)
+            | ScreenState::SaveCustomTheme(_)
+            | ScreenState::SaveCustomThemeAndClose(_)
+            | ScreenState::ResolveConflictLocal(_)
+            | ScreenState::ResolveConflictRemote(_)
+            | ScreenState::SyncNow
+            | ScreenState::SyncPause
+            | ScreenState::SyncRetry
+            | ScreenState::SyncResume => Ok(ActionOutcome::Continue { render: true }),
+        }
+    }
+
+    pub(crate) fn close_screen(&mut self) -> Result<ActionOutcome> {
+        if self.state.current_screen == ScreenType::ProfileCreation {
+            self.screen_manager.invalidate(ScreenType::ProfileCreation);
+            self.state.profile_editor = None;
+        }
+        if let Some(prev) = self.screen_stack.pop() {
+            self.state.current_screen = prev;
+            Ok(ActionOutcome::Continue { render: true })
+        } else if is_modal_screen(self.state.current_screen) {
+            self.state.current_screen = ScreenType::Home;
+            Ok(ActionOutcome::Continue { render: true })
+        } else {
+            Ok(ActionOutcome::Quit)
+        }
+    }
+}

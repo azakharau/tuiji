@@ -1,44 +1,138 @@
-# Repository Guidelines
+# AGENTS.md
 
-## Language / Язык
-- **All responses to user must be in Russian / Все ответы пользователю должны быть на русском языке**
-- Code, comments, commit messages, and documentation remain in English
-- Technical discussions and explanations should be in Russian
+## Purpose
 
-## Project Structure & Modules
-- Core app logic: `src/app.rs` (event loop, screen manager) plus submodules `src/app/{event,input,key_handlers,screen_manager,state}.rs`.
-- UI: `src/ui` (screens, components). Screens live in `src/ui/screens/*`, shared widgets in `src/ui/components/*`.
-- Jira client: `src/client/jira.rs` (async gouqi wrapper).
-- Repository hub: `src/data/repository/local.rs` (`RepositoryHub`) plus `AppRepository` trait in `src/data/repository/mod.rs`.
-- Config and types: `src/config.rs`.
-- Entry point: `src/main.rs`.
-- Build artifacts: `target/`; configuration files under `tuiji/config.toml` in your config dir.
+This repository is the Rust codebase for `tuiji`, a terminal-first Jira workflow client.
 
-## Build, Test, Run
-- `cargo check` — fast validation of the workspace.
-- `cargo test` — run the test suite (none yet; add tests here).
-- `cargo run` — launch the TUI with fullscreen viewport.
-- Optional: set config via env (`TUIJI_JIRA_*`, `TUIJI_CFG_FILE_PATH`) before running.
+Use this file as the repo-local operating guide for agents working in this worktree:
+- understand the module layout
+- preserve architectural boundaries
+- use the standard build/test commands
+- optionally consult the external project knowledge base and memory system when they exist
 
-## Coding Style & Naming
-- Rust 2024 edition; follow `rustfmt` defaults (4-space indent). Run `cargo fmt` before submitting.
-- Prefer `Arc` for shared data in async contexts; avoid `Rc` in new code.
-- Screen interfaces: implement `Screen` + `KeyHandler`; avoid long-lived borrows of `AppState`.
-- Config-driven key bindings: use `KeyBindings` instead of hardcoded keys.
-## Configuration Notes
-- UI settings live under `[ui]` in `config.toml` (e.g., `screen_cache_ttl_seconds`).
-- Key bindings live under `[keybindings]` in `config.toml`; defaults mirror the built-in vim-style bindings.
+## Project Structure
 
-## Testing Guidelines
-- Add unit tests alongside modules (e.g., `src/app/state.rs` → `state.rs` tests in the same file or `state_tests.rs`).
-- Prefer deterministic tests; stub Jira calls (do not hit network in CI).
-- Use `cargo test -- --nocapture` when debugging failures.
+Main runtime areas:
 
-## Commit & PR Guidelines
-- Commits: present-tense, concise summary (e.g., `Add async Jira client`, `Fix key binding hints`).
-- PRs should include: brief description, key changes, manual test notes (`cargo check`, `cargo run`), and screenshots/GIFs for UI tweaks.
-- Link relevant issues/tickets; note any breaking changes or config migrations.
+- `src/main.rs`
+  - terminal bootstrap and app startup
+- `src/app`
+  - event loop, command routing, state transitions, worker orchestration
+- `src/ui`
+  - screens, components, rendering, interaction contracts
+- `src/data`
+  - repository abstractions, SQLite cache, sync/conflict logic
+- `src/client`
+  - Jira HTTP client abstractions
+- `src/config`
+  - config model, env overrides, user settings
 
-## Security & Configuration Tips
-- Never commit real Jira credentials. Use env vars or `tuiji/config.toml` in your local config dir.
-- Validate that new async tasks are cancel-safe and avoid blocking calls on Tokio threads.
+Important architectural contracts:
+
+- UI interaction contracts: `src/ui/interaction.rs`
+- Layout primitives: `src/ui/layout.rs`
+- Shared contracts: `src/contracts`
+- Repository hub / traits: `src/data/repository`
+
+## Architectural Rules
+
+1. Keep input/routing/state orchestration in `src/app`.
+2. Keep rendering and screen composition in `src/ui`.
+3. Keep transport-specific Jira logic in `src/client`.
+4. Keep persistence and cache/sync behavior in `src/data`.
+5. Keep config- and keybinding-driven behavior in config modules rather than hardcoded shortcuts.
+
+Prefer preserving existing explicit contracts over introducing implicit coupling.
+
+## Standard Commands
+
+Prefer the standard Rust commands:
+
+- `cargo check`
+- `cargo test`
+- `cargo run`
+- `cargo fmt`
+- `cargo clippy -- -D warnings`
+
+Before finishing non-trivial code changes, prefer running:
+
+1. `cargo fmt`
+2. `cargo check`
+3. the narrowest relevant tests, or `cargo test` if practical
+
+If you could not run checks, say so explicitly.
+
+## Implementation Guidance
+
+When working in this repo:
+
+1. Inspect the affected module boundary before editing.
+2. Prefer config-driven key/action behavior over hardcoded values.
+3. Preserve local-cache compatibility unless intentionally changing sync semantics.
+4. Avoid blocking operations on Tokio runtime threads.
+5. Keep screen-specific behavior inside screen/UI modules unless it is truly cross-cutting.
+6. Prefer explicit typed contracts for routing, notifications, sync, and errors.
+
+## Testing Guidance
+
+- Prefer deterministic tests.
+- Stub Jira/network interactions in tests; do not depend on live network behavior.
+- For debugging failures, `cargo test -- --nocapture` is acceptable.
+
+## Optional External Knowledge Base And Memory
+
+The existence of these external sources is optional.
+Their usage is not optional when they are available.
+
+If the following paths exist, read and use them before making non-trivial decisions:
+
+- project notes root:
+  - `/Users/aliakseizakharau/obsidian/Projects/tuiji`
+- agent operating context:
+  - `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context`
+
+If they are missing or unavailable:
+- continue from repository-local evidence
+- do not block work
+- note briefly that the external knowledge source was unavailable
+
+## How To Use The External Notes
+
+If the notes root exists, you must start with:
+
+1. `/Users/aliakseizakharau/obsidian/Projects/tuiji/README.md`
+2. `/Users/aliakseizakharau/obsidian/Projects/tuiji/project-description.md`
+3. `/Users/aliakseizakharau/obsidian/Projects/tuiji/architecture.md`
+
+Treat those files as the durable project knowledge layer and do not skip them for non-trivial work.
+
+## How To Use Agent Context
+
+If `agent-context/` exists, you must treat it as an agent operating layer with three distinct parts:
+
+1. Core memory layer
+- `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/MEMORY.md`
+- `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/memory/**/*.md`
+- This is the closest equivalent to OpenClaw-style memory.
+
+2. Durable project knowledge layer
+- `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/PROJECT-KNOWLEDGE.md`
+- complements root docs, but does not replace repository code
+
+3. Operational workflow layer
+- `sessions/`
+- `todos/`
+- `decisions/`
+- `indexes/`
+- useful for handoff and execution tracking, but not the same thing as memory
+
+Required read order:
+
+1. `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/README.md`
+2. `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/AGENT-RUNBOOK.md`
+3. `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/PROJECT-KNOWLEDGE.md`
+4. `/Users/aliakseizakharau/obsidian/Projects/tuiji/agent-context/MEMORY.md`
+5. relevant recent files under `memory/`, then `sessions/`, `todos/`, and `decisions/`
+
+Do not let workflow notes override repository code or root project docs.
+But do not skip the available memory/context layer when preparing non-trivial changes.

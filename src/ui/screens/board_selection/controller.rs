@@ -1,5 +1,5 @@
 use crate::{
-    app::key_handlers::{ActionId, Command},
+    ui::interaction::{ActionId, Command},
     ui::screens::ScreenState,
 };
 

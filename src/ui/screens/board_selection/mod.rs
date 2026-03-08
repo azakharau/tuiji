@@ -7,14 +7,14 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, Command, KeyHandler},
-        state::Mode,
-    },
     data::BoardSummary,
     ui::{
         context::RenderContext,
         screens::{CommandLineCommand, Screen, ScreenState},
+    },
+    ui::{
+        interaction::Mode,
+        interaction::{ActionHint, Command, KeyHandler},
     },
 };
 

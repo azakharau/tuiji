@@ -6,8 +6,8 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
-use crate::app::input::overlay::command_line_area;
 use crate::ui::context::RenderContext;
+use crate::ui::layout::command_line_area;
 
 pub struct CommandLineModal<'a> {
     buffer: &'a str,

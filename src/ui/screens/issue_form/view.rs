@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{key_handlers::ActionHint, state::Mode},
+    ui::interaction::{ActionHint, Mode},
     ui::{
         components::{
             bottom_bar::BottomBar,

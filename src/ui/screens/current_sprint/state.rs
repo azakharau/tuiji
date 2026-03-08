@@ -1,51 +1,34 @@
-use std::sync::Arc;
-
-use crate::{client::jira::BoardConfig, ui::components::issue_card::IssueCardComponent};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum SprintViewMode {
-    Kanban,
-    Table,
-}
+use crate::data::IssueSummary;
 
 pub struct CurrentSprintState {
-    issues: Arc<Vec<IssueCardComponent>>,
-    board_cfg: BoardConfig,
-    selected_col: usize,
-    selected_row: usize,
+    issues: Vec<IssueSummary>,
+    selected_index: usize,
     scroll_offset: usize,
     rows_visible: usize,
-    view_mode: SprintViewMode,
+    detail_open: bool,
 }
 
 impl CurrentSprintState {
-    pub fn new(issues: Vec<IssueCardComponent>, board_cfg: BoardConfig) -> Self {
+    pub fn new(issues: Vec<IssueSummary>) -> Self {
         Self {
-            issues: Arc::new(issues),
-            board_cfg,
-            selected_col: 0,
-            selected_row: 0,
+            issues,
+            selected_index: 0,
             scroll_offset: 0,
             rows_visible: 1,
-            view_mode: SprintViewMode::Kanban,
+            detail_open: false,
         }
     }
 
-    pub fn issues(&self) -> &Arc<Vec<IssueCardComponent>> {
+    pub fn issues(&self) -> &[IssueSummary] {
         &self.issues
     }
 
-    pub fn board_cfg(&self) -> &BoardConfig {
-        &self.board_cfg
+    pub fn is_empty(&self) -> bool {
+        self.issues.is_empty()
     }
 
-    pub fn selected_col(&self) -> usize {
-        self.selected_col
-    }
-
-    pub fn selected_row(&self) -> usize {
-        self.selected_row
+    pub fn selected_index(&self) -> usize {
+        self.selected_index
     }
 
     pub fn scroll_offset(&self) -> usize {
@@ -56,41 +39,33 @@ impl CurrentSprintState {
         self.rows_visible
     }
 
-    pub fn view_mode(&self) -> SprintViewMode {
-        self.view_mode
+    pub fn detail_open(&self) -> bool {
+        self.detail_open
+    }
+
+    pub fn selected_issue(&self) -> Option<&IssueSummary> {
+        self.issues.get(self.selected_index)
     }
 
     pub fn set_rows_visible(&mut self, rows_visible: usize) {
         self.rows_visible = rows_visible.max(1);
     }
 
-    pub fn set_selected_col(&mut self, value: usize) {
-        self.selected_col = value;
-    }
-
-    pub fn set_selected_row(&mut self, value: usize) {
-        self.selected_row = value;
+    pub fn set_selected_index(&mut self, value: usize) {
+        self.selected_index = value;
     }
 
     pub fn set_scroll_offset(&mut self, value: usize) {
         self.scroll_offset = value;
     }
 
-    /// Get the key of the currently selected issue, if any.
-    pub fn selected_issue_key(&self) -> Option<&str> {
-        let col_issues: Vec<_> = self
-            .issues
-            .iter()
-            .filter(|issue| {
-                self.board_cfg
-                    .columns
-                    .get(self.selected_col)
-                    .map(|col| col.name.eq_ignore_ascii_case(&issue.status))
-                    .unwrap_or(false)
-            })
-            .collect();
-        col_issues
-            .get(self.selected_row)
-            .map(|issue| issue.key.as_str())
+    pub fn toggle_detail(&mut self) {
+        if !self.issues.is_empty() {
+            self.detail_open = !self.detail_open;
+        }
+    }
+
+    pub fn close_detail(&mut self) {
+        self.detail_open = false;
     }
 }

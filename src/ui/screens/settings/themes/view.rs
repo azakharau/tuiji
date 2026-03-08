@@ -8,13 +8,16 @@ use ratatui::{
 };
 
 use crate::{
-    app::{input::overlay::modal_dialog_area, key_handlers::ActionHint, state::Mode},
     ui::{
         components::{
             bottom_bar::BottomBar,
             list::{EmptyState, ListView},
         },
         context::RenderContext,
+    },
+    ui::{
+        interaction::{ActionHint, Mode},
+        layout::modal_dialog_area,
     },
 };
 

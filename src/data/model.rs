@@ -1,3 +1,36 @@
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct BoardConfig {
+    pub columns: Vec<BoardColumn>,
+    pub estimation: Estimation,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub enum Estimation {
+    StoryPoints(String),
+    DateBased(String),
+}
+
+impl Default for Estimation {
+    fn default() -> Self {
+        Self::StoryPoints("customfield_10002".to_string())
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct BoardColumn {
+    pub name: String,
+    pub statuses: Vec<ColumnStatusRef>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct ColumnStatusRef {
+    pub id: String,
+    #[serde(rename = "self")]
+    pub self_link: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct IssueSummary {
     pub key: String,

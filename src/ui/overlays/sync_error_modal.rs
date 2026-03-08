@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::input::overlay::modal_area,
+    ui::layout::modal_area,
     ui::{components::layout::ModalFrame, context::RenderContext},
 };
 

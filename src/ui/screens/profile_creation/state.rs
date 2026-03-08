@@ -1,6 +1,6 @@
 use crate::{
-    app::error::AppErrorState,
     config::ProfileConfig,
+    contracts::error::AppErrorState,
     ui::components::form::{CursorState, FieldValue, FormField, FormState},
 };
 
@@ -63,7 +63,7 @@ impl ProfileCreationState {
         let mut state = Self {
             profile_id: Some(profile.id),
             sync_mode: profile.sync_mode,
-            ..Default::default()
+            ..Self::default()
         };
         if let Some(item) = state.form.fields_mut().get_mut(0) {
             item.value = FieldValue::Text(profile.name.clone());

@@ -1,5 +1,5 @@
 use crate::{
-    app::error::AppErrorState,
+    contracts::error::AppErrorState,
     ui::components::form::{CursorState, FieldValue, FormField, FormState},
     ui::theme::{ThemePalette, color_to_hex},
 };

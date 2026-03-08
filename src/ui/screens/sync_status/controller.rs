@@ -1,6 +1,6 @@
 use crate::{
-    app::key_handlers::{ActionId, Command},
     data::SyncLogFilter,
+    ui::interaction::{ActionId, Command},
     ui::screens::ScreenState,
 };
 

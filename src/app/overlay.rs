@@ -1,18 +1,12 @@
 use std::collections::VecDeque;
 
 use crate::app::{error::AppErrorState, notification::AppNotification, render::RenderState};
+use crate::ui::interaction::BoardRequiredBindings;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WhichKeyMode {
     Screen,
     Prefix(char),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct BoardRequiredBindings<'a> {
-    pub open: &'a str,
-    pub profiles: Option<&'a str>,
-    pub quit: &'a str,
 }
 
 pub enum OverlayItem<'a> {

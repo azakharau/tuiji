@@ -5,8 +5,8 @@ mod view;
 use ratatui::Frame;
 
 use crate::{
-    app::key_handlers::{ActionHint, Command, KeyHandler},
     config::AppConfigState,
+    ui::interaction::{ActionHint, Command, KeyHandler},
     ui::{
         components::logo::AsciiLogoComponent,
         context::RenderContext,

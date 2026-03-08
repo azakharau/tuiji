@@ -1,1 +1,7 @@
 /target
+.todos/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.sidecar/

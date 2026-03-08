@@ -1,9 +1,9 @@
 use crate::{
-    app::{
-        key_handlers::{ActionId, Command},
-        state::ScreenType,
-    },
     ui::screens::ScreenState,
+    ui::{
+        interaction::ScreenType,
+        interaction::{ActionId, Command},
+    },
 };
 
 use super::state::{HomeState, HomeVariant};

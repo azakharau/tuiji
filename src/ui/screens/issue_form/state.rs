@@ -1,5 +1,5 @@
 use crate::{
-    app::error::AppErrorState,
+    contracts::error::AppErrorState,
     ui::components::form::{FormField, FormState, SelectOption},
 };
 

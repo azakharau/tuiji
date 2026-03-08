@@ -1,5 +1,5 @@
 use crate::{
-    app::worker_controller::SyncStatusSnapshot,
+    contracts::sync::SyncStatusSnapshot,
     data::{SyncLogEntry, SyncLogFilter},
 };
 

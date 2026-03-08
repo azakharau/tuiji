@@ -8,15 +8,11 @@ use ratatui::{
 };
 
 use crate::{
-    app::{key_handlers::ActionHint, state::Mode},
+    ui::interaction::{ActionHint, Mode},
     ui::{components::bottom_bar::BottomBar, context::RenderContext},
 };
 
-use super::{
-    kanban::KanbanView,
-    state::{CurrentSprintState, SprintViewMode},
-    table::TableView,
-};
+use super::{detail::render_issue_detail_modal, state::CurrentSprintState, table::TableView};
 
 pub struct CurrentSprintView;
 
@@ -34,22 +30,21 @@ impl CurrentSprintView {
         frame.render_widget(Block::default().style(base_style), frame.area());
 
         let layout = Layout::vertical([
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Fill(1),
             Constraint::Length(1),
         ])
         .split(frame.area());
 
-        match state.view_mode() {
-            SprintViewMode::Kanban => {
-                KanbanView::draw(frame, layout[1], state, context);
-            }
-            SprintViewMode::Table => {
-                TableView::draw(frame, layout[1], state, context);
-            }
-        }
+        TableView::draw(frame, layout[1], state, context);
 
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, layout[2]);
+
+        if state.detail_open()
+            && let Some(issue) = state.selected_issue()
+        {
+            render_issue_detail_modal(frame, issue, context);
+        }
     }
 }

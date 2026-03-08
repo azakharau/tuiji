@@ -1,8 +1,6 @@
 pub mod badges;
 pub mod bottom_bar;
 pub mod form;
-pub mod issue_card;
-pub mod kanban_board;
 pub mod layout;
 pub mod list;
 pub mod logo;

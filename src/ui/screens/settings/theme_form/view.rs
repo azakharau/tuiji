@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{key_handlers::ActionHint, state::Mode},
+    ui::interaction::{ActionHint, Mode},
     ui::{
         components::{bottom_bar::BottomBar, form::FormView},
         context::RenderContext,
@@ -28,7 +28,7 @@ impl SettingsThemeFormView {
         actions: &Arc<Vec<ActionHint>>,
         context: &RenderContext,
     ) {
-        let area = crate::app::input::overlay::modal_dialog_area(frame.area());
+        let area = crate::ui::layout::modal_dialog_area(frame.area());
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
             .borders(Borders::ALL)

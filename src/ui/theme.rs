@@ -169,8 +169,7 @@ fn mode_colors() -> ThemePalette {
 
 pub fn color_to_hex(color: Color) -> String {
     match color {
-        Color::Rgb(r, g, b) => format!("#{:02x}{:02x}{:02x}", r, g, b),
-        Color::Black => "#000000".to_string(),
+        Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
         Color::White => "#ffffff".to_string(),
         Color::Red => "#ff0000".to_string(),
         Color::Green => "#00ff00".to_string(),

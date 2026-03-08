@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
-use crate::{app::key_handlers::ActionHint, ui::context::RenderContext};
+use crate::{ui::context::RenderContext, ui::interaction::ActionHint};
 
 pub struct WhichKeyPopup {
     pub prefix: String,

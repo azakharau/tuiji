@@ -7,15 +7,15 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, Command, KeyHandler},
-        state::Mode,
-    },
     config::CustomThemeConfig,
     ui::{
         context::RenderContext,
         screens::{CommandLineCommand, Screen, ScreenState},
         theme::{ThemePalette, ThemeRegistry},
+    },
+    ui::{
+        interaction::Mode,
+        interaction::{ActionHint, Command, KeyHandler},
     },
 };
 

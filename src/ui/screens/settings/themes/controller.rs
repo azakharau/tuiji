@@ -1,5 +1,5 @@
 use crate::{
-    app::key_handlers::{ActionId, Command},
+    ui::interaction::{ActionId, Command},
     ui::screens::ScreenState,
 };
 
@@ -28,7 +28,7 @@ impl SettingsThemesController {
             }
             ActionId::Confirm => {
                 if state.selected_is_create() {
-                    ScreenState::SwitchTo(crate::app::state::ScreenType::SettingsThemeForm)
+                    ScreenState::SwitchTo(crate::ui::interaction::ScreenType::SettingsThemeForm)
                 } else {
                     state
                         .selected_theme_id()

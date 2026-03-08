@@ -1,5 +1,5 @@
 mod controller;
-mod kanban;
+mod detail;
 mod state;
 mod table;
 mod view;
@@ -10,15 +10,14 @@ use color_eyre::Result;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, Command, KeyHandler},
-        state::Mode,
-    },
     data::AppRepository,
     ui::{
-        components::issue_card::{IssueCardComponent, IssueType, Priority},
         context::RenderContext,
         screens::{CommandLineCommand, Screen, ScreenState},
+    },
+    ui::{
+        interaction::Mode,
+        interaction::{ActionHint, Command, KeyHandler},
     },
 };
 
@@ -34,48 +33,25 @@ pub struct CurrentSprintScreen {
 
 impl CurrentSprintScreen {
     pub async fn new(repo: Arc<dyn AppRepository>, mode: Mode, board_id: u64) -> Result<Self> {
-        let board_cfg = repo.board_config(board_id).await?;
-        let jira_issues = repo.current_sprint_issues(board_id).await?;
-
-        let mut issues = Vec::with_capacity(jira_issues.len());
-        for issue in jira_issues {
-            let issue_type = IssueType::from(issue.issue_type.as_str());
-            let priority = Priority::from(issue.priority.as_str());
-            let issue_card = IssueCardComponent {
-                key: issue.key,
-                summary: issue.summary,
-                epic: issue.epic,
-                status: issue.status,
-                issue_type,
-                priority,
-                assignee: issue.assignee,
-                story_points: issue.story_points,
-            };
-            issues.push(issue_card);
-        }
+        let issues = repo.current_sprint_issues(board_id).await?;
         Ok(Self {
-            state: CurrentSprintState::new(issues, board_cfg),
+            state: CurrentSprintState::new(issues),
             actions: Arc::new(vec![]),
             mode,
         })
-    }
-
-    fn issue_height(&self) -> u16 {
-        self.state.issues().first().map(|i| i.height()).unwrap_or(8)
     }
 }
 
 impl Screen for CurrentSprintScreen {
     fn draw(&mut self, frame: &mut Frame, context: &RenderContext) {
-        let issue_height = self.issue_height();
         let layout = ratatui::layout::Layout::vertical([
             ratatui::layout::Constraint::Length(2),
             ratatui::layout::Constraint::Fill(1),
             ratatui::layout::Constraint::Length(1),
         ])
         .split(frame.area());
-        let rows_visible =
-            ((layout[1].height.saturating_sub(1)) / issue_height.max(1)).max(1) as usize;
+        let content_height = layout[1].height.saturating_sub(3);
+        let rows_visible = (content_height / 2).max(1) as usize;
         CurrentSprintController::update_rows_visible(&mut self.state, rows_visible);
         CurrentSprintView::draw(frame, &self.state, self.mode, &self.actions, context);
     }

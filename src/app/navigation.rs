@@ -4,12 +4,15 @@ use ratatui::DefaultTerminal;
 use crate::{
     app::key_handlers::KeyBindings,
     app::{
-        ActionOutcome, AppState, ProfileEditorIntent, overlay::BoardRequiredBindings,
-        render::RenderStack, screen_manager::ScreenManager, state::ScreenType,
+        ActionOutcome, AppState, ProfileEditorIntent, render::RenderStack,
+        screen_manager::ScreenManager, state::ScreenType,
     },
     config::AppConfigState,
+    ui::interaction::BoardRequiredBindings,
     ui::screens::ScreenState,
 };
+
+mod controller_actions;
 
 pub fn is_modal_screen(screen: ScreenType) -> bool {
     matches!(
@@ -130,71 +133,6 @@ impl<'a> NavigationController<'a> {
             terminal,
             cfg_state,
             key_bindings,
-        }
-    }
-
-    pub(crate) fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
-        match action {
-            ScreenState::Quit => {
-                self.terminal.clear()?;
-                Ok(ActionOutcome::Quit)
-            }
-            ScreenState::SwitchTo(new_screen) => {
-                if self.state.current_screen == ScreenType::ProfileCreation
-                    && new_screen != ScreenType::ProfileCreation
-                {
-                    self.screen_manager.invalidate(ScreenType::ProfileCreation);
-                    self.state.profile_editor = None;
-                }
-                if new_screen == ScreenType::Home {
-                    self.screen_stack.clear();
-                } else if new_screen != self.state.current_screen {
-                    self.screen_stack.push(self.state.current_screen);
-                }
-                self.state.current_screen = new_screen;
-                if new_screen == ScreenType::ProfileCreation && self.state.profile_editor.is_none()
-                {
-                    self.state.profile_editor = Some(ProfileEditorIntent::New);
-                }
-                Ok(ActionOutcome::Continue { render: true })
-            }
-            ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
-            ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
-            ScreenState::SwitchMode(mode) => {
-                self.state.mode = mode;
-                Ok(ActionOutcome::Continue { render: true })
-            }
-            ScreenState::Close => self.close_screen(),
-            ScreenState::ViewIssue(_) => Ok(ActionOutcome::Continue { render: true }),
-            ScreenState::OpenInBrowser(_) => Ok(ActionOutcome::Continue { render: true }),
-            ScreenState::SaveProfile(_)
-            | ScreenState::SaveProfileAndClose(_)
-            | ScreenState::ApplyTheme(_)
-            | ScreenState::SaveCustomTheme(_)
-            | ScreenState::SaveCustomThemeAndClose(_)
-            | ScreenState::ResolveConflictLocal(_)
-            | ScreenState::ResolveConflictRemote(_)
-            | ScreenState::CreateIssue(_)
-            | ScreenState::SyncNow
-            | ScreenState::SyncPause
-            | ScreenState::SyncRetry
-            | ScreenState::SyncResume => Ok(ActionOutcome::Continue { render: true }),
-        }
-    }
-
-    pub(crate) fn close_screen(&mut self) -> Result<ActionOutcome> {
-        if self.state.current_screen == ScreenType::ProfileCreation {
-            self.screen_manager.invalidate(ScreenType::ProfileCreation);
-            self.state.profile_editor = None;
-        }
-        if let Some(prev) = self.screen_stack.pop() {
-            self.state.current_screen = prev;
-            Ok(ActionOutcome::Continue { render: true })
-        } else if is_modal_screen(self.state.current_screen) {
-            self.state.current_screen = ScreenType::Home;
-            Ok(ActionOutcome::Continue { render: true })
-        } else {
-            Ok(ActionOutcome::Quit)
         }
     }
 

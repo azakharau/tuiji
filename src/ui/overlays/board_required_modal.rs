@@ -5,9 +5,9 @@ use ratatui::{
     widgets::{Paragraph, Widget, Wrap},
 };
 
-use crate::{
-    app::{input::overlay::modal_area, overlay::BoardRequiredBindings},
-    ui::{components::layout::ModalFrame, context::RenderContext},
+use crate::ui::{
+    components::layout::ModalFrame, context::RenderContext, interaction::BoardRequiredBindings,
+    layout::modal_area,
 };
 
 pub struct BoardRequiredModal<'a> {

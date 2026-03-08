@@ -1,5 +1,7 @@
+use crossterm::event::KeyCode;
+
 use crate::{
-    app::key_handlers::{ActionId, Command},
+    ui::interaction::{ActionId, Command},
     ui::screens::ScreenState,
 };
 
@@ -9,13 +11,20 @@ pub struct CurrentSprintController;
 
 impl CurrentSprintController {
     pub fn handle_command(state: &mut CurrentSprintState, command: Command) -> ScreenState {
+        if state.detail_open() {
+            return match command.action {
+                ActionId::Confirm | ActionId::Quit | ActionId::RawInput(KeyCode::Esc) => {
+                    state.close_detail();
+                    ScreenState::Refresh
+                }
+                _ => ScreenState::Stay,
+            };
+        }
+
         match command.action {
             ActionId::Confirm => {
-                if let Some(key) = state.selected_issue_key() {
-                    ScreenState::ViewIssue(key.to_string())
-                } else {
-                    ScreenState::Stay
-                }
+                state.toggle_detail();
+                ScreenState::Refresh
             }
             ActionId::Refresh => ScreenState::Refresh,
             ActionId::MoveDown => {
@@ -24,14 +33,6 @@ impl CurrentSprintController {
             }
             ActionId::MoveUp => {
                 Self::move_up(state, command.repeat);
-                ScreenState::Refresh
-            }
-            ActionId::MoveLeft => {
-                Self::move_left(state, command.repeat);
-                ScreenState::Refresh
-            }
-            ActionId::MoveRight => {
-                Self::move_right(state, command.repeat);
                 ScreenState::Refresh
             }
             ActionId::MoveTop => {
@@ -48,87 +49,35 @@ impl CurrentSprintController {
 
     pub fn update_rows_visible(state: &mut CurrentSprintState, rows_visible: usize) {
         state.set_rows_visible(rows_visible);
-        Self::ensure_valid_column(state);
         Self::clamp_selection(state);
         Self::ensure_selection_visible(state);
     }
 
-    fn column_counts(state: &CurrentSprintState) -> Vec<usize> {
-        let mut counts = vec![0; state.board_cfg().columns.len()];
-        for issue in state.issues().iter() {
-            if let Some(idx) = state
-                .board_cfg()
-                .columns
-                .iter()
-                .position(|c| c.name.eq_ignore_ascii_case(&issue.status))
-            {
-                counts[idx] += 1;
-            }
-        }
-        counts
-    }
-
-    fn ensure_valid_column(state: &mut CurrentSprintState) {
-        let len = state.board_cfg().columns.len();
-        if len == 0 {
-            state.set_selected_col(0);
-            state.set_selected_row(0);
-            state.set_scroll_offset(0);
-            return;
-        }
-        if state.selected_col() >= len {
-            state.set_selected_col(len - 1);
-        }
-        let counts = Self::column_counts(state);
-        if counts.get(state.selected_col()).copied().unwrap_or(0) > 0 {
-            return;
-        }
-        if let Some(left) = (0..=state.selected_col())
-            .rev()
-            .find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
-        {
-            state.set_selected_col(left);
-        } else if let Some(right) =
-            (state.selected_col() + 1..len).find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
-        {
-            state.set_selected_col(right);
-        } else {
-            state.set_selected_col(0);
-            state.set_selected_row(0);
-            state.set_scroll_offset(0);
-        }
-    }
-
     fn clamp_selection(state: &mut CurrentSprintState) {
-        let counts = Self::column_counts(state);
-        let col_count = counts.get(state.selected_col()).copied().unwrap_or(0);
-        if col_count == 0 {
-            state.set_selected_row(0);
-        } else if state.selected_row() >= col_count {
-            state.set_selected_row(col_count - 1);
+        if state.is_empty() {
+            state.set_selected_index(0);
+            state.set_scroll_offset(0);
+            state.close_detail();
+        } else if state.selected_index() >= state.issues().len() {
+            state.set_selected_index(state.issues().len() - 1);
         }
     }
 
     fn ensure_selection_visible(state: &mut CurrentSprintState) {
-        let counts = Self::column_counts(state);
-        let col_count = counts.get(state.selected_col()).copied().unwrap_or(0);
-        let rows_visible = state.rows_visible().max(1);
-        if col_count <= rows_visible {
+        if state.is_empty() {
             state.set_scroll_offset(0);
             return;
         }
+
+        let rows_visible = state.rows_visible().max(1);
         let mut scroll_offset = state.scroll_offset();
-        if state.selected_row() < scroll_offset {
-            scroll_offset = state.selected_row();
-        } else if state.selected_row() >= scroll_offset + rows_visible {
-            scroll_offset = state.selected_row() + 1 - rows_visible;
+        if state.selected_index() < scroll_offset {
+            scroll_offset = state.selected_index();
+        } else if state.selected_index() >= scroll_offset + rows_visible {
+            scroll_offset = state.selected_index() + 1 - rows_visible;
         }
-        let max_offset = counts
-            .iter()
-            .copied()
-            .max()
-            .unwrap_or(0)
-            .saturating_sub(rows_visible);
+
+        let max_offset = state.issues().len().saturating_sub(rows_visible);
         if scroll_offset > max_offset {
             scroll_offset = max_offset;
         }
@@ -136,72 +85,119 @@ impl CurrentSprintController {
     }
 
     fn move_down(state: &mut CurrentSprintState, n: usize) {
-        let counts = Self::column_counts(state);
-        let count = counts.get(state.selected_col()).copied().unwrap_or(0);
-        if count == 0 {
+        if state.is_empty() {
             return;
         }
-        let max_row = count - 1;
-        state.set_selected_row((state.selected_row() + n).min(max_row));
+        let max_index = state.issues().len() - 1;
+        state.set_selected_index((state.selected_index() + n.max(1)).min(max_index));
         Self::ensure_selection_visible(state);
     }
 
     fn move_up(state: &mut CurrentSprintState, n: usize) {
-        if state.selected_row() > 0 {
-            state.set_selected_row(state.selected_row().saturating_sub(n));
-        }
-        Self::ensure_selection_visible(state);
-    }
-
-    fn move_left(state: &mut CurrentSprintState, steps: usize) {
-        if state.board_cfg().columns.is_empty() {
+        if state.is_empty() {
             return;
         }
-        let counts = Self::column_counts(state);
-        let target = state.selected_col().saturating_sub(steps);
-        if counts.get(target).copied().unwrap_or(0) > 0 {
-            state.set_selected_col(target);
-        } else if target > 0
-            && let Some(idx) = (0..target)
-                .rev()
-                .find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
-        {
-            state.set_selected_col(idx);
-        }
-        Self::clamp_selection(state);
-        Self::ensure_selection_visible(state);
-    }
-
-    fn move_right(state: &mut CurrentSprintState, steps: usize) {
-        if state.board_cfg().columns.is_empty() {
-            return;
-        }
-        let counts = Self::column_counts(state);
-        let len = state.board_cfg().columns.len();
-        let target = (state.selected_col() + steps).min(len.saturating_sub(1));
-        if counts.get(target).copied().unwrap_or(0) > 0 {
-            state.set_selected_col(target);
-        } else if target + 1 < len
-            && let Some(idx) = (target + 1..len).find(|&i| counts.get(i).copied().unwrap_or(0) > 0)
-        {
-            state.set_selected_col(idx);
-        }
-        Self::clamp_selection(state);
+        state.set_selected_index(state.selected_index().saturating_sub(n.max(1)));
         Self::ensure_selection_visible(state);
     }
 
     fn go_top(state: &mut CurrentSprintState) {
-        state.set_selected_row(0);
+        if state.is_empty() {
+            return;
+        }
+        state.set_selected_index(0);
         state.set_scroll_offset(0);
     }
 
     fn go_bottom(state: &mut CurrentSprintState) {
-        let counts = Self::column_counts(state);
-        if let Some(max_rows) = counts.get(state.selected_col())
-            && *max_rows > 0
-        {
-            state.set_selected_row(*max_rows - 1);
-            Self::ensure_selection_visible(state);
+        if state.is_empty() {
+            return;
         }
+        state.set_selected_index(state.issues().len() - 1);
+        Self::ensure_selection_visible(state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::IssueSummary;
+
+    fn issue(key: &str) -> IssueSummary {
+        IssueSummary {
+            key: key.to_string(),
+            summary: format!("Summary for {key}"),
+            epic: None,
+            status: "TODO".to_string(),
+            issue_type: "Task".to_string(),
+            assignee: "Alex".to_string(),
+            priority: "Medium".to_string(),
+            story_points: None,
+            project_key: Some("DEMO".to_string()),
+            sprint_id: Some(1),
+            updated_at: None,
+            comments: Vec::new(),
+            dirty: false,
+            conflict: false,
+            remote_snapshot: None,
+            description: None,
+            reporter: None,
+            creator: None,
+            created_at: None,
+            resolution_date: None,
+            resolution: None,
+            labels: Vec::new(),
+            fix_versions: Vec::new(),
+            parent_key: None,
+            environment: None,
+            time_estimate: None,
+            time_spent: None,
+            time_remaining: None,
+            custom_fields: None,
+        }
+    }
+
+    #[test]
+    fn confirm_should_toggle_detail_modal() {
+        let mut state = CurrentSprintState::new(vec![issue("DEMO-1")]);
+
+        let opened = CurrentSprintController::handle_command(
+            &mut state,
+            Command {
+                action: ActionId::Confirm,
+                repeat: 1,
+            },
+        );
+        assert_eq!(opened, ScreenState::Refresh);
+        assert!(state.detail_open());
+
+        let closed = CurrentSprintController::handle_command(
+            &mut state,
+            Command {
+                action: ActionId::Confirm,
+                repeat: 1,
+            },
+        );
+        assert_eq!(closed, ScreenState::Refresh);
+        assert!(!state.detail_open());
+    }
+
+    #[test]
+    fn move_bottom_should_adjust_scroll_window() {
+        let mut state =
+            CurrentSprintState::new(vec![issue("1"), issue("2"), issue("3"), issue("4")]);
+        CurrentSprintController::update_rows_visible(&mut state, 2);
+
+        let result = CurrentSprintController::handle_command(
+            &mut state,
+            Command {
+                action: ActionId::MoveBottom,
+                repeat: 1,
+            },
+        );
+
+        assert_eq!(result, ScreenState::Refresh);
+        assert_eq!(state.selected_index(), 3);
+        assert_eq!(state.scroll_offset(), 2);
     }
 }

@@ -118,6 +118,7 @@ CREATE TABLE issue_history (
 
 CREATE TABLE outbox (
   id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id TEXT NOT NULL,
   change_set TEXT NOT NULL,
@@ -150,7 +151,7 @@ CREATE INDEX idx_issue_history_profile_id ON issue_history(profile_id);
 CREATE INDEX idx_issues_status ON issues(profile_id, status);
 CREATE INDEX idx_issues_sprint ON issues(profile_id, sprint_id);
 CREATE INDEX idx_issue_history_issue ON issue_history(profile_id, issue_key, snapshot_at);
-CREATE INDEX idx_outbox_status ON outbox(status, created_at);
+CREATE INDEX idx_outbox_status ON outbox(profile_id, status, created_at);
 CREATE INDEX idx_board_columns_board ON board_columns(profile_id, board_id, position);
 CREATE INDEX idx_sprints_board_state ON sprints(profile_id, board_id, state);
 CREATE INDEX idx_selected_boards_default ON selected_boards(profile_id, is_default);

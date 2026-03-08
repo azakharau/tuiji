@@ -8,8 +8,8 @@ use ratatui::{
 };
 
 use crate::{
-    app::{key_handlers::ActionHint, state::Mode},
     ui::context::RenderContext,
+    ui::interaction::{ActionHint, Mode},
 };
 
 pub struct BottomBar<'a> {

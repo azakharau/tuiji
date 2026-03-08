@@ -1,6 +1,6 @@
 use crate::{
-    app::state::Mode,
     config::AppConfig,
+    ui::interaction::Mode,
     ui::theme::{ThemePalette, ThemeRegistry},
 };
 

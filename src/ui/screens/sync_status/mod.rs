@@ -7,14 +7,11 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, Command, KeyHandler},
-        state::Mode,
-        worker_controller::SyncStatusSnapshot,
-    },
+    contracts::sync::SyncStatusSnapshot,
     data::{SyncLogEntry, SyncLogFilter},
     ui::{
         context::RenderContext,
+        interaction::{ActionHint, Command, KeyHandler, Mode},
         screens::{CommandLineCommand, Screen, ScreenState},
     },
 };

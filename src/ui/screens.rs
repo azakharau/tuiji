@@ -3,20 +3,19 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, KeyHandler},
-        state::{Mode, ScreenType},
-    },
     config::{CustomThemeConfig, ProfileConfig},
-    ui::context::RenderContext,
+    ui::{
+        context::RenderContext,
+        interaction::{ActionHint, KeyHandler, Mode, ScreenType},
+    },
 };
 
 pub mod board_selection;
 pub mod conflicts;
 pub mod current_sprint;
 pub mod home;
-pub mod issue_detail;
 pub mod issue_form;
+pub mod issues_table;
 pub mod my_issues;
 pub mod profile_creation;
 pub mod profiles;
@@ -33,7 +32,7 @@ pub trait Screen: KeyHandler {
     fn set_action_hints(&mut self, _actions: Arc<Vec<ActionHint>>) {}
 
     /// Update current mode when screens display it (default no-op).
-    fn set_mode(&mut self, _mode: crate::app::state::Mode) {}
+    fn set_mode(&mut self, _mode: Mode) {}
 
     /// Handle command-line actions like :w or :wq.
     fn handle_command_line(&mut self, _cmd: CommandLineCommand) -> ScreenState {
@@ -67,9 +66,6 @@ pub enum ScreenState {
     SyncRetry,
     SyncResume,
     Close,
-    CreateIssue(Box<crate::data::IssueSummary>),
-    ViewIssue(String),
-    OpenInBrowser(String), // issue key
 }
 
 impl PartialEq for ScreenState {
@@ -92,10 +88,6 @@ impl PartialEq for ScreenState {
             (Self::SyncRetry, Self::SyncRetry) => true,
             (Self::SyncResume, Self::SyncResume) => true,
             (Self::Close, Self::Close) => true,
-            // CreateIssue variants are never equal (contains non-comparable data)
-            (Self::CreateIssue(_), Self::CreateIssue(_)) => false,
-            (Self::ViewIssue(a), Self::ViewIssue(b)) => a == b,
-            (Self::OpenInBrowser(a), Self::OpenInBrowser(b)) => a == b,
             _ => false,
         }
     }

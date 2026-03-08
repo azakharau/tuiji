@@ -8,14 +8,14 @@ use color_eyre::Result;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, Command, KeyHandler},
-        state::Mode,
-    },
     data::AppRepository,
     ui::{
         context::RenderContext,
         screens::{CommandLineCommand, Screen, ScreenState},
+    },
+    ui::{
+        interaction::Mode,
+        interaction::{ActionHint, Command, KeyHandler},
     },
 };
 
@@ -33,7 +33,7 @@ impl MyIssuesScreen {
     pub async fn new(repo: Arc<dyn AppRepository>, mode: Mode, board_id: u64) -> Result<Self> {
         let issues = repo.current_sprint_issues(board_id).await?;
         Ok(Self {
-            state: MyIssuesState::new(issues),
+            state: MyIssuesState::my_issues(issues),
             actions: Arc::new(Vec::new()),
             mode,
         })

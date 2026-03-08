@@ -8,9 +8,9 @@ use ratatui::{
 };
 
 use crate::{
-    app::input::overlay::notification_area,
-    app::notification::{AppNotification, AppNotificationKind},
+    contracts::notification::{AppNotification, AppNotificationKind},
     ui::context::RenderContext,
+    ui::layout::notification_area,
 };
 
 pub struct NotificationModal<'a> {

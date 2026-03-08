@@ -1,5 +1,5 @@
-use crate::app::key_handlers::{ActionId, Command, InsertMode};
-use crate::app::state::Mode;
+use crate::ui::interaction::Mode;
+use crate::ui::interaction::{ActionId, Command, InsertMode};
 use crate::ui::screens::ScreenState;
 
 use super::{controller::IssueFormController, state::IssueFormState};

@@ -5,8 +5,8 @@ use ratatui::{
 };
 
 use crate::{
-    app::error::{AppErrorLevel, AppErrorState},
-    app::input::overlay::modal_area,
+    contracts::error::{AppErrorLevel, AppErrorState},
+    ui::layout::modal_area,
     ui::{components::layout::ModalFrame, context::RenderContext},
 };
 
