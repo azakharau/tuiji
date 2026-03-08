@@ -1,5 +1,7 @@
 use super::super::field_type::{CursorState, FieldValue};
-use super::text_ops::{line_len_at_row, row_col_to_position};
+use super::text_ops::{
+    line_len_at_row, next_char_boundary, prev_char_boundary, row_col_to_position,
+};
 use super::*;
 
 impl FormState {
@@ -8,7 +10,7 @@ impl FormState {
             match (&mut field.cursor, &mut field.value) {
                 (CursorState::Text { position }, FieldValue::Text(s)) => {
                     s.insert(*position, ch);
-                    *position += 1;
+                    *position += ch.len_utf8();
                 }
                 (CursorState::TextArea { row, col }, FieldValue::Text(s)) => {
                     let pos = row_col_to_position(s, *row, *col);
@@ -18,7 +20,7 @@ impl FormState {
                         *row += 1;
                         *col = 0;
                     } else {
-                        *col += 1;
+                        *col += ch.len_utf8();
                     }
                 }
                 _ => {}
@@ -31,24 +33,24 @@ impl FormState {
             match (&mut field.cursor, &mut field.value) {
                 (CursorState::Text { position }, FieldValue::Text(s)) => {
                     if *position > 0 {
-                        *position -= 1;
-                        s.remove(*position);
+                        let prev = prev_char_boundary(s, *position);
+                        s.drain(prev..*position);
+                        *position = prev;
                     }
                 }
                 (CursorState::TextArea { row, col }, FieldValue::Text(s)) => {
-                    if *col > 0 {
-                        let pos = row_col_to_position(s, *row, *col);
-                        s.remove(pos - 1);
-                        *col -= 1;
-                    } else if *row > 0 {
-                        let lines: Vec<&str> = s.lines().collect();
-                        let prev_line_len = lines.get(*row - 1).map(|line| line.len()).unwrap_or(0);
+                    let pos = row_col_to_position(s, *row, *col);
+                    if pos > 0 {
+                        let prev = prev_char_boundary(s, pos);
+                        s.drain(prev..pos);
 
-                        let pos = row_col_to_position(s, *row, *col);
-                        if pos > 0 {
-                            s.remove(pos - 1);
+                        if *col > 0 {
+                            *col = prev.saturating_sub(row_col_to_position(s, *row, 0));
+                        } else if *row > 0 {
                             *row -= 1;
-                            *col = prev_line_len;
+                            *col = line_len_at_row(s, *row);
+                        } else {
+                            *col = 0;
                         }
                     }
                 }
@@ -62,13 +64,15 @@ impl FormState {
             match (&field.cursor, &mut field.value) {
                 (CursorState::Text { position }, FieldValue::Text(s)) => {
                     if *position < s.len() {
-                        s.remove(*position);
+                        let next = next_char_boundary(s, *position);
+                        s.drain(*position..next);
                     }
                 }
                 (CursorState::TextArea { row, col }, FieldValue::Text(s)) => {
                     let pos = row_col_to_position(s, *row, *col);
                     if pos < s.len() {
-                        s.remove(pos);
+                        let next = next_char_boundary(s, pos);
+                        s.drain(pos..next);
                     }
                 }
                 _ => {}
@@ -90,7 +94,7 @@ impl FormState {
             if pos < len
                 && let CursorState::Text { position } = &mut field.cursor
             {
-                *position = pos + 1;
+                *position = next_char_boundary(s, pos);
             }
         }
     }

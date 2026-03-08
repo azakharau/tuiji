@@ -318,6 +318,22 @@ fn test_command_line_write_with_validation_error() {
 }
 
 #[test]
+fn test_command_line_write_should_not_close_when_summary_present() {
+    use crate::ui::components::form::FieldValue;
+    use crate::ui::screens::CommandLineCommand;
+
+    let mut state = IssueFormState::new();
+    if let FieldValue::Text(summary) = &mut state.form_mut().fields_mut()[0].value {
+        *summary = "Valid summary".to_string();
+    }
+
+    let result = IssueFormController::handle_command_line(&mut state, CommandLineCommand::Write);
+
+    assert_eq!(result, ScreenState::Refresh);
+    assert!(state.error().is_none());
+}
+
+#[test]
 fn test_command_line_write_quit_with_validation_error() {
     use crate::ui::screens::CommandLineCommand;
     let mut state = IssueFormState::new();
@@ -465,6 +481,98 @@ fn test_dropdown_close_with_q() {
             .field_type
             .is_expanded()
     );
+}
+
+#[test]
+fn test_utf8_text_input_should_keep_byte_safe_cursor_positions() {
+    use crossterm::event::KeyCode;
+
+    let mut state = IssueFormState::new();
+    IssueFormController::handle_command(
+        &mut state,
+        Command {
+            action: ActionId::EnterInsert(InsertMode::Before),
+            repeat: 1,
+        },
+        Mode::Normal,
+    );
+
+    for ch in ['你', 'x'] {
+        IssueFormController::handle_command(
+            &mut state,
+            Command {
+                action: ActionId::RawInput(KeyCode::Char(ch)),
+                repeat: 1,
+            },
+            Mode::Insert,
+        );
+    }
+
+    IssueFormController::handle_command(
+        &mut state,
+        Command {
+            action: ActionId::MoveLeft,
+            repeat: 1,
+        },
+        Mode::Normal,
+    );
+
+    let field = state.form().selected_field().unwrap();
+    assert_eq!(field.value.as_text(), Some("你x"));
+    assert!(matches!(
+        field.cursor,
+        crate::ui::components::form::CursorState::Text { position } if position == "你".len()
+    ));
+}
+
+#[test]
+fn test_utf8_textarea_input_should_keep_byte_safe_columns() {
+    use crossterm::event::KeyCode;
+
+    let mut state = IssueFormState::new();
+    IssueFormController::handle_command(
+        &mut state,
+        Command {
+            action: ActionId::MoveDown,
+            repeat: 1,
+        },
+        Mode::Normal,
+    );
+    IssueFormController::handle_command(
+        &mut state,
+        Command {
+            action: ActionId::Confirm,
+            repeat: 1,
+        },
+        Mode::Normal,
+    );
+
+    for ch in ['你', '好'] {
+        IssueFormController::handle_command(
+            &mut state,
+            Command {
+                action: ActionId::RawInput(KeyCode::Char(ch)),
+                repeat: 1,
+            },
+            Mode::Insert,
+        );
+    }
+
+    IssueFormController::handle_command(
+        &mut state,
+        Command {
+            action: ActionId::MoveLeft,
+            repeat: 1,
+        },
+        Mode::Normal,
+    );
+
+    let field = state.form().selected_field().unwrap();
+    assert_eq!(field.value.as_text(), Some("你好"));
+    assert!(matches!(
+        field.cursor,
+        crate::ui::components::form::CursorState::TextArea { row: 0, col } if col == "你".len()
+    ));
 }
 
 #[test]

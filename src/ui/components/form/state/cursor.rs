@@ -1,5 +1,7 @@
 use super::super::field_type::{CursorState, FieldType, FieldValue};
-use super::text_ops::{word_backward, word_end, word_forward};
+use super::text_ops::{
+    next_char_boundary, prev_char_boundary, word_backward, word_end, word_forward,
+};
 use super::*;
 
 impl FormState {
@@ -7,7 +9,11 @@ impl FormState {
         if let Some(field) = self.selected_field_mut() {
             match (&field.field_type, &mut field.cursor, &field.value) {
                 (FieldType::Text { .. }, CursorState::Text { position }, _) => {
-                    *position = position.saturating_sub(repeat);
+                    if let FieldValue::Text(value) = &field.value {
+                        for _ in 0..repeat {
+                            *position = prev_char_boundary(value, *position);
+                        }
+                    }
                 }
                 (
                     FieldType::TextArea { .. },
@@ -23,7 +29,7 @@ impl FormState {
 
                     for _ in 0..repeat {
                         if *col > 0 {
-                            *col -= 1;
+                            *col = prev_char_boundary(lines.get(*row).copied().unwrap_or(""), *col);
                         } else if *row > 0 {
                             *row -= 1;
                             *col = lines.get(*row).map(|line| line.len()).unwrap_or(0);
@@ -39,8 +45,9 @@ impl FormState {
         if let Some(field) = self.selected_field_mut() {
             match (&field.field_type, &mut field.cursor, &field.value) {
                 (FieldType::Text { .. }, CursorState::Text { position }, FieldValue::Text(s)) => {
-                    let max = s.len();
-                    *position = (*position + repeat).min(max);
+                    for _ in 0..repeat {
+                        *position = next_char_boundary(s, *position);
+                    }
                 }
                 (
                     FieldType::TextArea { .. },
@@ -57,7 +64,7 @@ impl FormState {
                     for _ in 0..repeat {
                         let current_line = lines.get(*row).unwrap_or(&"");
                         if *col < current_line.len() {
-                            *col += 1;
+                            *col = next_char_boundary(current_line, *col);
                         } else if *row + 1 < lines.len() {
                             *row += 1;
                             *col = 0;

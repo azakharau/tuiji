@@ -46,7 +46,7 @@ impl CurrentSprintScreen {
 impl Screen for CurrentSprintScreen {
     fn draw(&mut self, frame: &mut Frame, context: &RenderContext) {
         let layout = ratatui::layout::Layout::vertical([
-            ratatui::layout::Constraint::Length(2),
+            ratatui::layout::Constraint::Length(1),
             ratatui::layout::Constraint::Fill(1),
             ratatui::layout::Constraint::Length(1),
         ])

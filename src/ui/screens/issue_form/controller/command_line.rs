@@ -9,8 +9,14 @@ use crate::ui::screens::issue_form::state::IssueFormState;
 impl IssueFormController {
     pub fn handle_command_line(state: &mut IssueFormState, cmd: CommandLineCommand) -> ScreenState {
         match cmd {
-            CommandLineCommand::Write | CommandLineCommand::WriteQuit => match validate_form(state)
-            {
+            CommandLineCommand::Write => match validate_form(state) {
+                Ok(()) => ScreenState::Refresh,
+                Err(err) => {
+                    state.set_error(AppErrorState::new("Validation Error", err));
+                    ScreenState::Refresh
+                }
+            },
+            CommandLineCommand::WriteQuit => match validate_form(state) {
                 Ok(()) => ScreenState::Close,
                 Err(err) => {
                     state.set_error(AppErrorState::new("Validation Error", err));

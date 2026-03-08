@@ -2,6 +2,28 @@ pub(super) fn is_word_char(ch: char) -> bool {
     ch.is_alphanumeric() || ch == '_'
 }
 
+pub(super) fn prev_char_boundary(value: &str, pos: usize) -> usize {
+    if pos == 0 {
+        return 0;
+    }
+
+    value[..pos]
+        .char_indices()
+        .last()
+        .map(|(idx, _)| idx)
+        .unwrap_or(0)
+}
+
+pub(super) fn next_char_boundary(value: &str, pos: usize) -> usize {
+    if pos >= value.len() {
+        return value.len();
+    }
+
+    let mut iter = value[pos..].char_indices();
+    let _ = iter.next();
+    iter.next().map(|(idx, _)| pos + idx).unwrap_or(value.len())
+}
+
 pub(super) fn word_forward(value: &str, pos: usize) -> usize {
     let chars = value.char_indices().collect::<Vec<(usize, char)>>();
     if chars.is_empty() {
