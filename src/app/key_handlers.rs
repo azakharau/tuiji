@@ -135,3 +135,23 @@ impl KeyBindings {
             .unwrap_or_default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::KeyBindingsConfig;
+
+    #[test]
+    fn default_workspace_screens_should_include_vim_navigation_bindings() {
+        let bindings = KeyBindings::from_config(&KeyBindingsConfig::default());
+
+        for screen in [ScreenType::MyIssues, ScreenType::SearchIssues] {
+            let screen_bindings = bindings.binding_strings_for_screen(screen);
+            assert!(screen_bindings.iter().any(|binding| binding == "j"));
+            assert!(screen_bindings.iter().any(|binding| binding == "k"));
+            assert!(screen_bindings.iter().any(|binding| binding == "gg"));
+            assert!(screen_bindings.iter().any(|binding| binding == "G"));
+            assert!(screen_bindings.iter().any(|binding| binding == "<enter>"));
+        }
+    }
+}

@@ -123,5 +123,5 @@ impl ActionHint {
 pub struct BoardRequiredBindings<'a> {
     pub open: &'a str,
     pub profiles: Option<&'a str>,
-    pub quit: &'a str,
+    pub quit: Option<&'a str>,
 }

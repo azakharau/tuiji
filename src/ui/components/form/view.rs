@@ -14,6 +14,10 @@ pub struct FormView;
 impl FormView {
     /// Calculate the Rect for the selected field (used for popup positioning)
     pub fn calculate_selected_field_rect(form: &FormState, area: Rect) -> Option<Rect> {
+        Self::calculate_field_rect(form, area, form.selected_index())
+    }
+
+    pub fn calculate_field_rect(form: &FormState, area: Rect, field_index: usize) -> Option<Rect> {
         let fields = form.fields();
         if fields.is_empty() || area.height == 0 {
             return None;
@@ -23,7 +27,7 @@ impl FormView {
         let total = fields.len();
         let max_visible = (area.height / field_height).max(1) as usize;
         let visible = total.min(max_visible);
-        let selected = form.selected_index().min(total.saturating_sub(1));
+        let selected = field_index.min(total.saturating_sub(1));
 
         let mut offset = 0usize;
         if total > visible {

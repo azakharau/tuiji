@@ -1,6 +1,3 @@
-use color_eyre::Result;
-use ratatui::DefaultTerminal;
-
 use crate::{
     app::key_handlers::KeyBindings,
     app::{
@@ -11,102 +8,22 @@ use crate::{
     ui::interaction::BoardRequiredBindings,
     ui::screens::ScreenState,
 };
+use color_eyre::Result;
+use ratatui::DefaultTerminal;
 
+mod board_required;
+mod close_policy;
 mod controller_actions;
+mod modal;
+mod render_policy;
 
-pub fn is_modal_screen(screen: ScreenType) -> bool {
-    matches!(
-        screen,
-        ScreenType::Profiles
-            | ScreenType::ProfileCreation
-            | ScreenType::BoardSelection
-            | ScreenType::Settings
-            | ScreenType::SettingsThemes
-            | ScreenType::SettingsThemeForm
-    )
-}
+pub use board_required::{
+    board_required_active, board_required_bindings, is_board_required_screen,
+};
+pub use modal::{has_modal_stack, is_modal_screen};
+pub use render_policy::build_render_stack;
 
-pub fn has_modal_stack(current_screen: ScreenType, screen_stack: &[ScreenType]) -> bool {
-    is_modal_screen(current_screen) || screen_stack.iter().any(|screen| is_modal_screen(*screen))
-}
-
-pub fn is_board_required_screen(screen: ScreenType) -> bool {
-    matches!(
-        screen,
-        ScreenType::Home
-            | ScreenType::CurrentSprint
-            | ScreenType::MyIssues
-            | ScreenType::SearchIssues
-    )
-}
-
-pub fn board_required_active(state: &AppState) -> bool {
-    state.selected_board_id.is_none() && is_board_required_screen(state.current_screen)
-}
-
-pub fn build_render_stack(
-    current_screen: ScreenType,
-    screen_stack: &[ScreenType],
-) -> RenderStack<'_> {
-    let include_stack = matches!(
-        current_screen,
-        ScreenType::Profiles
-            | ScreenType::ProfileCreation
-            | ScreenType::BoardSelection
-            | ScreenType::Settings
-            | ScreenType::SettingsThemes
-            | ScreenType::SettingsThemeForm
-    );
-    RenderStack::new(current_screen, screen_stack, include_stack)
-}
-
-pub fn board_required_bindings<'a>(
-    current_screen: ScreenType,
-    key_bindings: &'a KeyBindings,
-) -> BoardRequiredBindings<'a> {
-    let bindings = key_bindings.bindings_for_screen_ref(current_screen);
-    let open_key = bindings
-        .iter()
-        .find(|entry| entry.action == crate::app::key_handlers::ActionId::OpenBoards)
-        .map(|entry| entry.binding.as_str())
-        .unwrap_or("b");
-    let profiles_key = bindings
-        .iter()
-        .find(|entry| entry.action == crate::app::key_handlers::ActionId::OpenProfiles)
-        .map(|entry| entry.binding.as_str());
-    let quit_key = bindings
-        .iter()
-        .find(|entry| entry.action == crate::app::key_handlers::ActionId::Quit)
-        .map(|entry| entry.binding.as_str())
-        .unwrap_or("q");
-    BoardRequiredBindings {
-        open: open_key,
-        profiles: profiles_key,
-        quit: quit_key,
-    }
-}
-
-pub(crate) fn close_all_modals_impl(
-    state: &mut AppState,
-    screen_stack: &mut Vec<ScreenType>,
-    _terminal: &mut DefaultTerminal,
-) -> Result<ScreenState> {
-    if !has_modal_stack(state.current_screen, screen_stack) {
-        return Ok(ScreenState::Stay);
-    }
-    let target = screen_stack
-        .iter()
-        .rev()
-        .find(|screen| !is_modal_screen(**screen))
-        .copied()
-        .unwrap_or(ScreenType::Home);
-    screen_stack.clear();
-    if is_modal_screen(state.current_screen) {
-        state.profile_editor = None;
-    }
-    state.current_screen = target;
-    Ok(ScreenState::Refresh)
-}
+use close_policy::{close_all_modals_target, should_cleanup_profile_creation};
 
 pub struct NavigationController<'a> {
     state: &'a mut AppState,
@@ -137,7 +54,7 @@ impl<'a> NavigationController<'a> {
     }
 
     pub fn close_all_modals(&mut self) -> Result<ScreenState> {
-        close_all_modals_impl(self.state, self.screen_stack, self.terminal)
+        close_all_modals_impl(self.state, self.screen_stack, self.screen_manager)
     }
 
     pub fn build_render_stack(&self) -> RenderStack<'_> {
@@ -167,4 +84,28 @@ impl<'a> NavigationController<'a> {
     pub fn cfg_state(&self) -> &AppConfigState {
         self.cfg_state
     }
+}
+
+pub(crate) fn close_all_modals_impl(
+    state: &mut AppState,
+    screen_stack: &mut Vec<ScreenType>,
+    screen_manager: &mut ScreenManager,
+) -> Result<ScreenState> {
+    let Some(target) = close_all_modals_target(state.current_screen, screen_stack) else {
+        return Ok(ScreenState::Stay);
+    };
+
+    if should_cleanup_profile_creation(state.current_screen, screen_stack) {
+        cleanup_profile_creation(state, screen_manager);
+    } else if is_modal_screen(state.current_screen) {
+        state.profile_editor = None;
+    }
+    screen_stack.clear();
+    state.current_screen = target;
+    Ok(ScreenState::Refresh)
+}
+
+pub(super) fn cleanup_profile_creation(state: &mut AppState, screen_manager: &mut ScreenManager) {
+    screen_manager.invalidate(ScreenType::ProfileCreation);
+    state.profile_editor = None;
 }

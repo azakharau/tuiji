@@ -42,7 +42,7 @@ impl MyIssuesScreen {
 
 impl Screen for MyIssuesScreen {
     fn draw(&mut self, frame: &mut Frame, context: &RenderContext) {
-        MyIssuesView::draw(frame, &self.state, self.mode, &self.actions, context);
+        MyIssuesView::draw(frame, &mut self.state, self.mode, &self.actions, context);
     }
 
     fn name(&self) -> &'static str {

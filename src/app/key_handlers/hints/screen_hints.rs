@@ -17,7 +17,16 @@ const HOME_HINTS: &[ScreenHint] = &[
 ];
 
 const CURRENT_SPRINT_HINTS: &[ScreenHint] = &[
-    (ActionId::Confirm, "Open"),
+    (ActionId::Confirm, "Details"),
+    (ActionId::MoveUp, "Up"),
+    (ActionId::MoveDown, "Down"),
+    (ActionId::MoveTop, "Top"),
+    (ActionId::MoveBottom, "Bottom"),
+    (ActionId::GoHome, "Home"),
+];
+
+const ISSUES_WORKSPACE_HINTS: &[ScreenHint] = &[
+    (ActionId::Confirm, "Details"),
     (ActionId::MoveUp, "Up"),
     (ActionId::MoveDown, "Down"),
     (ActionId::MoveTop, "Top"),
@@ -88,6 +97,7 @@ pub(super) fn screen_hint_actions(screen: ScreenType) -> &'static [ScreenHint] {
     match screen {
         ScreenType::Home => HOME_HINTS,
         ScreenType::CurrentSprint => CURRENT_SPRINT_HINTS,
+        ScreenType::MyIssues | ScreenType::SearchIssues => ISSUES_WORKSPACE_HINTS,
         ScreenType::BoardSelection => BOARD_SELECTION_HINTS,
         ScreenType::Profiles => PROFILES_HINTS,
         ScreenType::Settings => SETTINGS_HINTS,
@@ -96,6 +106,5 @@ pub(super) fn screen_hint_actions(screen: ScreenType) -> &'static [ScreenHint] {
         ScreenType::Conflicts => CONFLICTS_HINTS,
         ScreenType::SyncStatus => SYNC_STATUS_HINTS,
         ScreenType::NewIssue | ScreenType::ProfileCreation => FORM_HINTS,
-        _ => &[],
     }
 }

@@ -57,7 +57,7 @@ impl<'a> CommandRouter<'a> {
                         .handle_screen_command_line(CommandLineCommand::Write)
                         .await?;
                     let _ = self.normalize_screen_state(state, false)?;
-                    close_all_modals_impl(self.state, self.screen_stack, self.terminal)
+                    close_all_modals_impl(self.state, self.screen_stack, self.screen_manager)
                 } else {
                     let state = self
                         .handle_screen_command_line(CommandLineCommand::WriteQuit)
@@ -68,7 +68,11 @@ impl<'a> CommandRouter<'a> {
             CommandLineAction::Quit => {
                 if has_modal_stack(self.state.current_screen, self.screen_stack) {
                     if self.screen_stack.is_empty() && is_modal_screen(self.state.current_screen) {
-                        return close_all_modals_impl(self.state, self.screen_stack, self.terminal);
+                        return close_all_modals_impl(
+                            self.state,
+                            self.screen_stack,
+                            self.screen_manager,
+                        );
                     }
                     return Ok(ScreenState::Close);
                 }

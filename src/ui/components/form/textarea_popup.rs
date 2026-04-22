@@ -10,7 +10,9 @@ use crate::ui::{components::form::FormField, context::RenderContext};
 
 mod wrap;
 
-use wrap::{calculate_wrapped_cursor_position, wrap_line};
+use wrap::{
+    calculate_wrapped_cursor_position, calculate_wrapped_textarea_cursor_position, wrap_line,
+};
 
 pub struct TextAreaPopup<'a> {
     field: &'a FormField,
@@ -29,8 +31,16 @@ impl<'a> TextAreaPopup<'a> {
 
     /// Calculate popup area centered on screen.
     pub fn calculate_area(frame_area: Rect, min_height: u16) -> Rect {
-        let popup_width = (frame_area.width * 3 / 4).min(80);
-        let popup_height = (frame_area.height * 2 / 3).max(min_height + 2);
+        if frame_area.width == 0 || frame_area.height == 0 {
+            return frame_area;
+        }
+
+        let popup_width = (frame_area.width * 3 / 4)
+            .clamp(1, 80)
+            .min(frame_area.width);
+        let popup_height = ((frame_area.height * 2 / 3).max(min_height + 2))
+            .max(1)
+            .min(frame_area.height);
 
         let popup_x = frame_area
             .x
@@ -50,11 +60,15 @@ impl<'a> TextAreaPopup<'a> {
 
 impl<'a> Widget for TextAreaPopup<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
         for y in area.y..area.y + area.height {
             for x in area.x..area.x + area.width {
-                buf.cell_mut((x, y))
-                    .expect("cell within popup area")
-                    .reset();
+                if let Some(cell) = buf.cell_mut((x, y)) {
+                    cell.reset();
+                }
             }
         }
 
@@ -75,7 +89,7 @@ impl<'a> Widget for TextAreaPopup<'a> {
         let max_width = inner_area.width as usize;
 
         let wrapped_lines: Vec<String> = text
-            .lines()
+            .split('\n')
             .flat_map(|line| wrap_line(line, max_width))
             .collect();
 
@@ -85,7 +99,9 @@ impl<'a> Widget for TextAreaPopup<'a> {
             .collect();
 
         let (cursor_row, cursor_col) = match self.field.cursor {
-            crate::ui::components::form::CursorState::TextArea { row, col } => (row, col),
+            crate::ui::components::form::CursorState::TextArea { row, col } => {
+                calculate_wrapped_textarea_cursor_position(text, row, col, max_width)
+            }
             crate::ui::components::form::CursorState::Text { position } => {
                 calculate_wrapped_cursor_position(text, position, max_width)
             }

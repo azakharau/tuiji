@@ -1,8 +1,56 @@
+use std::sync::Arc;
+
+use ratatui::{Terminal, backend::TestBackend};
+
+use crate::ui::context::RenderContext;
 use crate::ui::interaction::Mode;
 use crate::ui::interaction::{ActionId, Command, InsertMode};
 use crate::ui::screens::ScreenState;
 
-use super::{controller::IssueFormController, state::IssueFormState};
+use super::{
+    controller::IssueFormController,
+    state::{IssueFormState, IssueFormSurface},
+    view::IssueFormView,
+};
+
+fn execute(state: &mut IssueFormState, action: ActionId, repeat: usize, mode: Mode) -> ScreenState {
+    IssueFormController::handle_command(state, Command { action, repeat }, mode)
+}
+
+fn move_to_field(state: &mut IssueFormState, index: usize) {
+    if index > 0 {
+        let _ = execute(state, ActionId::MoveDown, index, Mode::Normal);
+    }
+}
+
+fn render_screen_with_size(state: &IssueFormState, mode: Mode, width: u16, height: u16) -> String {
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).expect("test terminal");
+    let actions = Arc::new(Vec::new());
+    let context = RenderContext::new(mode);
+
+    terminal
+        .draw(|frame| IssueFormView::draw(frame, state, mode, &actions, &context))
+        .expect("render issue form");
+
+    let buffer = terminal.backend().buffer();
+    let area = buffer.area();
+    let mut rendered = String::new();
+
+    for y in area.top()..area.bottom() {
+        for x in area.left()..area.right() {
+            let cell = buffer.cell((x, y)).expect("buffer cell inside area");
+            rendered.push_str(cell.symbol());
+        }
+        rendered.push('\n');
+    }
+
+    rendered
+}
+
+fn render_screen(state: &IssueFormState, mode: Mode) -> String {
+    render_screen_with_size(state, mode, 100, 30)
+}
 
 #[test]
 fn test_move_down_between_fields() {
@@ -232,6 +280,10 @@ fn test_dropdown_expand() {
     );
 
     assert_eq!(result, ScreenState::Refresh);
+    assert_eq!(
+        state.active_surface(),
+        IssueFormSurface::Dropdown { field_index: 2 }
+    );
     assert!(
         state
             .form()
@@ -279,6 +331,10 @@ fn test_dropdown_navigation() {
     assert_eq!(result, ScreenState::Refresh);
     // Cursor should move within dropdown, not to next field
     assert_eq!(state.form().selected_index(), 2);
+    assert_eq!(
+        state.active_surface(),
+        IssueFormSurface::Dropdown { field_index: 2 }
+    );
 }
 
 #[test]
@@ -399,6 +455,10 @@ fn test_text_popup_open_close() {
 
     assert_eq!(result, ScreenState::SwitchMode(Mode::Insert));
     assert!(state.is_text_popup_open());
+    assert_eq!(
+        state.active_surface(),
+        IssueFormSurface::TextPopup { field_index: 0 }
+    );
 
     // Press Esc in Insert mode - should NOT close popup (only switches to Normal mode)
     let _result = IssueFormController::handle_command(
@@ -425,6 +485,106 @@ fn test_text_popup_open_close() {
 
     assert_eq!(result, ScreenState::Refresh);
     assert!(!state.is_text_popup_open()); // Now closed
+    assert_eq!(state.active_surface(), IssueFormSurface::Form);
+}
+
+#[test]
+fn test_dropdown_confirm_selects_active_option_and_closes_popup() {
+    let mut state = IssueFormState::new();
+    move_to_field(&mut state, 2);
+
+    assert_eq!(
+        execute(&mut state, ActionId::Confirm, 1, Mode::Normal),
+        ScreenState::Refresh
+    );
+    assert_eq!(
+        state.active_surface(),
+        IssueFormSurface::Dropdown { field_index: 2 }
+    );
+
+    assert_eq!(
+        execute(&mut state, ActionId::MoveDown, 1, Mode::Normal),
+        ScreenState::Refresh
+    );
+    assert_eq!(state.form().selected_index(), 2);
+
+    assert_eq!(
+        execute(&mut state, ActionId::Confirm, 1, Mode::Normal),
+        ScreenState::Refresh
+    );
+
+    let field = state.form().selected_field().unwrap();
+    assert_eq!(field.value.as_single(), Some("task"));
+    assert_eq!(state.active_surface(), IssueFormSurface::Form);
+    assert!(!field.field_type.is_expanded());
+}
+
+#[test]
+fn test_text_popup_motions_stay_on_popup_surface() {
+    use crate::ui::components::form::CursorState;
+    use crossterm::event::KeyCode;
+
+    let mut state = IssueFormState::new();
+    move_to_field(&mut state, 1);
+
+    assert_eq!(
+        execute(&mut state, ActionId::Confirm, 1, Mode::Normal),
+        ScreenState::SwitchMode(Mode::Insert)
+    );
+
+    for code in [
+        KeyCode::Char('a'),
+        KeyCode::Char('b'),
+        KeyCode::Enter,
+        KeyCode::Char('c'),
+        KeyCode::Char('d'),
+    ] {
+        let _ = execute(&mut state, ActionId::RawInput(code), 1, Mode::Insert);
+    }
+
+    assert_eq!(
+        execute(&mut state, ActionId::MoveUp, 1, Mode::Normal),
+        ScreenState::Refresh
+    );
+
+    assert_eq!(state.form().selected_index(), 1);
+    assert_eq!(
+        state.active_surface(),
+        IssueFormSurface::TextPopup { field_index: 1 }
+    );
+    assert!(matches!(
+        state.form().selected_field().unwrap().cursor,
+        CursorState::TextArea { row: 0, col: 2 }
+    ));
+}
+
+#[test]
+fn test_issue_form_view_renders_text_popup_once_and_hides_inline_field_content() {
+    use crate::ui::components::form::FieldValue;
+
+    let mut state = IssueFormState::new();
+    let unique_text = "popup-only-summary-42";
+
+    if let FieldValue::Text(summary) = &mut state.form_mut().fields_mut()[0].value {
+        *summary = unique_text.to_string();
+    }
+    state.open_text_popup();
+
+    let rendered = render_screen(&state, Mode::Insert);
+
+    assert!(rendered.contains("Create Issue"));
+    assert!(rendered.contains("Summary"));
+    assert_eq!(rendered.matches(unique_text).count(), 1);
+}
+
+#[test]
+fn test_issue_form_view_renders_text_popup_on_tiny_terminal_without_panicking() {
+    let mut state = IssueFormState::new();
+    state.open_text_popup();
+
+    let rendered = render_screen_with_size(&state, Mode::Insert, 12, 4);
+
+    assert!(!rendered.is_empty());
 }
 
 #[test]

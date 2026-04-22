@@ -31,6 +31,7 @@ pub mod notification_service;
 pub mod overlay;
 pub mod render;
 pub mod screen_manager;
+pub(crate) mod screen_policy;
 pub mod services;
 pub mod state;
 pub mod worker_controller;

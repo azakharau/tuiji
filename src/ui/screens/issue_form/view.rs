@@ -20,7 +20,19 @@ use crate::{
     },
 };
 
-use super::state::IssueFormState;
+use super::state::{IssueFormState, IssueFormSurface};
+
+enum ActiveOverlay<'a> {
+    TextPopup {
+        field: &'a crate::ui::components::form::FormField,
+        min_height: u16,
+    },
+    Dropdown {
+        field_index: usize,
+        field: &'a crate::ui::components::form::FormField,
+        options: &'a [crate::ui::components::form::SelectOption],
+    },
+}
 
 pub struct IssueFormView;
 
@@ -65,68 +77,92 @@ impl IssueFormView {
         frame.render_widget(content_block, layout[1]);
 
         // Hide field content if text popup is open
-        let hide_content_for = if state.is_text_popup_open() {
-            Some(state.form().selected_index())
-        } else {
-            None
-        };
-
         let buffer = frame.buffer_mut();
-        FormView::render(state.form(), form_area, buffer, context, hide_content_for);
+        FormView::render(
+            state.form(),
+            form_area,
+            buffer,
+            context,
+            state.hide_form_content_for(),
+        );
 
         // Bottom bar
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, layout[2]);
 
-        // Render text popup overlay if open
-        if state.is_text_popup_open()
-            && let Some(field) = state.form().selected_field()
-            && matches!(
-                field.field_type,
-                FieldType::Text { .. } | FieldType::TextArea { .. }
-            )
-        {
-            let min_height = if matches!(field.field_type, FieldType::TextArea { .. }) {
-                10
-            } else {
-                5
-            };
-            let popup_area = TextAreaPopup::calculate_area(frame.area(), min_height);
-            // Show cursor in popup for editing
-            let popup = TextAreaPopup::new(field, context, true);
-            frame.render_widget(popup, popup_area);
-        }
-
-        // Render dropdown popup overlay if a select/multiselect field is expanded
-        if let Some(field) = state.form().selected_field() {
-            match &field.field_type {
-                FieldType::Select { options, expanded } if *expanded => {
-                    if let Some(field_rect) =
-                        FormView::calculate_selected_field_rect(state.form(), form_area)
-                    {
-                        let popup_area =
-                            DropdownPopup::calculate_area(field_rect, frame.area(), options.len());
-                        let popup = DropdownPopup::new(field, options, context);
-                        frame.render_widget(popup, popup_area);
-                    }
-                }
-                FieldType::MultiSelect { options, expanded } if *expanded => {
-                    if let Some(field_rect) =
-                        FormView::calculate_selected_field_rect(state.form(), form_area)
-                    {
-                        let popup_area =
-                            DropdownPopup::calculate_area(field_rect, frame.area(), options.len());
-                        let popup = DropdownPopup::new(field, options, context);
-                        frame.render_widget(popup, popup_area);
-                    }
-                }
-                _ => {}
-            }
-        }
+        Self::render_active_overlay(frame, state, form_area, context);
 
         // Error modal overlay (if present)
         if let Some(err) = state.error() {
             frame.render_widget(ErrorModal::new(err, context), frame.area());
+        }
+    }
+
+    fn render_active_overlay(
+        frame: &mut Frame,
+        state: &IssueFormState,
+        form_area: ratatui::layout::Rect,
+        context: &RenderContext,
+    ) {
+        let Some(overlay) = Self::active_overlay(state) else {
+            return;
+        };
+
+        match overlay {
+            ActiveOverlay::TextPopup { field, min_height } => {
+                let popup_area = TextAreaPopup::calculate_area(frame.area(), min_height);
+                frame.render_widget(TextAreaPopup::new(field, context, true), popup_area);
+            }
+            ActiveOverlay::Dropdown {
+                field_index,
+                field,
+                options,
+            } => {
+                if let Some(field_rect) =
+                    FormView::calculate_field_rect(state.form(), form_area, field_index)
+                {
+                    let popup_area =
+                        DropdownPopup::calculate_area(field_rect, frame.area(), options.len());
+                    frame.render_widget(DropdownPopup::new(field, options, context), popup_area);
+                }
+            }
+        }
+    }
+
+    fn active_overlay(state: &IssueFormState) -> Option<ActiveOverlay<'_>> {
+        let field_index = state
+            .active_overlay_field_index()
+            .unwrap_or_else(|| state.form().selected_index());
+        let field = state.form().fields().get(field_index)?;
+
+        match state.active_surface() {
+            IssueFormSurface::TextPopup { .. } => {
+                if !matches!(
+                    field.field_type,
+                    FieldType::Text { .. } | FieldType::TextArea { .. }
+                ) {
+                    return None;
+                }
+
+                let min_height = if matches!(field.field_type, FieldType::TextArea { .. }) {
+                    10
+                } else {
+                    5
+                };
+
+                Some(ActiveOverlay::TextPopup { field, min_height })
+            }
+            IssueFormSurface::Dropdown { .. } => match &field.field_type {
+                FieldType::Select { options, .. } | FieldType::MultiSelect { options, .. } => {
+                    Some(ActiveOverlay::Dropdown {
+                        field_index,
+                        field,
+                        options,
+                    })
+                }
+                _ => None,
+            },
+            IssueFormSurface::Form => None,
         }
     }
 }

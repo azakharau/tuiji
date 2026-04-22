@@ -11,8 +11,7 @@ impl<'a> NavigationController<'a> {
                 if self.state.current_screen == ScreenType::ProfileCreation
                     && new_screen != ScreenType::ProfileCreation
                 {
-                    self.screen_manager.invalidate(ScreenType::ProfileCreation);
-                    self.state.profile_editor = None;
+                    cleanup_profile_creation(self.state, self.screen_manager);
                 }
                 if new_screen == ScreenType::Home {
                     self.screen_stack.clear();
@@ -49,8 +48,7 @@ impl<'a> NavigationController<'a> {
 
     pub(crate) fn close_screen(&mut self) -> Result<ActionOutcome> {
         if self.state.current_screen == ScreenType::ProfileCreation {
-            self.screen_manager.invalidate(ScreenType::ProfileCreation);
-            self.state.profile_editor = None;
+            cleanup_profile_creation(self.state, self.screen_manager);
         }
         if let Some(prev) = self.screen_stack.pop() {
             self.state.current_screen = prev;

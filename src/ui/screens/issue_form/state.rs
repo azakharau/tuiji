@@ -1,12 +1,19 @@
 use crate::{
     contracts::error::AppErrorState,
-    ui::components::form::{FormField, FormState, SelectOption},
+    ui::components::form::{FieldType, FormField, FormState, SelectOption},
 };
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IssueFormSurface {
+    Form,
+    TextPopup { field_index: usize },
+    Dropdown { field_index: usize },
+}
 
 pub struct IssueFormState {
     form: FormState,
     error: Option<AppErrorState>,
-    text_popup_open: bool,
+    active_surface: IssueFormSurface,
 }
 
 impl IssueFormState {
@@ -14,7 +21,7 @@ impl IssueFormState {
         Self {
             form: Self::create_form(),
             error: None,
-            text_popup_open: false,
+            active_surface: IssueFormSurface::Form,
         }
     }
 
@@ -42,16 +49,78 @@ impl IssueFormState {
         "Create Issue"
     }
 
+    pub fn active_surface(&self) -> IssueFormSurface {
+        self.active_surface
+    }
+
+    pub fn active_overlay_field_index(&self) -> Option<usize> {
+        match self.active_surface {
+            IssueFormSurface::Form => None,
+            IssueFormSurface::TextPopup { field_index }
+            | IssueFormSurface::Dropdown { field_index } => Some(field_index),
+        }
+    }
+
     pub fn is_text_popup_open(&self) -> bool {
-        self.text_popup_open
+        matches!(self.active_surface, IssueFormSurface::TextPopup { .. })
+    }
+
+    pub fn is_dropdown_open(&self) -> bool {
+        matches!(self.active_surface, IssueFormSurface::Dropdown { .. })
     }
 
     pub fn open_text_popup(&mut self) {
-        self.text_popup_open = true;
+        self.active_surface = IssueFormSurface::TextPopup {
+            field_index: self.form.selected_index(),
+        };
     }
 
     pub fn close_text_popup(&mut self) {
-        self.text_popup_open = false;
+        if self.is_text_popup_open() {
+            self.active_surface = IssueFormSurface::Form;
+        }
+    }
+
+    pub fn open_dropdown(&mut self) {
+        let selected_index = self.form.selected_index();
+        if let Some(field) = self.form.selected_field_mut()
+            && matches!(
+                field.field_type,
+                FieldType::Select { .. } | FieldType::MultiSelect { .. }
+            )
+        {
+            field.field_type.set_expanded(true);
+            self.active_surface = IssueFormSurface::Dropdown {
+                field_index: selected_index,
+            };
+        }
+    }
+
+    pub fn close_dropdown(&mut self) {
+        if let Some(field_index) = self.active_overlay_field_index()
+            && let Some(field) = self.form.fields_mut().get_mut(field_index)
+        {
+            field.field_type.set_expanded(false);
+        }
+
+        if self.is_dropdown_open() {
+            self.active_surface = IssueFormSurface::Form;
+        }
+    }
+
+    pub fn close_active_overlay(&mut self) {
+        match self.active_surface {
+            IssueFormSurface::Form => {}
+            IssueFormSurface::TextPopup { .. } => self.close_text_popup(),
+            IssueFormSurface::Dropdown { .. } => self.close_dropdown(),
+        }
+    }
+
+    pub fn hide_form_content_for(&self) -> Option<usize> {
+        match self.active_surface {
+            IssueFormSurface::TextPopup { field_index } => Some(field_index),
+            IssueFormSurface::Form | IssueFormSurface::Dropdown { .. } => None,
+        }
     }
 
     fn create_form() -> FormState {

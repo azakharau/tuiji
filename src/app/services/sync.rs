@@ -11,6 +11,7 @@ use crate::{
         notification::AppNotificationKind,
         notification_service::NotificationService,
         screen_manager::{ScreenContext, ScreenManager},
+        screen_policy,
         state::ScreenType,
         worker_controller::{SyncJob, SyncJobKind, SyncSource, WorkerController},
     },
@@ -31,10 +32,36 @@ pub struct SyncActionDeps<'a> {
     pub worker_controller: &'a mut WorkerController,
 }
 
+enum SyncActionRequest {
+    RejectNonJira,
+    SwitchOffline,
+    Queue(SyncJobKind),
+}
+
 pub async fn handle_sync_action(
     action: SyncAction,
     source: SyncSource,
     current_screen: ScreenType,
+    deps: SyncActionDeps<'_>,
+) -> Result<ScreenState> {
+    apply_sync_action_request(classify_sync_action(action, current_screen), source, deps)
+}
+
+fn classify_sync_action(action: SyncAction, current_screen: ScreenType) -> SyncActionRequest {
+    if !screen_policy::is_jira_screen(current_screen) {
+        return SyncActionRequest::RejectNonJira;
+    }
+
+    match action {
+        SyncAction::Pull => SyncActionRequest::Queue(SyncJobKind::Pull),
+        SyncAction::Push => SyncActionRequest::Queue(SyncJobKind::Push),
+        SyncAction::SwitchOffline => SyncActionRequest::SwitchOffline,
+    }
+}
+
+fn apply_sync_action_request(
+    request: SyncActionRequest,
+    source: SyncSource,
     deps: SyncActionDeps<'_>,
 ) -> Result<ScreenState> {
     let SyncActionDeps {
@@ -45,32 +72,26 @@ pub async fn handle_sync_action(
         notification_service,
         worker_controller,
     } = deps;
-    if !is_jira_screen(current_screen) {
-        notification_service.set_error(AppErrorState::warning(
-            "Sync is available only on Jira screens",
-        ));
-        return Ok(ScreenState::Refresh);
-    }
-
-    if let SyncAction::SwitchOffline = action {
-        if let Some(name) =
-            configuration::switch_to_offline(cfg_state, key_bindings, repo, screen_manager)?
-        {
-            notification_service.push_notification(
-                format!("Profile \"{name}\" switched to offline mode"),
-                AppErrorLevel::Info,
-                AppNotificationKind::System,
-            );
+    match request {
+        SyncActionRequest::RejectNonJira => {
+            notification_service.set_error(AppErrorState::warning(
+                "Sync is available only on Jira screens",
+            ));
         }
-        return Ok(ScreenState::Refresh);
+        SyncActionRequest::SwitchOffline => {
+            if let Some(name) =
+                configuration::switch_to_offline(cfg_state, key_bindings, repo, screen_manager)?
+            {
+                notification_service.push_notification(
+                    format!("Profile \"{name}\" switched to offline mode"),
+                    AppErrorLevel::Info,
+                    AppNotificationKind::System,
+                );
+            }
+        }
+        SyncActionRequest::Queue(kind) => worker_controller.enqueue(SyncJob::new(kind, source)),
     }
 
-    let kind = match action {
-        SyncAction::Pull => SyncJobKind::Pull,
-        SyncAction::Push => SyncJobKind::Push,
-        SyncAction::SwitchOffline => return Ok(ScreenState::Refresh),
-    };
-    worker_controller.enqueue(SyncJob::new(kind, source));
     Ok(ScreenState::Refresh)
 }
 
@@ -98,24 +119,34 @@ pub async fn resolve_conflict(
     let repo = repo.as_ref().ok_or_else(|| {
         color_eyre::eyre::eyre!("Repository not initialized: cannot resolve conflicts")
     })?;
+
+    apply_conflict_resolution(repo, key, use_remote).await?;
+    refresh_conflict_resolution(state, cfg_state, repo.clone(), screen_manager).await
+}
+
+async fn apply_conflict_resolution(
+    repo: &RepositoryHub,
+    key: &str,
+    use_remote: bool,
+) -> Result<()> {
     if use_remote {
         repo.resolve_conflict_use_remote(key).await?;
     } else {
         repo.resolve_conflict_use_local(key).await?;
     }
 
+    Ok(())
+}
+
+async fn refresh_conflict_resolution(
+    state: &mut AppState,
+    cfg_state: &AppConfigState,
+    repo: Arc<RepositoryHub>,
+    screen_manager: &mut ScreenManager,
+) -> Result<()> {
     let issues = repo.conflict_issues().await.unwrap_or_default();
     let count = issues.len();
-    if screen_manager.conflicts_mut().is_none() {
-        let ctx = ScreenContext {
-            cfg_state,
-            app_state: state,
-            repo: repo.clone(),
-        };
-        let _ = screen_manager
-            .active_screen_mut(ScreenType::Conflicts, ctx)
-            .await?;
-    }
+    ensure_conflicts_screen_loaded(screen_manager, cfg_state, state, repo.clone()).await?;
     if let Some(screen) = screen_manager.conflicts_mut() {
         screen.set_issues(issues);
     }
@@ -124,12 +155,52 @@ pub async fn resolve_conflict(
     Ok(())
 }
 
-fn is_jira_screen(screen: ScreenType) -> bool {
-    matches!(
-        screen,
-        ScreenType::CurrentSprint
-            | ScreenType::MyIssues
-            | ScreenType::SearchIssues
-            | ScreenType::NewIssue
-    )
+async fn ensure_conflicts_screen_loaded(
+    screen_manager: &mut ScreenManager,
+    cfg_state: &AppConfigState,
+    state: &mut AppState,
+    repo: Arc<RepositoryHub>,
+) -> Result<()> {
+    if screen_manager.conflicts_mut().is_none() {
+        let ctx = ScreenContext {
+            cfg_state,
+            app_state: state,
+            repo,
+        };
+        let _ = screen_manager
+            .active_screen_mut(ScreenType::Conflicts, ctx)
+            .await?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SyncActionRequest, classify_sync_action};
+    use crate::app::{input::SyncAction, state::ScreenType, worker_controller::SyncJobKind};
+
+    #[test]
+    fn sync_action_should_reject_non_jira_screens() {
+        assert!(matches!(
+            classify_sync_action(SyncAction::Pull, ScreenType::Home),
+            SyncActionRequest::RejectNonJira
+        ));
+    }
+
+    #[test]
+    fn sync_action_should_queue_pull_on_jira_screens() {
+        assert!(matches!(
+            classify_sync_action(SyncAction::Pull, ScreenType::CurrentSprint),
+            SyncActionRequest::Queue(SyncJobKind::Pull)
+        ));
+    }
+
+    #[test]
+    fn sync_action_should_preserve_switch_offline_on_jira_screens() {
+        assert!(matches!(
+            classify_sync_action(SyncAction::SwitchOffline, ScreenType::MyIssues),
+            SyncActionRequest::SwitchOffline
+        ));
+    }
 }

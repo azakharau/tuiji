@@ -1,5 +1,8 @@
 use crate::{
-    app::state::{Mode, ScreenType},
+    app::{
+        screen_policy,
+        state::{Mode, ScreenType},
+    },
     ui::{interaction::ActionId, screens::ScreenState},
 };
 
@@ -67,17 +70,11 @@ impl ScreenTransitionPolicy {
     }
 
     pub fn command_mode_allowed(screen: ScreenType) -> bool {
-        !matches!(screen, ScreenType::Home)
+        screen_policy::command_mode_allowed(screen)
     }
 
     pub fn is_jira_screen(screen: ScreenType) -> bool {
-        matches!(
-            screen,
-            ScreenType::CurrentSprint
-                | ScreenType::MyIssues
-                | ScreenType::SearchIssues
-                | ScreenType::NewIssue
-        )
+        screen_policy::is_jira_screen(screen)
     }
 }
 

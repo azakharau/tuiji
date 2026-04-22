@@ -24,6 +24,7 @@ use crate::{
 
 use controller::CurrentSprintController;
 use state::CurrentSprintState;
+use table::TableView;
 use view::CurrentSprintView;
 
 pub struct CurrentSprintScreen {
@@ -51,9 +52,8 @@ impl Screen for CurrentSprintScreen {
             ratatui::layout::Constraint::Length(1),
         ])
         .split(frame.area());
-        let content_height = layout[1].height.saturating_sub(3);
-        let rows_visible = (content_height / 2).max(1) as usize;
-        CurrentSprintController::update_rows_visible(&mut self.state, rows_visible);
+        let rows_visible = TableView::rows_visible(layout[1].height);
+        self.state.set_rows_visible(rows_visible);
         CurrentSprintView::draw(frame, &self.state, self.mode, &self.actions, context);
     }
 

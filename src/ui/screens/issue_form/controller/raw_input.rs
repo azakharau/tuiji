@@ -1,27 +1,27 @@
 use crossterm::event::KeyCode;
 
 use crate::ui::components::form::{CursorState, FieldType, FieldValue, FormState};
+use crate::ui::screens::issue_form::state::IssueFormState;
 
-pub(super) fn handle_raw_input(form: &mut FormState, code: KeyCode) {
-    if let Some(field) = form.selected_field()
-        && field.field_type.is_expanded()
-    {
-        match code {
-            KeyCode::Esc => {
-                form.toggle_dropdown();
-                return;
-            }
-            KeyCode::Char(' ') => {
-                if matches!(field.field_type, FieldType::MultiSelect { .. }) {
-                    form.select_option();
-                    return;
-                }
-            }
-            _ => {}
-        }
+pub(super) fn handle_raw_input(state: &mut IssueFormState, code: KeyCode) {
+    if state.is_dropdown_open() {
+        handle_dropdown_raw_input(state.form_mut(), code);
         return;
     }
 
+    handle_text_raw_input(state.form_mut(), code);
+}
+
+fn handle_dropdown_raw_input(form: &mut FormState, code: KeyCode) {
+    if matches!(code, KeyCode::Char(' '))
+        && let Some(field) = form.selected_field()
+        && matches!(field.field_type, FieldType::MultiSelect { .. })
+    {
+        form.select_option();
+    }
+}
+
+fn handle_text_raw_input(form: &mut FormState, code: KeyCode) {
     let is_due_date = form
         .selected_field()
         .map(|field| field.label == "Due Date (YYYY-MM-DD)")

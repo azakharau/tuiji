@@ -16,6 +16,12 @@ use super::{formatting::format_story_points, state::CurrentSprintState};
 pub struct TableView;
 
 impl TableView {
+    pub fn rows_visible(area_height: u16) -> usize {
+        let inner_height = area_height.saturating_sub(2);
+        let content_height = inner_height.saturating_sub(2);
+        (content_height / 2).max(1) as usize
+    }
+
     pub fn draw(
         frame: &mut Frame,
         area: Rect,
@@ -121,5 +127,17 @@ impl TableView {
                 .style(Style::default().fg(context.colors().accent));
             frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TableView;
+
+    #[test]
+    fn rows_visible_should_not_overestimate_for_odd_heights() {
+        assert_eq!(TableView::rows_visible(7), 1);
+        assert_eq!(TableView::rows_visible(8), 2);
+        assert_eq!(TableView::rows_visible(9), 2);
     }
 }

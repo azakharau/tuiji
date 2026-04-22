@@ -59,6 +59,29 @@ impl FormState {
         }
     }
 
+    pub fn move_selection_top(&mut self) {
+        if let Some(field) = self.selected_field_mut() {
+            match &mut field.cursor {
+                CursorState::Select { index } | CursorState::MultiSelect { index } => {
+                    *index = 0;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn move_selection_bottom(&mut self) {
+        if let Some(field) = self.selected_field_mut() {
+            match (&field.field_type, &mut field.cursor) {
+                (FieldType::Select { options, .. }, CursorState::Select { index })
+                | (FieldType::MultiSelect { options, .. }, CursorState::MultiSelect { index }) => {
+                    *index = options.len().saturating_sub(1);
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn move_selection_down(&mut self) {
         if let Some(field) = self.selected_field_mut() {
             match (&field.field_type, &mut field.cursor) {

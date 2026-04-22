@@ -39,7 +39,9 @@ impl Widget for BoardRequiredModal<'_> {
         if let Some(profile_key) = self.bindings.profiles {
             options.push(format!("[{profile_key}] Profiles"));
         }
-        options.push(format!("[{}] Quit", self.bindings.quit));
+        if let Some(quit_key) = self.bindings.quit {
+            options.push(format!("[{quit_key}] Quit"));
+        }
         let options = Paragraph::new(options.join("\n"))
             .alignment(Alignment::Center)
             .wrap(Wrap::default());

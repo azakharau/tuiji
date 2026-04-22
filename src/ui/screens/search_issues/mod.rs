@@ -42,7 +42,7 @@ impl SearchIssuesScreen {
 
 impl Screen for SearchIssuesScreen {
     fn draw(&mut self, frame: &mut Frame, context: &RenderContext) {
-        SearchIssuesView::draw(frame, &self.state, self.mode, &self.actions, context);
+        SearchIssuesView::draw(frame, &mut self.state, self.mode, &self.actions, context);
     }
 
     fn name(&self) -> &'static str {

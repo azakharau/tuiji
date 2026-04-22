@@ -5,6 +5,7 @@ use super::*;
 use crate::app::{
     command_router::{CommandRouter, CommandRouterDeps},
     input::{CommandResolver, is_question_mark},
+    screen_policy,
     state::Mode,
 };
 use crate::ui::screens::ScreenState;
@@ -41,7 +42,6 @@ impl App {
             state: &mut self.state,
             screen_stack: &mut self.screen_stack,
             screen_manager: &mut self.screen_manager,
-            terminal: &mut self.terminal,
             cfg_state: &mut self.cfg_state,
             key_bindings: &mut self.key_bindings,
             repo: &mut self.repo,
@@ -55,7 +55,8 @@ impl App {
     }
 
     pub(super) fn enforce_command_mode_allowed(&mut self) {
-        if self.state.mode == Mode::Command && matches!(self.state.current_screen, ScreenType::Home)
+        if self.state.mode == Mode::Command
+            && !screen_policy::command_mode_allowed(self.state.current_screen)
         {
             self.state.mode = Mode::Normal;
             self.input.clear_pending();

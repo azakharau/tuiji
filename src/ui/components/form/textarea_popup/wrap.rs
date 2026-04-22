@@ -1,5 +1,4 @@
-/// Word-wrap a line to fit within the given width.
-/// Breaks on word boundaries, keeping whole words together.
+/// Soft-wrap a line to fit within the given width while preserving whitespace exactly.
 pub(super) fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
     if max_width == 0 {
         return vec![String::new()];
@@ -13,45 +12,13 @@ pub(super) fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
     let mut current_line = String::new();
     let mut current_width = 0;
 
-    for word in line.split_whitespace() {
-        let word_len = word.chars().count();
-
-        if word_len > max_width {
-            if !current_line.is_empty() {
-                result.push(current_line.clone());
-                current_line.clear();
-                current_width = 0;
-            }
-
-            let mut remaining = word;
-            while remaining.chars().count() > max_width {
-                let (chunk, rest) = split_at_char_width(remaining, max_width);
-                if chunk.is_empty() {
-                    break;
-                }
-                result.push(chunk.to_string());
-                remaining = rest;
-            }
-            if !remaining.is_empty() {
-                current_line = remaining.to_string();
-                current_width = remaining.chars().count();
-            }
-            continue;
+    for ch in line.chars() {
+        if current_width == max_width {
+            result.push(std::mem::take(&mut current_line));
+            current_width = 0;
         }
-
-        let space_needed = if current_line.is_empty() { 0 } else { 1 };
-        if current_width + space_needed + word_len > max_width {
-            result.push(current_line.clone());
-            current_line = word.to_string();
-            current_width = word_len;
-        } else {
-            if !current_line.is_empty() {
-                current_line.push(' ');
-                current_width += 1;
-            }
-            current_line.push_str(word);
-            current_width += word_len;
-        }
+        current_line.push(ch);
+        current_width += 1;
     }
 
     if !current_line.is_empty() {
@@ -65,7 +32,7 @@ pub(super) fn wrap_line(line: &str, max_width: usize) -> Vec<String> {
     }
 }
 
-/// Calculate cursor position after word wrapping.
+/// Calculate cursor position after soft wrapping.
 /// Returns (row, col) in wrapped text.
 pub(super) fn calculate_wrapped_cursor_position(
     text: &str,
@@ -80,99 +47,74 @@ pub(super) fn calculate_wrapped_cursor_position(
         return (0, 0);
     }
 
-    let mut original_pos = 0;
     let mut row = 0;
+    let mut col = 0;
+    let mut byte_pos = 0;
 
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let mut current_line_len = 0;
-
-    for (word_idx, word) in words.iter().enumerate() {
-        let word_len = word.chars().count();
-
-        if word_len <= max_width
-            && original_pos <= cursor_position
-            && cursor_position <= original_pos + word.len()
-        {
-            let col = current_line_len + char_count(&word[..cursor_position - original_pos]);
+    for ch in text.chars() {
+        if byte_pos >= cursor_position {
             return (row, col);
         }
 
-        let space_needed = if current_line_len == 0 { 0 } else { 1 };
-
-        if word_len > max_width {
-            let mut word_start = original_pos;
-            let mut remaining = *word;
-
-            while !remaining.is_empty() {
-                let available_width = if current_line_len >= max_width {
-                    max_width
-                } else {
-                    max_width - current_line_len
-                };
-                let chunk_width = available_width.max(1).min(remaining.chars().count());
-                let (chunk, rest) = split_at_char_width(remaining, chunk_width);
-                let chunk_end = word_start + chunk.len();
-
-                if word_start <= cursor_position && cursor_position <= chunk_end {
-                    let col = current_line_len + char_count(&chunk[..cursor_position - word_start]);
-                    return (row, col);
-                }
-
-                word_start = chunk_end;
-                remaining = rest;
-
-                if !remaining.is_empty() {
-                    row += 1;
-                    current_line_len = 0;
-                } else {
-                    current_line_len += char_count(chunk);
-                }
-            }
-        } else if current_line_len + space_needed + word_len > max_width {
+        if ch == '\n' {
             row += 1;
-            current_line_len = word_len;
-        } else {
-            if current_line_len > 0 {
-                current_line_len += 1;
-            }
-            current_line_len += word_len;
+            col = 0;
+            byte_pos += ch.len_utf8();
+            continue;
         }
 
-        original_pos += word_len;
-        if word_idx < words.len() - 1 {
-            original_pos += 1;
+        if col == max_width {
+            row += 1;
+            col = 0;
+        }
+
+        col += 1;
+        byte_pos += ch.len_utf8();
+
+        if col == max_width && byte_pos < cursor_position {
+            row += 1;
+            col = 0;
         }
     }
 
-    (row, current_line_len)
+    (row, col)
 }
 
-fn split_at_char_width(s: &str, width: usize) -> (&str, &str) {
-    if width == 0 {
-        return ("", s);
-    }
-
-    let mut split_idx = s.len();
-    let mut seen = 0;
-
-    for (idx, ch) in s.char_indices() {
-        seen += 1;
-        split_idx = idx + ch.len_utf8();
-        if seen == width {
-            break;
-        }
-    }
-
-    s.split_at(split_idx)
+pub(super) fn calculate_wrapped_textarea_cursor_position(
+    text: &str,
+    row: usize,
+    col: usize,
+    max_width: usize,
+) -> (usize, usize) {
+    let cursor_position = row_col_to_absolute_position(text, row, col);
+    calculate_wrapped_cursor_position(text, cursor_position, max_width)
 }
 
-fn char_count(s: &str) -> usize {
-    s.chars().count()
+fn row_col_to_absolute_position(text: &str, row: usize, col: usize) -> usize {
+    let mut absolute = 0;
+    let mut lines = text.split('\n').peekable();
+    let mut current_row = 0;
+
+    while let Some(line) = lines.next() {
+        if current_row == row {
+            return absolute + col.min(line.len());
+        }
+
+        absolute += line.len();
+        if lines.peek().is_some() {
+            absolute += 1;
+        }
+        current_row += 1;
+    }
+
+    text.len()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{calculate_wrapped_cursor_position, wrap_line};
+    use super::{
+        calculate_wrapped_cursor_position, calculate_wrapped_textarea_cursor_position, wrap_line,
+    };
 
     #[test]
     fn wrap_line_should_handle_zero_width_without_looping() {
@@ -195,5 +137,35 @@ mod tests {
     #[test]
     fn wrapped_cursor_position_should_progress_when_line_is_full() {
         assert_eq!(calculate_wrapped_cursor_position("abcdefgh", 7, 4), (1, 3));
+    }
+
+    #[test]
+    fn wrap_line_should_preserve_repeated_spaces() {
+        assert_eq!(wrap_line("a  b", 4), vec!["a  b".to_string()]);
+        assert_eq!(
+            wrap_line("a  bc", 4),
+            vec!["a  b".to_string(), "c".to_string()]
+        );
+    }
+
+    #[test]
+    fn wrapped_cursor_position_should_preserve_leading_whitespace() {
+        assert_eq!(calculate_wrapped_cursor_position("  abc", 2, 4), (0, 2));
+    }
+
+    #[test]
+    fn wrapped_textarea_cursor_position_should_follow_soft_wrapped_line() {
+        assert_eq!(
+            calculate_wrapped_textarea_cursor_position("abcdef", 0, 5, 4),
+            (1, 1)
+        );
+    }
+
+    #[test]
+    fn wrapped_textarea_cursor_position_should_keep_trailing_empty_line() {
+        assert_eq!(
+            calculate_wrapped_textarea_cursor_position("abc\n", 1, 0, 4),
+            (1, 0)
+        );
     }
 }
