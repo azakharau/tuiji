@@ -42,7 +42,6 @@ uuid = { version = "1.19.0", features = ["serde", "v7"] }
 tui-input = "0.14.0"
 
 [profile.release]
-codegen-units = 1
 lto = true
-opt-level = "s"
+codegen-units = 1
 strip = true
