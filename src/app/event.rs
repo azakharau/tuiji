@@ -20,7 +20,6 @@ pub enum UiEvent {
 
 /// Messages produced by background workers (placeholder for Jira/cache notifications).
 pub enum WorkerEvent {
-    JiraUpdated,
     Notification(String),
     SyncCompleted(SyncJob),
     SyncFailed { job: SyncJob, error: String },

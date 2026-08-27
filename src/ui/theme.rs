@@ -16,7 +16,6 @@ pub struct ThemePalette {
     pub logo: Color,
     pub mode_normal_bg: Color,
     pub mode_insert_bg: Color,
-    pub mode_visual_bg: Color,
     pub mode_command_bg: Color,
     pub mode_text: Color,
 }
@@ -161,7 +160,6 @@ fn mode_colors() -> ThemePalette {
         logo: Color::White,
         mode_normal_bg: Color::Blue,
         mode_insert_bg: Color::LightGreen,
-        mode_visual_bg: Color::LightMagenta,
         mode_command_bg: Color::Yellow,
         mode_text: Color::Black,
     }

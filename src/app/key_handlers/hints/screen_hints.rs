@@ -25,6 +25,21 @@ const CURRENT_SPRINT_HINTS: &[ScreenHint] = &[
     (ActionId::GoHome, "Home"),
 ];
 
+const ISSUE_DETAIL_HINTS: &[ScreenHint] = &[
+    (ActionId::Quit, "Quit"),
+    (ActionId::EditIssue, "Edit issue"),
+    (ActionId::TransitionIssue, "Transition"),
+    (ActionId::AddComment, "Comment"),
+    (ActionId::AssignToMe, "Assign to me"),
+    (ActionId::OpenInBrowser, "Open in browser"),
+    (ActionId::MoveUp, "Up"),
+    (ActionId::MoveDown, "Down"),
+    (ActionId::MoveTop, "Top"),
+    (ActionId::MoveBottom, "Bottom"),
+    (ActionId::PageUp, "Page up"),
+    (ActionId::PageDown, "Page down"),
+];
+
 const ISSUES_WORKSPACE_HINTS: &[ScreenHint] = &[
     (ActionId::Confirm, "Details"),
     (ActionId::MoveUp, "Up"),
@@ -97,6 +112,7 @@ pub(super) fn screen_hint_actions(screen: ScreenType) -> &'static [ScreenHint] {
     match screen {
         ScreenType::Home => HOME_HINTS,
         ScreenType::CurrentSprint => CURRENT_SPRINT_HINTS,
+        ScreenType::IssueDetail => ISSUE_DETAIL_HINTS,
         ScreenType::MyIssues | ScreenType::SearchIssues => ISSUES_WORKSPACE_HINTS,
         ScreenType::BoardSelection => BOARD_SELECTION_HINTS,
         ScreenType::Profiles => PROFILES_HINTS,

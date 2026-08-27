@@ -14,6 +14,7 @@ pub mod board_selection;
 pub mod conflicts;
 pub mod current_sprint;
 pub mod home;
+pub mod issue_detail;
 pub mod issue_form;
 pub mod issues_table;
 pub mod my_issues;
@@ -53,6 +54,8 @@ pub enum ScreenState {
     Refresh,
     SwitchTo(ScreenType),
     SwitchMode(Mode),
+    ViewIssue(String),
+    OpenIssueForm(crate::app::FormPurpose),
     Quit,
     SaveProfile(ProfileConfig),
     SaveProfileAndClose(ProfileConfig),
@@ -61,6 +64,9 @@ pub enum ScreenState {
     SaveCustomThemeAndClose(CustomThemeConfig),
     ResolveConflictLocal(String),
     ResolveConflictRemote(String),
+    Mutate(crate::data::model::IssueMutation),
+    OpenInBrowser(String),
+    RunSearch(String),
     SyncNow,
     SyncPause,
     SyncRetry,
@@ -75,6 +81,8 @@ impl PartialEq for ScreenState {
             (Self::Refresh, Self::Refresh) => true,
             (Self::SwitchTo(a), Self::SwitchTo(b)) => a == b,
             (Self::SwitchMode(a), Self::SwitchMode(b)) => a == b,
+            (Self::ViewIssue(a), Self::ViewIssue(b)) => a == b,
+            (Self::OpenIssueForm(a), Self::OpenIssueForm(b)) => a == b,
             (Self::Quit, Self::Quit) => true,
             (Self::SaveProfile(a), Self::SaveProfile(b)) => a == b,
             (Self::SaveProfileAndClose(a), Self::SaveProfileAndClose(b)) => a == b,
@@ -83,6 +91,9 @@ impl PartialEq for ScreenState {
             (Self::SaveCustomThemeAndClose(a), Self::SaveCustomThemeAndClose(b)) => a == b,
             (Self::ResolveConflictLocal(a), Self::ResolveConflictLocal(b)) => a == b,
             (Self::ResolveConflictRemote(a), Self::ResolveConflictRemote(b)) => a == b,
+            (Self::Mutate(a), Self::Mutate(b)) => a == b,
+            (Self::OpenInBrowser(a), Self::OpenInBrowser(b)) => a == b,
+            (Self::RunSearch(a), Self::RunSearch(b)) => a == b,
             (Self::SyncNow, Self::SyncNow) => true,
             (Self::SyncPause, Self::SyncPause) => true,
             (Self::SyncRetry, Self::SyncRetry) => true,

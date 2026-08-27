@@ -67,7 +67,6 @@ fn mode_color(mode: Mode, context: &RenderContext) -> ratatui::style::Color {
     match mode {
         Mode::Normal => colors.mode_normal_bg,
         Mode::Insert => colors.mode_insert_bg,
-        Mode::Visual => colors.mode_visual_bg,
         Mode::Command => colors.mode_command_bg,
     }
 }

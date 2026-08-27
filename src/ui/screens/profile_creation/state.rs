@@ -7,7 +7,6 @@ use crate::{
 pub struct ProfileCreationState {
     form: FormState,
     profile_id: Option<String>,
-    sync_mode: Option<String>,
     error: Option<AppErrorState>,
 }
 
@@ -47,10 +46,6 @@ impl ProfileCreationState {
         &mut self.form
     }
 
-    pub fn sync_mode(&self) -> Option<&String> {
-        self.sync_mode.as_ref()
-    }
-
     pub fn title(&self) -> &'static str {
         if self.profile_id.is_some() {
             "Edit Profile"
@@ -62,7 +57,6 @@ impl ProfileCreationState {
     fn from_profile(profile: ProfileConfig) -> Self {
         let mut state = Self {
             profile_id: Some(profile.id),
-            sync_mode: profile.sync_mode,
             ..Self::default()
         };
         if let Some(item) = state.form.fields_mut().get_mut(0) {
@@ -104,7 +98,6 @@ impl Default for ProfileCreationState {
         Self {
             form,
             profile_id: None,
-            sync_mode: None,
             error: None,
         }
     }

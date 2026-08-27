@@ -52,6 +52,10 @@ impl KeyBindings {
             Arc::new(merge_bindings(&global, &map_bindings(&cfg.current_sprint))),
         );
         by_screen.insert(
+            ScreenType::IssueDetail,
+            Arc::new(merge_bindings(&global, &map_bindings(&cfg.issue_detail))),
+        );
+        by_screen.insert(
             ScreenType::ProfileCreation,
             Arc::new(merge_bindings(
                 &global,

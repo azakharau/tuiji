@@ -7,10 +7,12 @@ mod env_overrides;
 mod keybinding_defaults;
 mod keybindings;
 mod profile;
+pub mod sync;
 mod ui;
 pub use app_config_ops::resolve_config_dir;
 pub use keybindings::{BindingAction, KeyBindingConfig, KeyBindingsConfig};
-pub use profile::{JiraConfig, ProfileConfig, SyncMode};
+pub use profile::{JiraConfig, ProfileConfig};
+pub use sync::SyncConfig;
 pub use ui::{CustomThemeConfig, ThemePaletteConfig, UiConfig};
 
 const ENV_PREFIX: &str = "TUIJI_";
@@ -35,6 +37,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub active_profile_id: Option<String>,
     pub ui: UiConfig,
+    #[serde(default)]
+    pub sync: SyncConfig,
     #[serde(default, skip_serializing_if = "is_keybindings_default")]
     pub keybindings: KeyBindingsConfig,
 }
@@ -90,8 +94,8 @@ mod tests {
                     base_url: "http://test.com".to_string(),
                     username: "test".to_string(),
                     api_token: "token".to_string(),
+                    api_token_command: None,
                 },
-                sync_mode: None,
             }],
             ..AppConfig::default()
         };

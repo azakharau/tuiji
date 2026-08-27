@@ -3,6 +3,13 @@ use crate::app::command_router::policies::{
     effects::{ScreenEffect, ScreenEffectPolicy, SyncControl},
     screen_transition::ScreenTransitionPolicy,
 };
+use crate::{
+    app::{
+        error::AppErrorState,
+        worker_controller::{SyncJob, SyncJobKind},
+    },
+    data::repository::MutationRepository,
+};
 
 impl<'a> CommandRouter<'a> {
     pub(super) async fn handle_action_command(&mut self, cmd: Command) -> Result<ScreenState> {
@@ -42,6 +49,37 @@ impl<'a> CommandRouter<'a> {
                 self.resolve_conflict(key, use_remote).await?;
                 return Ok(ScreenState::Refresh);
             }
+            ScreenEffect::Mutate(mutation) => {
+                self.set_mode(Mode::Normal);
+                let Some(repo) = self.repo.as_ref() else {
+                    self.notification_service.set_error(AppErrorState::error(
+                        "Repository not initialized: cannot apply issue mutation",
+                    ));
+                    return Ok(ScreenState::Refresh);
+                };
+                if let Err(err) = repo.apply_mutation(mutation.clone()).await {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                    return Ok(ScreenState::Refresh);
+                }
+                self.worker_controller
+                    .enqueue(SyncJob::new(SyncJobKind::Push, SyncSource::Manual));
+                self.screen_manager.invalidate(self.state.current_screen);
+                return Ok(ScreenState::Refresh);
+            }
+            ScreenEffect::OpenInBrowser(url) => {
+                if let Err(err) = crate::app::services::browser::open_url(url) {
+                    self.notification_service
+                        .set_error(AppErrorState::error(err.to_string()));
+                }
+                return Ok(ScreenState::Refresh);
+            }
+            ScreenEffect::RunSearch(jql) => {
+                self.set_mode(Mode::Normal);
+                self.state.search_issues_query = Some(jql.to_owned());
+                self.screen_manager.invalidate(ScreenType::SearchIssues);
+                return Ok(ScreenState::Refresh);
+            }
             ScreenEffect::Sync(SyncControl::Now) => {
                 self.enqueue_sync_now();
                 return Ok(ScreenState::Refresh);
@@ -51,7 +89,7 @@ impl<'a> CommandRouter<'a> {
                 return Ok(ScreenState::Refresh);
             }
             ScreenEffect::Sync(SyncControl::Retry) => {
-                self.retry_last_sync();
+                self.retry_last_sync().await?;
                 return Ok(ScreenState::Refresh);
             }
             ScreenEffect::Sync(SyncControl::Resume) => {

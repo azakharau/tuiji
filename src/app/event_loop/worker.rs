@@ -4,7 +4,7 @@ use super::*;
 use crate::app::{
     event::{AppEvent, WorkerEvent},
     screen_manager::ScreenContext,
-    state::ScreenType,
+    state::{Mode, ScreenType},
     worker_controller::SyncJobEvent,
 };
 use crate::contracts::{
@@ -16,7 +16,6 @@ use crate::data::{ConflictRepository, SyncExecutor};
 
 pub(super) async fn handle_worker_event(app: &mut App, msg: WorkerEvent) -> bool {
     match msg {
-        WorkerEvent::JiraUpdated => true,
         WorkerEvent::Notification(message) => {
             app.notification_service.push_notification(
                 message,
@@ -29,7 +28,16 @@ pub(super) async fn handle_worker_event(app: &mut App, msg: WorkerEvent) -> bool
             let kind = job.kind;
             app.worker_controller
                 .handle_worker_event(SyncJobEvent::Completed(job));
-            app.screen_manager.invalidate(app.state.current_screen);
+            if app.state.mode == Mode::Normal
+                && !matches!(
+                    app.state.current_screen,
+                    ScreenType::NewIssue
+                        | ScreenType::ProfileCreation
+                        | ScreenType::SettingsThemeForm
+                )
+            {
+                app.screen_manager.invalidate(app.state.current_screen);
+            }
             if kind == SyncJobKind::Pull {
                 refresh_conflicts_after_pull(app).await;
             }

@@ -29,7 +29,7 @@ impl InputParser {
         }
         match mode {
             Mode::Insert | Mode::Command => self.parse_text_mode(key),
-            Mode::Normal | Mode::Visual => self.parse_action_mode(key, bindings),
+            Mode::Normal => self.parse_action_mode(key, bindings),
         }
     }
 
@@ -68,10 +68,6 @@ impl InputParser {
             KeyCode::Esc => {
                 self.reset_state();
                 return Some(ParsedInput::ModeSwitch(Mode::Normal));
-            }
-            KeyCode::Char('v') => {
-                self.reset_state();
-                return Some(ParsedInput::ModeSwitch(Mode::Visual));
             }
             KeyCode::Char(':') => {
                 self.reset_state();

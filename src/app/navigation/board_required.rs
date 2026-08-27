@@ -8,13 +8,11 @@ use crate::{
 };
 
 pub fn is_board_required_screen(screen: ScreenType) -> bool {
-    matches!(
-        screen,
-        ScreenType::Home
-            | ScreenType::CurrentSprint
-            | ScreenType::MyIssues
-            | ScreenType::SearchIssues
-    )
+    screen == ScreenType::Home
+        || screen == ScreenType::CurrentSprint
+        || screen == ScreenType::IssueDetail
+        || screen == ScreenType::MyIssues
+        || screen == ScreenType::SearchIssues
 }
 
 pub fn board_required_active(state: &AppState) -> bool {

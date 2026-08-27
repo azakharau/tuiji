@@ -43,11 +43,23 @@ pub struct AppState {
     pub selected_board_id: Option<u64>,
     pub profile_editor: Option<ProfileEditorIntent>,
     pub conflict_count: usize,
+    /// Issue the detail screen is built for, set by whoever navigates into it.
+    pub issue_detail_key: Option<String>,
+    /// Whether the issue form was opened to create a new issue or edit one.
+    pub issue_form_purpose: Option<FormPurpose>,
+    /// Last JQL submitted on the search screen, re-run by the factory on rebuild.
+    pub search_issues_query: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfileEditorIntent {
     New,
+    Edit(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormPurpose {
+    Create,
     Edit(String),
 }
 

@@ -31,6 +31,10 @@ impl WorkerController {
             }
         }
     }
+
+    pub fn last_pull(&self) -> Option<SystemTime> {
+        self.last_pull
+    }
 }
 
 fn backoff_for(retries: u8) -> std::time::Duration {

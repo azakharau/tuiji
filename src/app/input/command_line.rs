@@ -15,7 +15,6 @@ pub enum CommandLineAction {
 pub enum SyncAction {
     Pull,
     Push,
-    SwitchOffline,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,9 +119,6 @@ fn parse_command(cmd: &str) -> Option<CommandLineAction> {
                 None => Some(CommandLineAction::Sync(SyncAction::Pull)),
                 Some("pull") => Some(CommandLineAction::Sync(SyncAction::Pull)),
                 Some("push") => Some(CommandLineAction::Sync(SyncAction::Push)),
-                Some("offline") | Some("cache") => {
-                    Some(CommandLineAction::Sync(SyncAction::SwitchOffline))
-                }
                 _ => Some(CommandLineAction::Invalid),
             }
         }

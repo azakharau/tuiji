@@ -49,8 +49,9 @@ pub fn normalize_screen_state(
                 screen_manager,
             ) {
                 notification_service.set_error(AppErrorState::error(err.to_string()));
+                return Ok(ScreenState::Refresh);
             }
-            Ok(ScreenState::Refresh)
+            Ok(after_profile_saved(app_state, ScreenState::Refresh))
         }
         ScreenState::SaveProfileAndClose(profile) => {
             if let Err(err) = configuration::save_profile(
@@ -64,11 +65,12 @@ pub fn normalize_screen_state(
                 notification_service.set_error(AppErrorState::error(err.to_string()));
                 return Ok(ScreenState::Refresh);
             }
-            if close_on_save {
-                Ok(ScreenState::Close)
+            let stay = if close_on_save {
+                ScreenState::Close
             } else {
-                Ok(ScreenState::Refresh)
-            }
+                ScreenState::Refresh
+            };
+            Ok(after_profile_saved(app_state, stay))
         }
         ScreenState::ApplyTheme(theme_id) => {
             if let Err(err) = configuration::save_theme(theme_id.as_str(), cfg_state) {
@@ -104,5 +106,19 @@ pub fn normalize_screen_state(
             }
         }
         other => Ok(other),
+    }
+}
+
+/// Onboarding handoff after a profile is persisted successfully.
+///
+/// A freshly configured profile has no board yet, so the user is moved forward
+/// to board selection instead of being left on the profile form with nothing to
+/// look at. Editing a profile that already has a board keeps the caller's own
+/// outcome, so `:w` still refreshes and `:wq` still closes the editor.
+fn after_profile_saved(state: &AppState, already_onboarded: ScreenState) -> ScreenState {
+    if state.selected_board_id.is_none() {
+        ScreenState::SwitchTo(ScreenType::BoardSelection)
+    } else {
+        already_onboarded
     }
 }

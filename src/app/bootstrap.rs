@@ -63,10 +63,7 @@ impl App {
             AppConfigState::Missing(_) => None,
         };
         let repo = RepositoryHub::connect(cfg, profile).await?;
-        let mut selected = repo.default_board_id().await?;
-        if selected.is_none() {
-            selected = repo.seed_mock_data_if_empty().await?;
-        }
+        let selected = repo.default_board_id().await?;
         self.state.selected_board_id = selected;
         self.state.conflict_count = repo.conflict_count().await.unwrap_or(0);
         self.repo = Some(Arc::new(repo));
@@ -74,14 +71,19 @@ impl App {
     }
 
     pub(super) fn init_start_screen(&mut self) {
-        match self.cfg_state {
-            AppConfigState::Loaded(_) => {
-                self.state.current_screen = ScreenType::Home;
-            }
-            AppConfigState::Missing(_) => {
-                // Placeholder: could route to Welcome screen later.
-                self.state.current_screen = ScreenType::Home;
-            }
-        }
+        let has_usable_profile = match &self.cfg_state {
+            AppConfigState::Loaded(cfg) => cfg.active_profile().is_some_and(|profile| {
+                !profile.jira.base_url.trim().is_empty() && !profile.jira.username.trim().is_empty()
+            }),
+            AppConfigState::Missing(_) => false,
+        };
+
+        self.state.current_screen = if !has_usable_profile {
+            ScreenType::ProfileCreation
+        } else if self.state.selected_board_id.is_none() {
+            ScreenType::BoardSelection
+        } else {
+            ScreenType::CurrentSprint
+        };
     }
 }

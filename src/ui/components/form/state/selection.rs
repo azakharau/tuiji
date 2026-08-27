@@ -23,7 +23,7 @@ impl FormState {
                     }
                 }
                 (
-                    FieldType::MultiSelect { options: _, .. },
+                    FieldType::MultiSelect { .. },
                     CursorState::MultiSelect { index },
                     FieldValue::Multiple(selected),
                 ) => {
@@ -85,15 +85,11 @@ impl FormState {
     pub fn move_selection_down(&mut self) {
         if let Some(field) = self.selected_field_mut() {
             match (&field.field_type, &mut field.cursor) {
-                (FieldType::Select { options, .. }, CursorState::Select { index }) => {
-                    if *index + 1 < options.len() {
-                        *index += 1;
-                    }
-                }
-                (FieldType::MultiSelect { options, .. }, CursorState::MultiSelect { index }) => {
-                    if *index + 1 < options.len() {
-                        *index += 1;
-                    }
+                (FieldType::Select { options, .. }, CursorState::Select { index })
+                | (FieldType::MultiSelect { options, .. }, CursorState::MultiSelect { index })
+                    if *index + 1 < options.len() =>
+                {
+                    *index += 1;
                 }
                 _ => {}
             }

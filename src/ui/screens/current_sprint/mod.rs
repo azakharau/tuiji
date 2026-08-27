@@ -1,5 +1,4 @@
 mod controller;
-mod detail;
 mod formatting;
 mod state;
 mod table;

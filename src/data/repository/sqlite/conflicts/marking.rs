@@ -5,12 +5,26 @@ impl SqliteRepository {
         sqlx::query(
             r#"
             UPDATE issues
-            SET conflict = 1,
-                remote_snapshot = ?
+            SET remote_snapshot = ?
             WHERE key = ? AND profile_id = ?
             "#,
         )
         .bind(remote_snapshot)
+        .bind(key)
+        .bind(self.profile_id())
+        .execute(&self.pool)
+        .await?;
+        self.set_issue_conflict(key).await
+    }
+
+    pub async fn set_issue_conflict(&self, key: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE issues
+            SET conflict = 1
+            WHERE key = ? AND profile_id = ?
+            "#,
+        )
         .bind(key)
         .bind(self.profile_id())
         .execute(&self.pool)

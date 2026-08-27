@@ -7,8 +7,6 @@ use crate::{
         AppState,
         error::AppErrorState,
         input::SyncAction,
-        key_handlers::KeyBindings,
-        notification::AppNotificationKind,
         notification_service::NotificationService,
         screen_manager::{ScreenContext, ScreenManager},
         screen_policy,
@@ -16,25 +14,17 @@ use crate::{
         worker_controller::{SyncJob, SyncJobKind, SyncSource, WorkerController},
     },
     config::AppConfigState,
-    contracts::error::AppErrorLevel,
     data::{ConflictRepository, RepositoryHub},
     ui::screens::ScreenState,
 };
 
-use super::configuration;
-
 pub struct SyncActionDeps<'a> {
-    pub cfg_state: &'a mut AppConfigState,
-    pub key_bindings: &'a mut Arc<KeyBindings>,
-    pub repo: &'a mut Option<Arc<RepositoryHub>>,
-    pub screen_manager: &'a mut ScreenManager,
     pub notification_service: &'a mut NotificationService,
     pub worker_controller: &'a mut WorkerController,
 }
 
 enum SyncActionRequest {
     RejectNonJira,
-    SwitchOffline,
     Queue(SyncJobKind),
 }
 
@@ -55,7 +45,6 @@ fn classify_sync_action(action: SyncAction, current_screen: ScreenType) -> SyncA
     match action {
         SyncAction::Pull => SyncActionRequest::Queue(SyncJobKind::Pull),
         SyncAction::Push => SyncActionRequest::Queue(SyncJobKind::Push),
-        SyncAction::SwitchOffline => SyncActionRequest::SwitchOffline,
     }
 }
 
@@ -65,10 +54,6 @@ fn apply_sync_action_request(
     deps: SyncActionDeps<'_>,
 ) -> Result<ScreenState> {
     let SyncActionDeps {
-        cfg_state,
-        key_bindings,
-        repo,
-        screen_manager,
         notification_service,
         worker_controller,
     } = deps;
@@ -77,17 +62,6 @@ fn apply_sync_action_request(
             notification_service.set_error(AppErrorState::warning(
                 "Sync is available only on Jira screens",
             ));
-        }
-        SyncActionRequest::SwitchOffline => {
-            if let Some(name) =
-                configuration::switch_to_offline(cfg_state, key_bindings, repo, screen_manager)?
-            {
-                notification_service.push_notification(
-                    format!("Profile \"{name}\" switched to offline mode"),
-                    AppErrorLevel::Info,
-                    AppNotificationKind::System,
-                );
-            }
         }
         SyncActionRequest::Queue(kind) => worker_controller.enqueue(SyncJob::new(kind, source)),
     }
@@ -100,12 +74,28 @@ pub fn enqueue_sync_now(worker_controller: &mut WorkerController) {
     worker_controller.enqueue(SyncJob::new(SyncJobKind::Push, SyncSource::Manual));
 }
 
-pub fn retry_last_sync(worker_controller: &mut WorkerController) {
-    worker_controller.resume();
-    if let Some(mut job) = worker_controller.take_last_failed_job() {
-        job.next_attempt_at = None;
-        worker_controller.enqueue_front(job);
+/// Retry after a sync failure.
+///
+/// Outbox rows that Jira rejected permanently are returned to `pending` first:
+/// without that, a single permanent rejection would strand the user's edit with
+/// no way to try it again. Then the failed worker job is re-queued, or a fresh
+/// push is scheduled if the failure was recorded at the row level only.
+pub async fn retry_last_sync(
+    repo: &Option<Arc<RepositoryHub>>,
+    worker_controller: &mut WorkerController,
+) -> Result<()> {
+    if let Some(repo) = repo.as_ref() {
+        repo.requeue_failed_outbox().await?;
     }
+    worker_controller.resume();
+    match worker_controller.take_last_failed_job() {
+        Some(mut job) => {
+            job.next_attempt_at = None;
+            worker_controller.enqueue_front(job);
+        }
+        None => worker_controller.enqueue(SyncJob::new(SyncJobKind::Push, SyncSource::Manual)),
+    }
+    Ok(())
 }
 
 pub async fn resolve_conflict(
@@ -193,14 +183,6 @@ mod tests {
         assert!(matches!(
             classify_sync_action(SyncAction::Pull, ScreenType::CurrentSprint),
             SyncActionRequest::Queue(SyncJobKind::Pull)
-        ));
-    }
-
-    #[test]
-    fn sync_action_should_preserve_switch_offline_on_jira_screens() {
-        assert!(matches!(
-            classify_sync_action(SyncAction::SwitchOffline, ScreenType::MyIssues),
-            SyncActionRequest::SwitchOffline
         ));
     }
 }

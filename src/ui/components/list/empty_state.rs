@@ -1,7 +1,7 @@
 use ratatui::{
     layout::{Alignment, Rect},
     style::Style,
-    text::Line,
+    text::{Line, Text},
     widgets::{Paragraph, Widget, Wrap},
 };
 
@@ -28,7 +28,7 @@ impl Widget for EmptyState<'_> {
         let style = Style::default()
             .fg(self.context.colors().info)
             .bg(self.context.colors().background);
-        let text = Line::from(format!("{}\n{}", self.title, self.message)).centered();
+        let text = Text::from(vec![Line::from(self.title), Line::from(self.message)]);
         Paragraph::new(text)
             .style(style)
             .alignment(Alignment::Center)

@@ -48,6 +48,25 @@ impl SqliteRepository {
         Ok(())
     }
 
+    pub async fn mark_outbox_pending(&self, id: &str, error: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE outbox
+            SET status = 'pending',
+                last_error = ?,
+                updated_at = strftime('%s','now')
+            WHERE id = ?
+              AND profile_id = ?
+            "#,
+        )
+        .bind(error)
+        .bind(id)
+        .bind(self.profile_id())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn mark_outbox_done(&self, id: &str) -> Result<()> {
         sqlx::query(
             r#"
@@ -101,6 +120,39 @@ impl SqliteRepository {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    pub async fn requeue_processing_outbox(&self) -> Result<u64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE outbox
+            SET status = 'pending',
+                updated_at = strftime('%s','now')
+            WHERE status = 'processing'
+              AND profile_id = ?
+            "#,
+        )
+        .bind(self.profile_id())
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn requeue_failed_outbox(&self) -> Result<u64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE outbox
+            SET status = 'pending',
+                attempts = 0,
+                updated_at = strftime('%s','now')
+            WHERE status = 'failed'
+              AND profile_id = ?
+            "#,
+        )
+        .bind(self.profile_id())
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     pub async fn outbox_entity_conflict(&self, entity_type: &str, entity_id: &str) -> Result<bool> {

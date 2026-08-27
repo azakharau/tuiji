@@ -4,18 +4,14 @@ mod view;
 
 use std::sync::Arc;
 
-use color_eyre::Result;
 use ratatui::Frame;
 
 use crate::{
-    data::AppRepository,
+    data::IssueSummary,
     ui::{
         context::RenderContext,
+        interaction::{ActionHint, Command, KeyHandler, Mode},
         screens::{CommandLineCommand, Screen, ScreenState},
-    },
-    ui::{
-        interaction::Mode,
-        interaction::{ActionHint, Command, KeyHandler},
     },
 };
 
@@ -30,13 +26,17 @@ pub struct SearchIssuesScreen {
 }
 
 impl SearchIssuesScreen {
-    pub async fn new(repo: Arc<dyn AppRepository>, mode: Mode, board_id: u64) -> Result<Self> {
-        let issues = repo.current_sprint_issues(board_id).await?;
-        Ok(Self {
-            state: SearchIssuesState::search_issues(issues),
+    pub fn new(
+        mode: Mode,
+        query: String,
+        issues: Vec<IssueSummary>,
+        error: Option<String>,
+    ) -> Self {
+        Self {
+            state: SearchIssuesState::new(query, issues, error),
             actions: Arc::new(Vec::new()),
             mode,
-        })
+        }
     }
 }
 
@@ -68,6 +68,6 @@ impl Screen for SearchIssuesScreen {
 
 impl KeyHandler for SearchIssuesScreen {
     fn handle_command(&mut self, command: Command) -> ScreenState {
-        SearchIssuesController::handle_command(&mut self.state, command)
+        SearchIssuesController::handle_command(&mut self.state, command, self.mode)
     }
 }

@@ -7,7 +7,7 @@ use crate::{
         AppState, ProfileEditorIntent, key_handlers::KeyBindings, screen_manager::ScreenManager,
         state::ScreenType,
     },
-    config::{AppConfig, AppConfigState, CustomThemeConfig, ProfileConfig, SyncMode},
+    config::{AppConfig, AppConfigState, CustomThemeConfig, ProfileConfig},
     data::RepositoryHub,
 };
 
@@ -117,20 +117,4 @@ pub fn current_theme_id(cfg_state: &AppConfigState) -> &str {
         AppConfigState::Loaded(cfg) => cfg.ui.theme.as_str(),
         AppConfigState::Missing(_) => "default",
     }
-}
-
-pub fn switch_to_offline(
-    cfg_state: &mut AppConfigState,
-    key_bindings: &mut Arc<KeyBindings>,
-    repo: &mut Option<Arc<RepositoryHub>>,
-    screen_manager: &mut ScreenManager,
-) -> Result<Option<String>> {
-    let mut cfg = cfg_or_default(cfg_state);
-    let Some(profile) = cfg.active_profile_mut() else {
-        return Ok(None);
-    };
-    profile.set_sync_mode(SyncMode::Cache);
-    let name = profile.name.clone();
-    save_config(cfg, cfg_state, key_bindings, repo, screen_manager)?;
-    Ok(Some(name))
 }

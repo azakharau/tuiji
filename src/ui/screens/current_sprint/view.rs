@@ -12,7 +12,7 @@ use crate::{
     ui::{components::bottom_bar::BottomBar, context::RenderContext},
 };
 
-use super::{detail::render_issue_detail_modal, state::CurrentSprintState, table::TableView};
+use super::{state::CurrentSprintState, table::TableView};
 
 pub struct CurrentSprintView;
 
@@ -40,11 +40,5 @@ impl CurrentSprintView {
 
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, layout[2]);
-
-        if state.detail_open()
-            && let Some(issue) = state.selected_issue()
-        {
-            render_issue_detail_modal(frame, issue, context);
-        }
     }
 }

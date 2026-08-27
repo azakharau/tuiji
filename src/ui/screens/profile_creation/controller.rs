@@ -137,8 +137,8 @@ fn build_profile(state: &ProfileCreationState) -> Result<ProfileConfig, String> 
             base_url: jira_url.to_string(),
             username: username.to_string(),
             api_token: api_token.to_string(),
+            api_token_command: None,
         },
-        sync_mode: state.sync_mode().cloned(),
     })
 }
 

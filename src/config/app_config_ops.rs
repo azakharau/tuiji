@@ -41,7 +41,16 @@ impl AppConfig {
         std::fs::write(&cfg_path, content).map_err(|e| ConfigError::Io {
             source: e,
             path: cfg_path.clone(),
-        })
+        })?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let _ = std::fs::set_permissions(&cfg_path, std::fs::Permissions::from_mode(0o600));
+        }
+
+        Ok(())
     }
 
     pub fn active_profile(&self) -> Option<&ProfileConfig> {
@@ -98,6 +107,7 @@ impl Default for AppConfig {
                 notification_stack_limit: UiConfig::default_notification_stack_limit(),
                 error_ttl_seconds: UiConfig::default_error_ttl_seconds(),
             },
+            sync: SyncConfig::default(),
             keybindings: KeyBindingsConfig::default(),
         }
     }
@@ -133,6 +143,7 @@ fn env_override_config(mut config: AppConfig) -> AppConfig {
     if let Some(profile) = config.active_profile_mut() {
         profile.jira.env_override();
     }
+    config.sync.env_override();
     config.ui.env_override();
     config
 }

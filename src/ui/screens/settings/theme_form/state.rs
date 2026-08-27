@@ -36,7 +36,7 @@ impl SettingsThemeFormState {
             color_to_hex(palette.info),
             color_to_hex(palette.success),
         ];
-        for (field, value_str) in fields.iter_mut().zip(defaults.into_iter()) {
+        for (field, value_str) in fields.iter_mut().zip(defaults) {
             field.value = FieldValue::Text(value_str.clone());
             if let CursorState::Text { position } = &mut field.cursor {
                 *position = value_str.len();

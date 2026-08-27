@@ -5,20 +5,12 @@ use crate::data::repository::QueryRepository;
 
 impl RepositoryHub {
     pub async fn sync_pull(&self) -> Result<()> {
-        let Some(remote) = &self.remote else {
-            self.cache
-                .log_sync_event(
-                    "pull",
-                    "error",
-                    Some("sync pull requires online mode"),
-                    Some(self.profile_id.as_str()),
-                )
-                .await?;
-            return Err(eyre!("Sync pull requires online mode"));
-        };
-
-        let board_ids = self.cache.selected_board_ids().await?;
         let result: Result<()> = async {
+            let remote = self
+                .remote
+                .as_ref()
+                .ok_or_else(|| eyre!("Sync pull requires an active Jira connection"))?;
+            let board_ids = self.cache.selected_board_ids().await?;
             for board_id in board_ids {
                 let config = remote.board_config(board_id).await?;
                 self.cache.upsert_board_config(board_id, &config).await?;

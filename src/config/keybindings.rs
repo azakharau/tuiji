@@ -13,6 +13,8 @@ pub struct KeyBindingsConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub current_sprint: Vec<KeyBindingConfig>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub issue_detail: Vec<KeyBindingConfig>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub profile_creation: Vec<KeyBindingConfig>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub profiles: Vec<KeyBindingConfig>,
@@ -79,6 +81,13 @@ pub enum BindingAction {
     EditProfile,
     DeleteProfile,
     OpenInBrowser,
+    EditIssue,
+    TransitionIssue,
+    AddComment,
+    AssignToMe,
+    FocusQuery,
+    PageUp,
+    PageDown,
     MoveUp,
     MoveDown,
     MoveLeft,

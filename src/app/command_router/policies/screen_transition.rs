@@ -1,6 +1,6 @@
 use crate::{
     app::{
-        screen_policy,
+        FormPurpose, screen_policy,
         state::{Mode, ScreenType},
     },
     ui::{interaction::ActionId, screens::ScreenState},
@@ -61,7 +61,7 @@ impl ScreenTransitionPolicy {
             }
             ActionId::OpenMyIssues => Some(ScreenState::SwitchTo(ScreenType::MyIssues)),
             ActionId::OpenSearchIssues => Some(ScreenState::SwitchTo(ScreenType::SearchIssues)),
-            ActionId::OpenNewIssue => Some(ScreenState::SwitchTo(ScreenType::NewIssue)),
+            ActionId::OpenNewIssue => Some(ScreenState::OpenIssueForm(FormPurpose::Create)),
             ActionId::OpenBoards => Some(ScreenState::SwitchTo(ScreenType::BoardSelection)),
             ActionId::OpenSettings => Some(ScreenState::SwitchTo(ScreenType::Settings)),
             ActionId::OpenSyncStatus => Some(ScreenState::SwitchTo(ScreenType::SyncStatus)),

@@ -93,8 +93,7 @@ fn build_list_items(labels: &[String]) -> Vec<ListItem<'static>> {
 
 fn build_entries(boards: Vec<BoardSummary>) -> (Vec<String>, Vec<u64>, String) {
     if boards.is_empty() {
-        let message = "No boards are available yet.\nSync or configure boards first.".to_string();
-        return (Vec::new(), Vec::new(), message);
+        return (Vec::new(), Vec::new(), String::new());
     }
 
     let mut labels = Vec::with_capacity(boards.len());

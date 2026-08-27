@@ -10,13 +10,12 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
+    app::FormPurpose,
     ui::{
         context::RenderContext,
-        screens::{CommandLineCommand, Screen, ScreenState},
-    },
-    ui::{
         interaction::Mode,
         interaction::{ActionHint, Command, KeyHandler},
+        screens::{CommandLineCommand, Screen, ScreenState},
     },
 };
 
@@ -32,17 +31,35 @@ pub struct IssueFormScreen {
 
 impl Default for IssueFormScreen {
     fn default() -> Self {
-        Self::new()
+        Self::new(FormPurpose::Create, None, Vec::new(), String::new(), None)
     }
 }
 
 impl IssueFormScreen {
-    pub fn new() -> Self {
+    pub fn new(
+        purpose: FormPurpose,
+        project_key: Option<String>,
+        issue_types: Vec<String>,
+        summary: String,
+        description: Option<String>,
+    ) -> Self {
+        let state = match purpose {
+            FormPurpose::Create => IssueFormState::create(project_key, issue_types),
+            FormPurpose::Edit(key) => IssueFormState::edit(key, summary, description),
+        };
+
         Self {
-            state: IssueFormState::new(),
+            state,
             actions: Arc::new(Vec::new()),
             mode: Mode::Normal,
         }
+    }
+
+    /// Surfaces a load failure raised while the factory was building the form,
+    /// so an empty Issue Type list explains itself instead of failing validation
+    /// with "issue type is required".
+    pub fn set_error(&mut self, error: crate::contracts::error::AppErrorState) {
+        self.state.set_error(error);
     }
 }
 
@@ -52,7 +69,7 @@ impl Screen for IssueFormScreen {
     }
 
     fn name(&self) -> &'static str {
-        self.state.title()
+        self.state.screen_name()
     }
 
     fn set_action_hints(&mut self, actions: Arc<Vec<ActionHint>>) {

@@ -19,6 +19,7 @@ mod boards;
 mod conflicts;
 mod outbox;
 mod query;
+#[cfg(test)]
 mod seeds;
 mod writes;
 
@@ -58,11 +59,13 @@ impl SqliteRepository {
             .create_if_missing(true);
         let pool = SqlitePool::connect_with(options).await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
-        Ok(Self {
+        let repo = Self {
             cfg,
             pool,
             profile_id,
-        })
+        };
+        repo.requeue_processing_outbox().await?;
+        Ok(repo)
     }
 
     pub fn db_path(&self) -> &PathBuf {
@@ -94,10 +97,6 @@ impl SqliteRepository {
     ) -> Result<()> {
         self.log_sync_event_impl(direction, status, error, profile_id)
             .await
-    }
-
-    pub async fn seed_mock_data_if_empty(&self) -> Result<Option<u64>> {
-        self.seed_mock_data_if_empty_impl().await
     }
 
     pub async fn sync_log(&self, limit: usize, filter: SyncLogFilter) -> Result<Vec<SyncLogEntry>> {

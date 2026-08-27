@@ -1,15 +1,18 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Margin},
+    layout::{Alignment, Constraint, Layout, Margin},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
-    app::{key_handlers::ActionHint, state::Mode},
     data::IssueSummary,
-    ui::context::RenderContext,
+    ui::{
+        components::layout::ModalFrame,
+        context::RenderContext,
+        interaction::{ActionHint, Mode},
+    },
 };
 
 use super::state::IssueDetailState;
@@ -217,76 +220,157 @@ impl IssueDetailView {
         state: &mut IssueDetailState,
         _mode: Mode,
         _actions: &[ActionHint],
-        _context: &RenderContext,
+        context: &RenderContext,
     ) {
         let area = frame.area();
+        let Some(issue) = state.issue() else {
+            let message = state
+                .unavailable_message()
+                .unwrap_or("Issue details are unavailable");
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title(" Issue Detail ");
+            frame.render_widget(
+                Paragraph::new(message)
+                    .alignment(Alignment::Center)
+                    .block(block),
+                area,
+            );
+            return;
+        };
+        let issue_key = issue.key.clone();
+        let issue_summary = issue.summary.clone();
 
-        // Clone issue data to avoid borrow conflicts
-        let issue = state.issue().clone();
-
-        // Layout: title + content
         let layout = Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(area);
-
-        // Title block
         let title_text = vec![Line::from(vec![
             Span::styled(
-                issue.key.clone(),
+                issue_key,
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" - "),
-            Span::raw(issue.summary.clone()),
+            Span::raw(issue_summary),
         ])];
         let title_block = Block::default()
             .borders(Borders::ALL)
             .style(Style::default());
-        let title = Paragraph::new(title_text).block(title_block);
-        frame.render_widget(title, layout[0]);
+        frame.render_widget(Paragraph::new(title_text).block(title_block), layout[0]);
 
-        // Get or build content lines (with caching)
-        let content_lines = if let Some(cached) = state.cached_content() {
-            cached.clone()
-        } else {
-            let lines = Self::build_content_lines(&issue);
-            state.cache_content(lines.clone());
-            lines
-        };
-
-        // Create initial block to calculate inner area
+        if state.cached_content().is_none() {
+            let lines = state
+                .issue()
+                .map(Self::build_content_lines)
+                .unwrap_or_default();
+            state.cache_content(lines);
+        }
+        let content_lines = state.cached_content().cloned().unwrap_or_default();
         let temp_block = Block::default().borders(Borders::ALL);
-        let inner_area = temp_block.inner(layout[1]);
+        let inner_area = temp_block.inner(layout[1]).inner(Margin::new(1, 0));
+        let measured = Paragraph::new(content_lines.clone()).wrap(Wrap { trim: false });
+        let total_lines = measured.line_count(inner_area.width);
+        state.update_bounds(total_lines, inner_area.height as usize);
 
-        // Update scroll bounds based on content size
-        let total_lines = content_lines.len();
-        let viewport_height = inner_area.inner(Margin::new(1, 0)).height as usize;
-        state.update_bounds(total_lines, viewport_height);
-
-        // Get scroll position for display
-        let scroll_pct = state.scroll_percentage();
-        let title = if total_lines > viewport_height {
-            format!(" Details [{}%] ", scroll_pct)
+        let title = if total_lines > inner_area.height as usize {
+            format!(" Details [{}%] ", state.scroll_percentage())
         } else {
             " Details ".to_string()
         };
-
-        // Create final content block with scroll info
         let content_block = Block::default()
             .borders(Borders::ALL)
             .title(title)
             .style(Style::default());
-
         frame.render_widget(content_block, layout[1]);
 
-        // Apply scroll offset (get it after update_bounds to get clamped value)
-        let scroll_offset = state.scroll_offset();
-        let horizontal_offset = state.horizontal_offset();
-        let visible_lines: Vec<_> = content_lines.into_iter().skip(scroll_offset).collect();
-
-        let content = Paragraph::new(visible_lines)
+        let vertical_offset = state.scroll_offset().min(u16::MAX as usize) as u16;
+        let horizontal_offset = state.horizontal_offset().min(u16::MAX as usize) as u16;
+        let content = Paragraph::new(content_lines)
             .wrap(Wrap { trim: false })
-            .scroll((0, horizontal_offset as u16));
+            .scroll((vertical_offset, horizontal_offset));
+        frame.render_widget(content, inner_area);
 
-        frame.render_widget(content, inner_area.inner(Margin::new(1, 0)));
+        if state.transition_picker_open() {
+            Self::draw_transition_picker(frame, state, context);
+        } else if state.comment_input().is_some() {
+            Self::draw_comment_input(frame, state, context);
+        }
+    }
+
+    fn draw_transition_picker(
+        frame: &mut Frame,
+        state: &IssueDetailState,
+        context: &RenderContext,
+    ) {
+        let area = frame.area();
+        let width = (area.width.saturating_mul(6) / 10).max(32).min(area.width);
+        let content_height = state.transitions().len().clamp(1, 12) as u16;
+        let height = content_height.saturating_add(4).min(area.height);
+        let modal = crate::ui::layout::modal_area(area, width, height);
+        let inner = ModalFrame::new(
+            "Transition Issue",
+            modal,
+            Style::default().fg(context.colors().accent),
+            context,
+        )
+        .render(frame);
+
+        let lines = if let Some(error) = state.transition_error() {
+            vec![Line::from(error).style(Style::default().fg(context.colors().error))]
+        } else if state.transitions().is_empty() {
+            vec![Line::from("No transitions are available")]
+        } else {
+            state
+                .transitions()
+                .iter()
+                .enumerate()
+                .map(|(index, transition)| {
+                    let marker = if index == state.transition_selected() {
+                        "> "
+                    } else {
+                        "  "
+                    };
+                    let style = if index == state.transition_selected() {
+                        Style::default()
+                            .fg(context.colors().accent)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(context.colors().text)
+                    };
+                    Line::from(format!(
+                        "{marker}{} → {}",
+                        transition.name, transition.to_status
+                    ))
+                    .style(style)
+                })
+                .collect()
+        };
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+    }
+
+    fn draw_comment_input(frame: &mut Frame, state: &IssueDetailState, context: &RenderContext) {
+        let Some(input) = state.comment_input() else {
+            return;
+        };
+        let area = frame.area();
+        let width = (area.width.saturating_mul(7) / 10).max(32).min(area.width);
+        let height = 5.min(area.height);
+        let modal = crate::ui::layout::modal_area(area, width, height);
+        let inner = ModalFrame::new(
+            "Add Comment",
+            modal,
+            Style::default().fg(context.colors().accent),
+            context,
+        )
+        .render(frame);
+        let scroll = input.visual_scroll(inner.width as usize);
+        frame.render_widget(
+            Paragraph::new(input.value()).scroll((0, scroll.min(u16::MAX as usize) as u16)),
+            inner,
+        );
+        let cursor = input.visual_cursor().saturating_sub(scroll);
+        let cursor_x = inner
+            .x
+            .saturating_add(cursor.min(inner.width.saturating_sub(1) as usize) as u16);
+        frame.set_cursor_position((cursor_x, inner.y));
     }
 }

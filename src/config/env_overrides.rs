@@ -14,6 +14,16 @@ impl JiraConfig {
     }
 }
 
+impl SyncConfig {
+    pub(super) fn env_override(&mut self) {
+        if let Ok(interval) = std::env::var(format!("{}SYNC_INTERVAL_SECONDS", ENV_PREFIX))
+            && let Ok(value) = interval.parse::<u64>()
+        {
+            self.interval_seconds = value;
+        }
+    }
+}
+
 impl UiConfig {
     pub(super) fn env_override(&mut self) {
         if let Ok(theme) = std::env::var(format!("{}UI_THEME", ENV_PREFIX)) {

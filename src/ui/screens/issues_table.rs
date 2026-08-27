@@ -1,21 +1,15 @@
 use std::{ops::Range, sync::Arc};
 
-use crossterm::event::KeyCode;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout},
     style::Style,
-    text::{Line, Span, Text},
-    widgets::{Paragraph, Wrap},
+    text::Line,
+    widgets::Paragraph,
 };
 
 use crate::{
     data::IssueSummary,
-    ui::{
-        components::layout::ModalFrame,
-        interaction::Mode,
-        interaction::{ActionHint, ActionId, Command},
-    },
     ui::{
         components::{
             bottom_bar::BottomBar,
@@ -24,6 +18,10 @@ use crate::{
         context::RenderContext,
         screens::ScreenState,
     },
+    ui::{
+        interaction::Mode,
+        interaction::{ActionHint, ActionId, Command},
+    },
 };
 
 pub struct IssueWorkspaceState {
@@ -31,7 +29,6 @@ pub struct IssueWorkspaceState {
     selected_index: usize,
     scroll_offset: usize,
     rows_visible: usize,
-    detail_open: bool,
 }
 
 impl IssueWorkspaceState {
@@ -41,7 +38,6 @@ impl IssueWorkspaceState {
             selected_index: 0,
             scroll_offset: 0,
             rows_visible: 1,
-            detail_open: false,
         };
         workspace.clamp_viewport();
         workspace
@@ -65,10 +61,6 @@ impl IssueWorkspaceState {
 
     pub fn rows_visible(&self) -> usize {
         self.rows_visible
-    }
-
-    pub fn detail_open(&self) -> bool {
-        self.detail_open
     }
 
     pub fn selected_issue(&self) -> Option<&IssueSummary> {
@@ -119,22 +111,10 @@ impl IssueWorkspaceState {
         self.clamp_viewport();
     }
 
-    pub fn toggle_detail(&mut self) {
-        if self.is_empty() {
-            return;
-        }
-        self.detail_open = !self.detail_open;
-    }
-
-    pub fn close_detail(&mut self) {
-        self.detail_open = false;
-    }
-
     fn clamp_viewport(&mut self) {
         if self.is_empty() {
             self.selected_index = 0;
             self.scroll_offset = 0;
-            self.detail_open = false;
             return;
         }
 
@@ -229,10 +209,6 @@ impl IssuesTableState {
         self.workspace.rows_visible()
     }
 
-    pub fn detail_open(&self) -> bool {
-        self.workspace.detail_open()
-    }
-
     pub fn selected_issue(&self) -> Option<&IssueSummary> {
         self.workspace.selected_issue()
     }
@@ -256,35 +232,17 @@ impl IssuesTableState {
     pub fn move_bottom(&mut self) {
         self.workspace.move_bottom();
     }
-
-    pub fn toggle_detail(&mut self) {
-        self.workspace.toggle_detail();
-    }
-
-    pub fn close_detail(&mut self) {
-        self.workspace.close_detail();
-    }
 }
 
 pub struct IssueWorkspaceController;
 
 impl IssueWorkspaceController {
     pub fn handle_command(state: &mut IssueWorkspaceState, command: Command) -> ScreenState {
-        if state.detail_open() {
-            return match command.action {
-                ActionId::Confirm | ActionId::Quit | ActionId::RawInput(KeyCode::Esc) => {
-                    state.close_detail();
-                    ScreenState::Refresh
-                }
-                _ => ScreenState::Stay,
-            };
-        }
-
         match command.action {
-            ActionId::Confirm => {
-                state.toggle_detail();
-                ScreenState::Refresh
-            }
+            ActionId::Confirm => state
+                .selected_issue()
+                .map(|issue| ScreenState::ViewIssue(issue.key.clone()))
+                .unwrap_or(ScreenState::Stay),
             ActionId::Refresh => ScreenState::Refresh,
             ActionId::MoveUp => {
                 state.move_up(command.repeat);
@@ -363,84 +321,7 @@ impl IssuesTableView {
 
         let bottom_bar = BottomBar::new(mode, actions.clone(), context);
         frame.render_widget(bottom_bar, layout[2]);
-
-        if state.detail_open()
-            && let Some(issue) = state.selected_issue()
-        {
-            render_issue_detail_modal(frame, issue, context);
-        }
     }
-}
-
-pub(crate) fn render_issue_detail_modal(
-    frame: &mut Frame,
-    issue: &IssueSummary,
-    context: &RenderContext,
-) {
-    let area = frame.area();
-    let width = (area.width.saturating_mul(4) / 5).max(56).min(area.width);
-    let height = (area.height.saturating_mul(4) / 5).max(14).min(area.height);
-    let modal = crate::ui::layout::modal_area(area, width, height);
-    let inner = ModalFrame::new(
-        issue.key.as_str(),
-        modal,
-        Style::default().fg(context.colors().accent),
-        context,
-    )
-    .render(frame);
-
-    let labels = if issue.labels.is_empty() {
-        "none".to_string()
-    } else {
-        issue.labels.join(", ")
-    };
-    let fix_versions = if issue.fix_versions.is_empty() {
-        "none".to_string()
-    } else {
-        issue.fix_versions.join(", ")
-    };
-    let story_points = issue
-        .story_points
-        .map(format_story_points)
-        .unwrap_or_else(|| "n/a".to_string());
-    let comments_count = issue.comments.len().to_string();
-    let description = issue
-        .description
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or("No description");
-
-    let text = Text::from(vec![
-        Line::from(Span::styled(
-            issue.summary.as_str(),
-            Style::default().fg(context.colors().text),
-        )),
-        Line::from(""),
-        kv_line("Status", issue.status.as_str(), context),
-        kv_line("Type", issue.issue_type.as_str(), context),
-        kv_line("Priority", issue.priority.as_str(), context),
-        kv_line("Assignee", issue.assignee.as_str(), context),
-        kv_line("Epic", issue.epic.as_deref().unwrap_or("none"), context),
-        kv_line("Story Points", story_points.as_str(), context),
-        kv_line("Labels", labels.as_str(), context),
-        kv_line("Fix Versions", fix_versions.as_str(), context),
-        kv_line("Comments", comments_count.as_str(), context),
-        Line::from(""),
-        Line::from(Span::styled(
-            "Description",
-            Style::default().fg(context.colors().accent),
-        )),
-        Line::from(description),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("Enter", Style::default().fg(context.colors().accent)),
-            Span::styled(" / ", Style::default().fg(context.colors().border)),
-            Span::styled("Esc", Style::default().fg(context.colors().accent)),
-            Span::styled(" close", Style::default().fg(context.colors().border)),
-        ]),
-    ]);
-
-    frame.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }), inner);
 }
 
 fn build_rows(issues: &[IssueSummary]) -> Vec<TableRow<'static>> {
@@ -454,27 +335,6 @@ fn build_rows(issues: &[IssueSummary]) -> Vec<TableRow<'static>> {
             ])
         })
         .collect()
-}
-
-fn format_story_points(value: f64) -> String {
-    if value.fract() == 0.0 {
-        format!("{value:.0}")
-    } else {
-        format!("{value:.1}")
-    }
-}
-
-fn kv_line<'a>(label: &'a str, value: &'a str, context: &RenderContext) -> Line<'a> {
-    Line::from(vec![
-        Span::styled(
-            format!("{label}: "),
-            Style::default().fg(context.colors().accent),
-        ),
-        Span::styled(
-            value.to_string(),
-            Style::default().fg(context.colors().text),
-        ),
-    ])
 }
 
 #[cfg(test)]
@@ -491,7 +351,7 @@ mod tests {
             assignee: "Alex".to_string(),
             priority: "Medium".to_string(),
             story_points: None,
-            project_key: Some("DEMO".to_string()),
+            project_key: Some("TEST".to_string()),
             sprint_id: Some(1),
             updated_at: None,
             comments: Vec::new(),
@@ -517,8 +377,12 @@ mod tests {
 
     #[test]
     fn workspace_should_keep_selection_visible_when_moving_to_bottom() {
-        let mut workspace =
-            IssueWorkspaceState::new(vec![issue("1"), issue("2"), issue("3"), issue("4")]);
+        let mut workspace = IssueWorkspaceState::new(vec![
+            issue("TEST-1"),
+            issue("TEST-2"),
+            issue("TEST-3"),
+            issue("TEST-4"),
+        ]);
         workspace.set_rows_visible(2);
 
         workspace.move_bottom();
@@ -531,11 +395,11 @@ mod tests {
     #[test]
     fn workspace_should_clamp_scroll_when_rows_visible_grow() {
         let mut workspace = IssueWorkspaceState::new(vec![
-            issue("1"),
-            issue("2"),
-            issue("3"),
-            issue("4"),
-            issue("5"),
+            issue("TEST-1"),
+            issue("TEST-2"),
+            issue("TEST-3"),
+            issue("TEST-4"),
+            issue("TEST-5"),
         ]);
         workspace.set_rows_visible(2);
         workspace.move_bottom();
@@ -548,37 +412,31 @@ mod tests {
     }
 
     #[test]
-    fn issues_table_confirm_should_toggle_local_detail() {
-        let mut state = IssuesTableState::my_issues(vec![issue("DEMO-1")]);
+    fn issues_table_confirm_should_open_selected_issue() {
+        let mut state = IssuesTableState::my_issues(vec![issue("TEST-1")]);
 
-        let opened = IssuesTableController::handle_command(
+        let result = IssuesTableController::handle_command(
             &mut state,
             Command {
                 action: ActionId::Confirm,
                 repeat: 1,
             },
         );
-        assert_eq!(opened, ScreenState::Refresh);
-        assert!(state.detail_open());
+
+        assert_eq!(result, ScreenState::ViewIssue("TEST-1".to_string()));
         assert_eq!(
             state.selected_issue().map(|issue| issue.key.as_str()),
-            Some("DEMO-1")
+            Some("TEST-1")
         );
-
-        let closed = IssuesTableController::handle_command(
-            &mut state,
-            Command {
-                action: ActionId::RawInput(KeyCode::Esc),
-                repeat: 1,
-            },
-        );
-        assert_eq!(closed, ScreenState::Refresh);
-        assert!(!state.detail_open());
     }
 
     #[test]
     fn issues_table_selection_should_follow_workspace_navigation() {
-        let mut state = IssuesTableState::search_issues(vec![issue("1"), issue("2"), issue("3")]);
+        let mut state = IssuesTableState::search_issues(vec![
+            issue("TEST-1"),
+            issue("TEST-2"),
+            issue("TEST-3"),
+        ]);
         state.set_rows_visible(2);
 
         let result = IssuesTableController::handle_command(

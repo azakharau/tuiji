@@ -17,14 +17,3 @@ async fn main() -> Result<()> {
     println!();
     result
 }
-
-// fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     use tuiji::client::jira::JiraClient;
-//     use tuiji::config::AppConfig;
-//     let cfg = AppConfig::load()?;
-//     let jira = JiraClient::new(&cfg.jira.base_url, &cfg.jira.username, &cfg.jira.api_token);
-//     let res = jira.get_current_sprint_issues(175_u64)?;
-//     dbg!(res);
-//
-//     Ok(())
-// }

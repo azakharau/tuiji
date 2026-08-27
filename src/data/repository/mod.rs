@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use color_eyre::Result;
 
 use crate::data::model::{
-    BoardConfig, IssueSummary, OutboxCommand, SyncLogEntry, SyncLogFilter, SyncState,
+    BoardConfig, IssueMutation, IssueSummary, OutboxCommand, SyncLogEntry, SyncLogFilter,
+    SyncState, TransitionChoice,
 };
 
 pub mod jira;
@@ -40,12 +41,26 @@ pub trait BoardRepository: Send + Sync {
     async fn default_board_id(&self) -> Result<Option<u64>>;
     async fn set_selected_board(&self, board_id: u64, is_default: bool) -> Result<()>;
     async fn selected_board_ids(&self) -> Result<Vec<u64>>;
-    async fn seed_mock_data_if_empty(&self) -> Result<Option<u64>>;
+}
+
+/// Writes. Mutations that target an existing issue are applied to the cache and
+/// enqueued in the outbox, so they survive being offline. `IssueMutation::Create`
+/// and the metadata lookups require a live connection.
+#[async_trait]
+pub trait MutationRepository: Send + Sync {
+    async fn apply_mutation(&self, mutation: IssueMutation) -> Result<()>;
+    async fn available_transitions(&self, key: &str) -> Result<Vec<TransitionChoice>>;
+    async fn issue_types(&self, project_key: &str) -> Result<Vec<String>>;
+    async fn issue_by_key(&self, key: &str) -> Result<Option<IssueSummary>>;
 }
 
 #[async_trait]
 pub trait IssueRepository: Send + Sync {
     async fn current_sprint_issues(&self, board_id: u64) -> Result<Vec<IssueSummary>>;
+    /// `assignee = currentUser() AND resolution = Unresolved`. Requires a connection.
+    async fn my_issues(&self) -> Result<Vec<IssueSummary>>;
+    /// Raw user JQL. Requires a connection.
+    async fn search_issues(&self, jql: &str) -> Result<Vec<IssueSummary>>;
 }
 
 #[async_trait]
@@ -69,11 +84,15 @@ pub trait SyncExecutor: Send + Sync {
 }
 
 pub trait AppRepository:
-    BoardRepository + IssueRepository + ConflictRepository + SyncStatusRepository
+    BoardRepository + IssueRepository + ConflictRepository + SyncStatusRepository + MutationRepository
 {
 }
 
 impl<T> AppRepository for T where
-    T: BoardRepository + IssueRepository + ConflictRepository + SyncStatusRepository
+    T: BoardRepository
+        + IssueRepository
+        + ConflictRepository
+        + SyncStatusRepository
+        + MutationRepository
 {
 }

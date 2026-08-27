@@ -16,6 +16,7 @@ use crate::{
         conflicts::ConflictsScreen,
         current_sprint::CurrentSprintScreen,
         home::HomeScreen,
+        issue_detail::IssueDetailScreen,
         issue_form::IssueFormScreen,
         my_issues::MyIssuesScreen,
         profile_creation::ProfileCreationScreen,
@@ -49,6 +50,10 @@ struct ScreenSlot {
     last_used: Instant,
 }
 
+// At most one slot per `ScreenType` is cached, so the layout slack between the
+// largest and smallest screen is a few kilobytes in total; boxing a variant
+// would only add indirection to every frame.
+#[allow(clippy::large_enum_variant)]
 enum ScreenEntry {
     Home(HomeScreen),
     BoardSelection(BoardSelectionScreen),
@@ -57,6 +62,7 @@ enum ScreenEntry {
     CurrentSprint(CurrentSprintScreen),
     MyIssues(MyIssuesScreen),
     SearchIssues(SearchIssuesScreen),
+    IssueDetail(IssueDetailScreen),
     IssueForm(IssueFormScreen),
     Settings(SettingsScreen),
     SettingsThemes(SettingsThemesScreen),
@@ -75,6 +81,7 @@ impl ScreenEntry {
             ScreenEntry::CurrentSprint(screen) => screen,
             ScreenEntry::MyIssues(screen) => screen,
             ScreenEntry::SearchIssues(screen) => screen,
+            ScreenEntry::IssueDetail(screen) => screen,
             ScreenEntry::IssueForm(screen) => screen,
             ScreenEntry::Settings(screen) => screen,
             ScreenEntry::SettingsThemes(screen) => screen,
@@ -99,8 +106,20 @@ impl ScreenManager {
         ctx: ScreenContext<'_>,
     ) -> Result<&mut dyn Screen> {
         self.evict_expired();
+        let load_transitions = matches!(
+            self.screens.get(&screen_type),
+            Some(ScreenSlot {
+                screen: ScreenEntry::IssueDetail(screen),
+                ..
+            }) if screen.transitions_requested()
+        );
+        if load_transitions {
+            self.screens.remove(&screen_type);
+        }
         if !self.screens.contains_key(&screen_type) {
-            let entry = self.create_entry(screen_type, ctx).await?;
+            let entry = self
+                .create_entry(screen_type, ctx, load_transitions)
+                .await?;
             self.insert(screen_type, entry);
         }
         let Some(slot) = self.screens.get_mut(&screen_type) else {
@@ -133,8 +152,10 @@ impl ScreenManager {
         &self,
         screen_type: ScreenType,
         ctx: ScreenContext<'_>,
+        load_transitions: bool,
     ) -> Result<ScreenEntry> {
-        self.create_entry_impl(screen_type, ctx).await
+        self.create_entry_impl(screen_type, ctx, load_transitions)
+            .await
     }
 }
 

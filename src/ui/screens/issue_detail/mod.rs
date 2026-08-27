@@ -7,13 +7,10 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
-    app::{
-        key_handlers::{ActionHint, Command, KeyHandler},
-        state::Mode,
-    },
-    data::IssueSummary,
+    data::{IssueSummary, TransitionChoice},
     ui::{
         context::RenderContext,
+        interaction::{ActionHint, Command, KeyHandler, Mode},
         screens::{CommandLineCommand, Screen, ScreenState},
     },
 };
@@ -29,16 +26,29 @@ pub struct IssueDetailScreen {
 }
 
 impl IssueDetailScreen {
-    pub fn new(issue: IssueSummary, mode: Mode) -> Self {
+    pub fn new(
+        issue: IssueSummary,
+        mode: Mode,
+        base_url: Option<String>,
+        transition_result: Option<Result<Vec<TransitionChoice>, String>>,
+    ) -> Self {
         Self {
-            state: IssueDetailState::new(issue),
+            state: IssueDetailState::new(issue, base_url, transition_result),
             actions: Arc::new(vec![]),
             mode,
         }
     }
 
-    pub fn issue_key(&self) -> &str {
-        &self.state.issue().key
+    pub fn unavailable(message: String, mode: Mode) -> Self {
+        Self {
+            state: IssueDetailState::unavailable(message),
+            actions: Arc::new(vec![]),
+            mode,
+        }
+    }
+
+    pub fn transitions_requested(&self) -> bool {
+        self.state.transitions_requested()
     }
 }
 

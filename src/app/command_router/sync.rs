@@ -12,10 +12,6 @@ impl<'a> CommandRouter<'a> {
             source,
             self.state.current_screen,
             sync_service::SyncActionDeps {
-                cfg_state: self.cfg_state,
-                key_bindings: self.key_bindings,
-                repo: self.repo,
-                screen_manager: self.screen_manager,
                 notification_service: self.notification_service,
                 worker_controller: self.worker_controller,
             },
@@ -27,8 +23,8 @@ impl<'a> CommandRouter<'a> {
         sync_service::enqueue_sync_now(self.worker_controller);
     }
 
-    pub(super) fn retry_last_sync(&mut self) {
-        sync_service::retry_last_sync(self.worker_controller);
+    pub(super) async fn retry_last_sync(&mut self) -> Result<()> {
+        sync_service::retry_last_sync(self.repo, self.worker_controller).await
     }
 
     pub(super) async fn resolve_conflict(&mut self, key: &str, use_remote: bool) -> Result<()> {

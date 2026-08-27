@@ -25,6 +25,14 @@ impl<'a> NavigationController<'a> {
                 }
                 Ok(ActionOutcome::Continue { render: true })
             }
+            ScreenState::ViewIssue(key) => {
+                self.state.issue_detail_key = Some(key);
+                self.apply_action(ScreenState::SwitchTo(ScreenType::IssueDetail))
+            }
+            ScreenState::OpenIssueForm(purpose) => {
+                self.state.issue_form_purpose = Some(purpose);
+                self.apply_action(ScreenState::SwitchTo(ScreenType::NewIssue))
+            }
             ScreenState::Refresh => Ok(ActionOutcome::Continue { render: true }),
             ScreenState::Stay => Ok(ActionOutcome::Continue { render: false }),
             ScreenState::SwitchMode(mode) => {
@@ -39,6 +47,9 @@ impl<'a> NavigationController<'a> {
             | ScreenState::SaveCustomThemeAndClose(_)
             | ScreenState::ResolveConflictLocal(_)
             | ScreenState::ResolveConflictRemote(_)
+            | ScreenState::Mutate(_)
+            | ScreenState::OpenInBrowser(_)
+            | ScreenState::RunSearch(_)
             | ScreenState::SyncNow
             | ScreenState::SyncPause
             | ScreenState::SyncRetry

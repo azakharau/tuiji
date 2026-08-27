@@ -28,11 +28,13 @@ pub(super) fn extract_comments(issue: &gouqi::Issue, issue_key: &str) -> Vec<Iss
             .and_then(serde_json::Value::as_str)
             .unwrap_or("Unknown")
             .to_string();
-        let body = match comment.get("body") {
-            Some(body) if body.is_string() => body.as_str().unwrap_or_default().to_string(),
-            Some(body) => serde_json::to_string(body).unwrap_or_default(),
-            None => String::new(),
-        };
+        let body = comment.get("body").map_or_else(String::new, |body| {
+            body.as_str().map(str::to_string).unwrap_or_else(|| {
+                serde_json::from_value::<gouqi::AdfDocument>(body.clone())
+                    .map(|document| document.to_plain_text())
+                    .unwrap_or_else(|_| serde_json::to_string(body).unwrap_or_default())
+            })
+        });
         let created_at = comment
             .get("created")
             .and_then(serde_json::Value::as_str)
@@ -65,7 +67,7 @@ mod tests {
     use super::extract_comments;
 
     #[test]
-    fn extract_comments_should_skip_entries_without_id_and_keep_json_bodies() {
+    fn extract_comments_should_skip_entries_without_id_and_convert_adf_bodies() {
         let issue: gouqi::Issue = serde_json::from_value(json!({
             "self": "https://jira.example/issues/1",
             "key": "TUIJI-1",
@@ -87,7 +89,18 @@ mod tests {
                         },
                         {
                             "id": "c2",
-                            "body": { "type": "doc", "content": [] }
+                            "body": {
+                                "version": 1,
+                                "type": "doc",
+                                "content": [
+                                    {
+                                        "type": "paragraph",
+                                        "content": [
+                                            { "type": "text", "text": "Cloud body" }
+                                        ]
+                                    }
+                                ]
+                            }
                         }
                     ]
                 }
@@ -103,6 +116,6 @@ mod tests {
         assert_eq!(comments[0].body, "plain text");
         assert_eq!(comments[1].id, "c2");
         assert_eq!(comments[1].author, "Unknown");
-        assert_eq!(comments[1].body, r#"{"content":[],"type":"doc"}"#);
+        assert_eq!(comments[1].body, "Cloud body");
     }
 }

@@ -6,7 +6,6 @@ use crate::ui::screens::ScreenState;
 pub enum Mode {
     #[default]
     Normal,
-    Visual,
     Insert,
     Command,
 }
@@ -15,7 +14,6 @@ impl From<Mode> for &'static str {
     fn from(mode: Mode) -> Self {
         match mode {
             Mode::Normal => "NORMAL",
-            Mode::Visual => "VISUAL",
             Mode::Insert => "INSERT",
             Mode::Command => "COMMAND",
         }
@@ -34,6 +32,7 @@ pub enum ScreenType {
     Home,
     BoardSelection,
     CurrentSprint,
+    IssueDetail,
     MyIssues,
     SearchIssues,
     NewIssue,
@@ -73,6 +72,13 @@ pub enum ActionId {
     EditProfile,
     DeleteProfile,
     OpenInBrowser,
+    EditIssue,
+    TransitionIssue,
+    AddComment,
+    AssignToMe,
+    FocusQuery,
+    PageUp,
+    PageDown,
     MoveUp,
     MoveDown,
     MoveLeft,

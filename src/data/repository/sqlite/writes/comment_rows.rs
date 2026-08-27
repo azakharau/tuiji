@@ -1,6 +1,42 @@
 use super::*;
 
 impl SqliteRepository {
+    pub async fn insert_local_comment(&self, issue_key: &str, id: &str, body: &str) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO issue_comments (
+                id,
+                issue_key,
+                author,
+                body,
+                created_at,
+                updated_at,
+                profile_id,
+                dirty
+            )
+            VALUES (?, ?, '', ?, strftime('%s','now'), strftime('%s','now'), ?, 1)
+            "#,
+        )
+        .bind(id)
+        .bind(issue_key)
+        .bind(body)
+        .bind(self.profile_id())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn delete_comment(&self, id: &str) -> Result<()> {
+        sqlx::query("DELETE FROM issue_comments WHERE id = ? AND profile_id = ?")
+            .bind(id)
+            .bind(self.profile_id())
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
     pub(super) async fn has_dirty_comments(
         &self,
         tx: &mut SqliteTx<'_>,
