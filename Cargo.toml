@@ -8,6 +8,7 @@ repository = "https://github.com/tuijiorg/tuiji"
 readme = "README.md"
 keywords = ["jira", "tui", "terminal", "ratatui", "offline"]
 categories = ["command-line-utilities", "development-tools"]
+rust-version = "1.89"
 
 [dependencies]
 async-trait = "0.1.89"
