@@ -176,11 +176,21 @@ impl IssuePatch {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransitionChoice {
     pub id: String,
     pub name: String,
     pub to_status: String,
+}
+
+/// Transitions offered for an issue. `from_cache` is true when Jira was
+/// unreachable and the list came from the last successful fetch, which the
+/// picker must show so nobody queues a transition believing Jira just
+/// confirmed it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionOptions {
+    pub choices: Vec<TransitionChoice>,
+    pub from_cache: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

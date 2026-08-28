@@ -1,7 +1,7 @@
 use ratatui::text::Line;
 use tui_input::{Input, InputRequest};
 
-use crate::data::{IssueSummary, TransitionChoice};
+use crate::data::{IssueSummary, TransitionChoice, TransitionOptions};
 
 pub struct IssueDetailState {
     issue: Option<IssueSummary>,
@@ -19,21 +19,28 @@ pub struct IssueDetailState {
     transition_error: Option<String>,
     transition_picker_open: bool,
     transition_selected: usize,
+    transitions_from_cache: bool,
 }
 
 impl IssueDetailState {
     pub fn new(
         issue: IssueSummary,
         base_url: Option<String>,
-        transition_result: Option<Result<Vec<TransitionChoice>, String>>,
+        transition_result: Option<Result<TransitionOptions, String>>,
     ) -> Self {
         let browse_url = base_url
             .map(|base_url| format!("{}/browse/{}", base_url.trim_end_matches('/'), issue.key));
-        let (transitions, transitions_loaded, transition_error, transition_picker_open) =
+        let (transitions, transitions_loaded, transition_error, transition_picker_open, from_cache) =
             match transition_result {
-                Option::Some(Ok(transitions)) => (transitions, true, Option::None, true),
-                Option::Some(Err(error)) => (Vec::new(), true, Some(error), true),
-                Option::None => (Vec::new(), false, Option::None, false),
+                Option::Some(Ok(options)) => (
+                    options.choices,
+                    true,
+                    Option::None,
+                    true,
+                    options.from_cache,
+                ),
+                Option::Some(Err(error)) => (Vec::new(), true, Some(error), true, false),
+                Option::None => (Vec::new(), false, Option::None, false, false),
             };
 
         Self {
@@ -52,6 +59,7 @@ impl IssueDetailState {
             transition_error,
             transition_picker_open,
             transition_selected: 0,
+            transitions_from_cache: from_cache,
         }
     }
 
@@ -72,6 +80,7 @@ impl IssueDetailState {
             transition_error: None,
             transition_picker_open: false,
             transition_selected: 0,
+            transitions_from_cache: false,
         }
     }
 
@@ -206,6 +215,10 @@ impl IssueDetailState {
 
     pub fn transitions(&self) -> &[TransitionChoice] {
         &self.transitions
+    }
+
+    pub fn transitions_from_cache(&self) -> bool {
+        self.transitions_from_cache
     }
 
     pub fn transition_selected(&self) -> usize {

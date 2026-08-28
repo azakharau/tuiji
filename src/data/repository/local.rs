@@ -7,11 +7,12 @@ use color_eyre::{
 };
 
 use crate::{
+    client::jira::write::WriteError,
     config::ProfileConfig,
     data::{
         BoardConfig, BoardSummary, IssueSummary, OutboxCommand, SqliteRepository,
         SqliteRepositoryConfig, SyncLogEntry, SyncLogFilter, SyncState,
-        model::{IssueMutation, OutboxChange, TransitionChoice},
+        model::{IssueMutation, OutboxChange, TransitionOptions},
         repository::{
             BoardRepository, CommandRepository, ConflictRepository, IssueRepository,
             MutationRepository, QueryRepository, SyncStatusRepository, jira::JiraRepository,
@@ -71,6 +72,26 @@ impl RepositoryHub {
         self.remote
             .as_deref()
             .ok_or_else(|| eyre!("{operation} requires an active Jira connection"))
+    }
+
+    /// Cached transitions stay valid only while the issue sits in the status
+    /// they were fetched under. Jira scopes the list to the current status, so
+    /// offering a list captured under another status would queue a transition
+    /// Jira is going to reject.
+    async fn usable_cached_transitions(&self, key: &str) -> Result<Option<TransitionOptions>> {
+        let Some((cached_status, choices)) = self.cache.cached_transitions(key).await? else {
+            return Ok(None);
+        };
+        let Some(issue) = self.cache.issue_by_key(key).await? else {
+            return Ok(None);
+        };
+        if issue.status != cached_status {
+            return Ok(None);
+        }
+        Ok(Some(TransitionOptions {
+            choices,
+            from_cache: true,
+        }))
     }
 
     async fn resolve_my_identity(&self) -> Result<&(String, String)> {
@@ -206,11 +227,35 @@ impl MutationRepository for RepositoryHub {
         Ok(())
     }
 
-    async fn available_transitions(&self, key: &str) -> Result<Vec<TransitionChoice>> {
-        Ok(self
-            .require_remote("Loading available transitions")?
-            .list_transitions(key)
-            .await?)
+    async fn available_transitions(&self, key: &str) -> Result<TransitionOptions> {
+        let remote_error = match self.remote.as_deref() {
+            Some(remote) => match remote.list_transitions(key).await {
+                Ok(choices) => {
+                    if let Some(issue) = self.cache.issue_by_key(key).await? {
+                        self.cache
+                            .cache_transitions(key, &issue.status, &choices)
+                            .await?;
+                    }
+                    return Ok(TransitionOptions {
+                        choices,
+                        from_cache: false,
+                    });
+                }
+                // Jira answered. A rejection or a conflict is that answer, and
+                // hiding it behind a cached list labelled "unreachable" would
+                // misreport a bad token or a lost issue as an offline blip.
+                Err(error) => match error {
+                    WriteError::Transient(_) => eyre!(error),
+                    answered => return Err(eyre!(answered)),
+                },
+            },
+            None => eyre!("Loading available transitions requires an active Jira connection"),
+        };
+
+        match self.usable_cached_transitions(key).await? {
+            Some(options) => Ok(options),
+            None => Err(remote_error),
+        }
     }
 
     async fn issue_types(&self, project_key: &str) -> Result<Vec<String>> {
@@ -265,4 +310,218 @@ fn build_remote(profile: Option<&ProfileConfig>) -> Result<Option<Arc<JiraReposi
     profile
         .map(|profile| JiraRepository::new(&profile.jira).map(Arc::new))
         .transpose()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::JiraConfig, data::model::TransitionChoice};
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    fn issue(key: &str, status: &str) -> IssueSummary {
+        IssueSummary {
+            key: key.to_string(),
+            summary: format!("Summary for {key}"),
+            epic: None,
+            status: status.to_string(),
+            issue_type: "Task".to_string(),
+            assignee: "Alex".to_string(),
+            priority: "Medium".to_string(),
+            story_points: None,
+            project_key: Some("SMK".to_string()),
+            sprint_id: None,
+            updated_at: None,
+            comments: Vec::new(),
+            dirty: false,
+            conflict: false,
+            remote_snapshot: None,
+            description: None,
+            reporter: None,
+            creator: None,
+            created_at: None,
+            resolution_date: None,
+            resolution: None,
+            labels: Vec::new(),
+            fix_versions: Vec::new(),
+            parent_key: None,
+            environment: None,
+            time_estimate: None,
+            time_spent: None,
+            time_remaining: None,
+            custom_fields: None,
+        }
+    }
+
+    fn choices() -> Vec<TransitionChoice> {
+        vec![TransitionChoice {
+            id: "31".to_string(),
+            name: "Done".to_string(),
+            to_status: "Done".to_string(),
+        }]
+    }
+
+    /// A hub without a profile has no remote, which is exactly the offline case
+    /// the transition cache exists for.
+    async fn offline_hub() -> (RepositoryHub, std::path::PathBuf) {
+        let db_path = std::env::temp_dir().join(format!("tuiji-hub-{}.db", uuid::Uuid::now_v7()));
+        let hub = RepositoryHub::connect(
+            SqliteRepositoryConfig {
+                db_path: db_path.clone(),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+        (hub, db_path)
+    }
+
+    #[tokio::test]
+    async fn transitions_should_fall_back_to_the_cached_list_when_jira_is_unreachable() {
+        let (hub, db_path) = offline_hub().await;
+        hub.cache
+            .upsert_issues_impl(&[issue("SMK-1", "TODO")])
+            .await
+            .unwrap();
+        hub.cache
+            .cache_transitions("SMK-1", "TODO", &choices())
+            .await
+            .unwrap();
+
+        let options = hub.available_transitions("SMK-1").await.unwrap();
+
+        assert_eq!(options.choices, choices());
+        assert!(
+            options.from_cache,
+            "the picker must be able to tell the user this list was not just confirmed by Jira"
+        );
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    #[tokio::test]
+    async fn cached_transitions_should_be_dropped_once_the_issue_left_that_status() {
+        let (hub, db_path) = offline_hub().await;
+        hub.cache
+            .upsert_issues_impl(&[issue("SMK-1", "TODO")])
+            .await
+            .unwrap();
+        hub.cache
+            .cache_transitions("SMK-1", "TODO", &choices())
+            .await
+            .unwrap();
+        hub.cache
+            .set_issue_status("SMK-1", "In Progress")
+            .await
+            .unwrap();
+
+        let error = hub
+            .available_transitions("SMK-1")
+            .await
+            .expect_err("a list captured under another status must not be offered")
+            .to_string();
+
+        assert!(error.contains("active Jira connection"), "got: {error}");
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    #[tokio::test]
+    async fn transitions_should_report_the_connection_error_when_nothing_is_cached() {
+        let (hub, db_path) = offline_hub().await;
+        hub.cache
+            .upsert_issues_impl(&[issue("SMK-1", "TODO")])
+            .await
+            .unwrap();
+
+        let error = hub
+            .available_transitions("SMK-1")
+            .await
+            .expect_err("without a cached list there is nothing honest to show")
+            .to_string();
+
+        assert!(error.contains("active Jira connection"), "got: {error}");
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    async fn hub_with_jira(base_url: &str) -> (RepositoryHub, std::path::PathBuf) {
+        let profile = ProfileConfig {
+            id: "smoke".to_string(),
+            name: "Smoke".to_string(),
+            jira: JiraConfig {
+                base_url: base_url.to_string(),
+                username: "user@example.com".to_string(),
+                api_token: "token".to_string(),
+                api_token_command: None,
+            },
+        };
+        let db_path = std::env::temp_dir().join(format!("tuiji-hub-{}.db", uuid::Uuid::now_v7()));
+        let hub = RepositoryHub::connect(
+            SqliteRepositoryConfig {
+                db_path: db_path.clone(),
+            },
+            Some(&profile),
+        )
+        .await
+        .unwrap();
+        (hub, db_path)
+    }
+
+    async fn jira_answering(status: u16) -> MockServer {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/SMK-1/transitions"))
+            .respond_with(ResponseTemplate::new(status))
+            .mount(&server)
+            .await;
+        server
+    }
+
+    async fn cached_hub(server: &MockServer) -> (RepositoryHub, std::path::PathBuf) {
+        let (hub, db_path) = hub_with_jira(&server.uri()).await;
+        hub.cache
+            .upsert_issues_impl(&[issue("SMK-1", "TODO")])
+            .await
+            .unwrap();
+        hub.cache
+            .cache_transitions("SMK-1", "TODO", &choices())
+            .await
+            .unwrap();
+        (hub, db_path)
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_jira_should_fall_back_to_the_cached_list() {
+        let server = jira_answering(503).await;
+        let (hub, db_path) = cached_hub(&server).await;
+
+        let options = hub.available_transitions("SMK-1").await.unwrap();
+
+        assert!(options.from_cache);
+        assert_eq!(options.choices, choices());
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    #[tokio::test]
+    async fn a_rejection_from_jira_should_not_be_masked_by_the_cached_list() {
+        let server = jira_answering(401).await;
+        let (hub, db_path) = cached_hub(&server).await;
+
+        let error = hub
+            .available_transitions("SMK-1")
+            .await
+            .expect_err("Jira answered, so its rejection is the answer the user needs")
+            .to_string();
+
+        assert!(
+            !error.contains("active Jira connection"),
+            "a rejection must not be reported as being offline, got: {error}"
+        );
+
+        let _ = std::fs::remove_file(db_path);
+    }
 }

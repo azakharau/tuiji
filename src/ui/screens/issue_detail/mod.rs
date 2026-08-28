@@ -7,7 +7,7 @@ use std::sync::Arc;
 use ratatui::Frame;
 
 use crate::{
-    data::{IssueSummary, TransitionChoice},
+    data::{IssueSummary, TransitionOptions},
     ui::{
         context::RenderContext,
         interaction::{ActionHint, Command, KeyHandler, Mode},
@@ -30,7 +30,7 @@ impl IssueDetailScreen {
         issue: IssueSummary,
         mode: Mode,
         base_url: Option<String>,
-        transition_result: Option<Result<Vec<TransitionChoice>, String>>,
+        transition_result: Option<Result<TransitionOptions, String>>,
     ) -> Self {
         Self {
             state: IssueDetailState::new(issue, base_url, transition_result),

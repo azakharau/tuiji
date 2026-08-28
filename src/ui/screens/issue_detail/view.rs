@@ -306,8 +306,13 @@ impl IssueDetailView {
         let content_height = state.transitions().len().clamp(1, 12) as u16;
         let height = content_height.saturating_add(4).min(area.height);
         let modal = crate::ui::layout::modal_area(area, width, height);
+        let title = if state.transitions_from_cache() {
+            "Transition Issue (cached, Jira unreachable)"
+        } else {
+            "Transition Issue"
+        };
         let inner = ModalFrame::new(
-            "Transition Issue",
+            title,
             modal,
             Style::default().fg(context.colors().accent),
             context,

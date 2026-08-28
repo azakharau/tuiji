@@ -3,7 +3,7 @@ use color_eyre::Result;
 
 use crate::data::model::{
     BoardConfig, IssueMutation, IssueSummary, OutboxCommand, SyncLogEntry, SyncLogFilter,
-    SyncState, TransitionChoice,
+    SyncState, TransitionOptions,
 };
 
 pub mod jira;
@@ -49,7 +49,7 @@ pub trait BoardRepository: Send + Sync {
 #[async_trait]
 pub trait MutationRepository: Send + Sync {
     async fn apply_mutation(&self, mutation: IssueMutation) -> Result<()>;
-    async fn available_transitions(&self, key: &str) -> Result<Vec<TransitionChoice>>;
+    async fn available_transitions(&self, key: &str) -> Result<TransitionOptions>;
     async fn issue_types(&self, project_key: &str) -> Result<Vec<String>>;
     async fn issue_by_key(&self, key: &str) -> Result<Option<IssueSummary>>;
 }

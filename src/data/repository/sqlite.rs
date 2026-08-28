@@ -9,7 +9,7 @@ use crate::{
     data::{
         model::{
             BoardColumn, BoardConfig, BoardSummary, ColumnStatusRef, Estimation, IssueComment,
-            IssueSummary, OutboxCommand, SyncLogEntry, SyncLogFilter, SyncState,
+            IssueSummary, OutboxCommand, SyncLogEntry, SyncLogFilter, SyncState, TransitionChoice,
         },
         repository::{CommandRepository, QueryRepository},
     },
@@ -21,6 +21,7 @@ mod outbox;
 mod query;
 #[cfg(test)]
 mod seeds;
+mod transitions;
 mod writes;
 
 #[derive(Debug, Clone)]
