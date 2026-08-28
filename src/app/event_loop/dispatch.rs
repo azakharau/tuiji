@@ -32,7 +32,6 @@ pub(super) async fn dispatch_event(app: &mut App, event: AppEvent) -> Result<Dis
                         &mut app.state,
                         &mut app.screen_stack,
                         &mut app.screen_manager,
-                        &mut app.terminal,
                         &app.cfg_state,
                         &app.key_bindings,
                     );

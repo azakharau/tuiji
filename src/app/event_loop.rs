@@ -14,7 +14,6 @@ use worker::start_next_job;
 
 pub async fn run(app: &mut App) -> Result<()> {
     app.init_db().await?;
-    app.terminal.clear()?;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let _input = spawn_input_listener(tx.clone());

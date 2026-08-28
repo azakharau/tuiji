@@ -28,7 +28,13 @@ impl SqliteRepository {
         limit: usize,
         filter: SyncLogFilter,
     ) -> Result<Vec<SyncLogEntry>> {
-        let mut sql = String::from(
+        let direction = match filter {
+            SyncLogFilter::All => None,
+            SyncLogFilter::Pull => Some("pull"),
+            SyncLogFilter::Push => Some("push"),
+        };
+
+        let rows = sqlx::query(
             r#"
             SELECT direction,
                    status,
@@ -36,25 +42,17 @@ impl SqliteRepository {
                    datetime(created_at, 'unixepoch') as created_at
             FROM sync_log
             WHERE profile_id = ?
+              AND (? IS NULL OR direction = ?)
+            ORDER BY created_at DESC
+            LIMIT ?
             "#,
-        );
-        if !matches!(filter, SyncLogFilter::All) {
-            sql.push_str(" AND direction = ?");
-        }
-        sql.push_str(" ORDER BY created_at DESC LIMIT ?");
-
-        let mut query = sqlx::query(&sql).bind(self.profile_id());
-        if !matches!(filter, SyncLogFilter::All) {
-            let direction = match filter {
-                SyncLogFilter::Pull => "pull",
-                SyncLogFilter::Push => "push",
-                SyncLogFilter::All => "pull",
-            };
-            query = query.bind(direction);
-        }
-        query = query.bind(limit as i64);
-
-        let rows = query.fetch_all(&self.pool).await?;
+        )
+        .bind(self.profile_id())
+        .bind(direction)
+        .bind(direction)
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await?;
         let mut entries = Vec::with_capacity(rows.len());
         for row in rows {
             let direction: String = row.get("direction");
@@ -91,5 +89,38 @@ impl SqliteRepository {
             last_pull: ts_to_system_time(row.get("last_pull")),
             last_push: ts_to_system_time(row.get("last_push")),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn the_direction_filter_should_select_only_that_direction() {
+        let db_path =
+            std::env::temp_dir().join(format!("tuiji-sync-log-{}.db", uuid::Uuid::now_v7()));
+        let repo = SqliteRepository::connect(
+            SqliteRepositoryConfig {
+                db_path: db_path.clone(),
+            },
+            "test-profile".to_string(),
+        )
+        .await
+        .unwrap();
+
+        for direction in ["pull", "pull", "push"] {
+            repo.log_sync_event_impl(direction, "ok", None, Some("test-profile"))
+                .await
+                .unwrap();
+        }
+
+        let count = async |filter| repo.sync_log_impl(10, filter).await.unwrap().len();
+
+        assert_eq!(count(SyncLogFilter::All).await, 3);
+        assert_eq!(count(SyncLogFilter::Pull).await, 2);
+        assert_eq!(count(SyncLogFilter::Push).await, 1);
+
+        let _ = std::fs::remove_file(db_path);
     }
 }

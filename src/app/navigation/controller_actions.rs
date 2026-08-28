@@ -3,10 +3,7 @@ use super::*;
 impl<'a> NavigationController<'a> {
     pub(crate) fn apply_action(&mut self, action: ScreenState) -> Result<ActionOutcome> {
         match action {
-            ScreenState::Quit => {
-                self.terminal.clear()?;
-                Ok(ActionOutcome::Quit)
-            }
+            ScreenState::Quit => Ok(ActionOutcome::Quit),
             ScreenState::SwitchTo(new_screen) => {
                 if self.state.current_screen == ScreenType::ProfileCreation
                     && new_screen != ScreenType::ProfileCreation

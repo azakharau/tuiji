@@ -9,7 +9,6 @@ use crate::{
     ui::screens::ScreenState,
 };
 use color_eyre::Result;
-use ratatui::DefaultTerminal;
 
 mod board_required;
 mod close_policy;
@@ -29,7 +28,6 @@ pub struct NavigationController<'a> {
     state: &'a mut AppState,
     screen_stack: &'a mut Vec<ScreenType>,
     screen_manager: &'a mut ScreenManager,
-    terminal: &'a mut DefaultTerminal,
     cfg_state: &'a AppConfigState,
     key_bindings: &'a KeyBindings,
 }
@@ -39,7 +37,6 @@ impl<'a> NavigationController<'a> {
         state: &'a mut AppState,
         screen_stack: &'a mut Vec<ScreenType>,
         screen_manager: &'a mut ScreenManager,
-        terminal: &'a mut DefaultTerminal,
         cfg_state: &'a AppConfigState,
         key_bindings: &'a KeyBindings,
     ) -> Self {
@@ -47,7 +44,6 @@ impl<'a> NavigationController<'a> {
             state,
             screen_stack,
             screen_manager,
-            terminal,
             cfg_state,
             key_bindings,
         }
