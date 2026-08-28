@@ -30,7 +30,14 @@ ratatui = { version = "0.30.2", features = [
   "unstable-rendered-line-info",
   "unstable-widget-ref",
 ] }
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+# Held at 0.12 on purpose: gouqi 0.20 depends on reqwest ^0.12, so bumping to
+# 0.13 links a second HTTP stack into the binary and, through the shared
+# rustls, swaps the crypto provider for aws-lc-rs, which needs cmake and a C
+# compiler at install time. Revisit once gouqi ships a 0.13 client.
+reqwest = { version = "0.12.28", default-features = false, features = [
+  "json",
+  "rustls-tls",
+] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sqlx = { version = "0.9.0", features = [
