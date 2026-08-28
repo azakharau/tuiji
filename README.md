@@ -27,13 +27,13 @@ Current capabilities are deliberately narrow:
 Tuiji is not published to crates.io yet. Install the current revision with Cargo:
 
 ```bash
-cargo install --git https://github.com/tuijiorg/tuiji
+cargo install --git https://github.com/azakharau/tuiji
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/tuijiorg/tuiji.git
+git clone https://github.com/azakharau/tuiji.git
 cd tuiji
 cargo build --release
 ./target/release/tuiji
